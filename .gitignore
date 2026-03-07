@@ -1,3 +1,4 @@
+# Unity generated folders
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -7,16 +8,23 @@
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
+[Dd]erivedDataCache/
+[Tt]est[Rr]esults/
 
 # Visual Studio / VS Code
 .vscode/
 *.csproj
 *.sln
+*.slnx
 *.user
 *.unityproj
 *.pidb
 *.booproj
 *.svd
+
+# JetBrains Rider
+.idea/
+*.DotSettings.user
 
 # OS junk
 .DS_Store
@@ -28,4 +36,8 @@ ServerData/
 # Crash reports
 sysinfo.txt
 
-*.slnx
+# Unity package exports (optional)
+*.unitypackage
+
+# Ignore raw Asset Store downloads
+Assets/UnityStorePackage/
