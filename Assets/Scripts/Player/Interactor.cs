@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -6,101 +5,259 @@ public class Interactor : MonoBehaviour
 {
     [Header("Refs")]
     public InteractSensor sensor;
-    public Transform[] holdPoints;     // 现在只放 1 个，以后加第二个
-
-    [Header("Carry Limits")]
-    public int capacity = 1;           // 现在=1，以后改成2即可
+    public Transform holdPoint;     // 手持搬运挂点（现在先只用一个）
+    public Transform equipPoint;    // 装备挂点
 
     [Header("Debug")]
     public bool debugLog = true;
 
-    private readonly List<CarryableDish> held = new List<CarryableDish>();
+    // 当前手里拿着的物体（二选一）
+    private CarryableDish heldDish;
+    private CarryableTool heldTool;
+
+    // 当前已装备的工具
+    private CarryableTool equippedTool;
 
     void Update()
     {
+        // 空格按下
         if (Keyboard.current.spaceKey.wasPressedThisFrame)
-            TryPickUp();
+        {
+            if (equippedTool != null)
+            {
+                TryUseEquippedTool();
+            }
+            else
+            {
+                TryPickUp();
+            }
+        }
 
+        // 空格松开
         if (Keyboard.current.spaceKey.wasReleasedThisFrame)
-            TryDrop();
+        {
+            // 只有“未装备状态”下，空格松开才表示放手/放下
+            if (equippedTool == null)
+            {
+                TryDropHeldItem();
+            }
+        }
+
+        // J：装备 / 卸下
+        if (Keyboard.current.jKey.wasPressedThisFrame)
+        {
+            if (equippedTool != null)
+            {
+                TryUnequipTool();
+            }
+            else
+            {
+                TryEquipHeldTool();
+            }
+        }
     }
 
+    // 给 InteractSensor 用：
+    // 只要手里拿着东西，或者已经装备了工具，都算“正在持有东西”
     public bool IsHoldingSomething()
     {
-        return held.Count > 0;
+        return heldDish != null || heldTool != null || equippedTool != null;
+    }
+
+    public bool HasEquippedTool()
+    {
+        return equippedTool != null;
+    }
+
+    public CarryableTool GetEquippedTool()
+    {
+        return equippedTool;
     }
 
     void TryPickUp()
     {
-        if (held.Count >= capacity)
+        // 已装备工具时，不允许再拿别的
+        if (equippedTool != null)
         {
             if (debugLog)
-                Debug.Log($"[Interactor] PickUp blocked: held={held.Count}, capacity={capacity}");
+                Debug.Log("[Interactor] PickUp blocked: already equipped with a tool.");
             return;
         }
 
-        var dishHighlight = sensor ? sensor.GetCurrentDish() : null;
-        if (dishHighlight == null)
+        // 手里已经拿着一个东西时，不允许再拿
+        if (heldDish != null || heldTool != null)
         {
             if (debugLog)
-                Debug.Log("[Interactor] No current dish to pick up.");
+                Debug.Log("[Interactor] PickUp blocked: already holding an item.");
             return;
         }
 
-        var dish = dishHighlight.GetComponentInParent<CarryableDish>();
-        if (dish == null)
+        var currentHighlight = sensor ? sensor.GetCurrentDish() : null;
+        if (currentHighlight == null)
         {
             if (debugLog)
-                Debug.Log($"[Interactor] FAIL: {dishHighlight.name} has no CarryableDish in parent.");
+                Debug.Log("[Interactor] No current item to pick up.");
             return;
         }
 
-        int slot = held.Count; // 第0个拿到 HoldPoint_0，第1个拿到 HoldPoint_1...
-        if (holdPoints == null || slot >= holdPoints.Length || holdPoints[slot] == null)
+        // 先判断是不是 Tool
+        CarryableTool tool = currentHighlight.GetComponentInParent<CarryableTool>();
+        if (tool != null)
         {
+            if (holdPoint == null)
+            {
+                if (debugLog)
+                    Debug.Log("[Interactor] FAIL: holdPoint is not assigned.");
+                return;
+            }
+
+            tool.PickUp(holdPoint);
+            heldTool = tool;
+
             if (debugLog)
-                Debug.Log($"[Interactor] FAIL: No hold point for slot {slot}. Check holdPoints array.");
+                Debug.Log($"[Interactor] Picked up tool: {tool.name}");
             return;
         }
 
-        dish.PickUp(holdPoints[slot]);
-        held.Add(dish);
+        // 再判断是不是 Dish
+        CarryableDish dish = currentHighlight.GetComponentInParent<CarryableDish>();
+        if (dish != null)
+        {
+            if (holdPoint == null)
+            {
+                if (debugLog)
+                    Debug.Log("[Interactor] FAIL: holdPoint is not assigned.");
+                return;
+            }
+
+            dish.PickUp(holdPoint);
+            heldDish = dish;
+
+            if (debugLog)
+                Debug.Log($"[Interactor] Picked up dish: {dish.name}");
+            return;
+        }
 
         if (debugLog)
-            Debug.Log($"[Interactor] Picked up: {dish.name}. held={held.Count}/{capacity}, slot={slot}");
+            Debug.Log($"[Interactor] FAIL: {currentHighlight.name} has neither CarryableTool nor CarryableDish.");
     }
 
-    void TryDrop()
+    void TryDropHeldItem()
     {
-        if (held.Count == 0)
+        // 优先处理手里拿着的 Dish
+        if (heldDish != null)
         {
-            if (debugLog)
-                Debug.Log("[Interactor] Drop ignored: nothing held.");
+            CarryableDish dish = heldDish;
+            heldDish = null;
+
+            PlaceableSurface surface = sensor ? sensor.GetCurrentSurface() : null;
+
+            if (surface != null && surface.CanPlace())
+            {
+                if (debugLog)
+                    Debug.Log($"[Interactor] Place dish on surface: {dish.name} -> {surface.name}");
+
+                dish.PlaceOnSurface(surface);
+            }
+            else
+            {
+                if (debugLog)
+                    Debug.Log($"[Interactor] Drop dish to ground: {dish.name}");
+
+                dish.Drop();
+            }
+
             return;
         }
 
-        var dish = held[held.Count - 1];
-        PlaceableSurface surface = sensor ? sensor.GetCurrentSurface() : null;
-
-        held.RemoveAt(held.Count - 1);
-
-        // 优先放桌子
-        if (surface != null && surface.CanPlace())
+        // 再处理手里拿着的 Tool
+        if (heldTool != null)
         {
-            if (debugLog)
-                Debug.Log($"[Interactor] Place on surface: {dish.name} -> {surface.name}");
+            CarryableTool tool = heldTool;
+            heldTool = null;
 
-            dish.PlaceOnSurface(surface);
-        }
-        else
-        {
+            // 目前工具先只做“掉地上”
+            // 如果你以后想让工具也能放到 PlacePoint，
+            // 再给 CarryableTool 增加 PlaceOnSurface() 即可。
             if (debugLog)
-                Debug.Log($"[Interactor] Drop to ground: {dish.name}");
+                Debug.Log($"[Interactor] Drop tool to ground: {tool.name}");
 
-            dish.Drop();
+            tool.Drop();
+            return;
         }
 
         if (debugLog)
-            Debug.Log($"[Interactor] Held now = {held.Count}/{capacity}");
+            Debug.Log("[Interactor] Drop ignored: nothing held.");
+    }
+
+    void TryEquipHeldTool()
+    {
+        if (equippedTool != null)
+        {
+            if (debugLog)
+                Debug.Log("[Interactor] Equip blocked: already have an equipped tool.");
+            return;
+        }
+
+        if (heldTool == null)
+        {
+            if (debugLog)
+                Debug.Log("[Interactor] Equip ignored: no held tool.");
+            return;
+        }
+
+        if (equipPoint == null)
+        {
+            if (debugLog)
+                Debug.Log("[Interactor] Equip failed: equipPoint is not assigned.");
+            return;
+        }
+
+        equippedTool = heldTool;
+        heldTool = null;
+
+        equippedTool.Equip(equipPoint);
+
+        if (debugLog)
+            Debug.Log($"[Interactor] Equipped tool: {equippedTool.name}");
+    }
+
+    void TryUnequipTool()
+    {
+        if (equippedTool == null)
+        {
+            if (debugLog)
+                Debug.Log("[Interactor] Unequip ignored: no equipped tool.");
+            return;
+        }
+
+        CarryableTool tool = equippedTool;
+        equippedTool = null;
+
+        // 当前最小版本：卸下直接掉地上
+        // 以后如果你想支持“优先放 PlacePoint”，
+        // 给 CarryableTool 增加 PlaceOnSurface() 就可以了。
+        tool.UnequipToGround();
+
+        if (debugLog)
+            Debug.Log($"[Interactor] Unequipped tool: {tool.name}");
+    }
+
+    void TryUseEquippedTool()
+    {
+        if (equippedTool == null)
+        {
+            if (debugLog)
+                Debug.Log("[Interactor] Use ignored: no equipped tool.");
+            return;
+        }
+
+        // 当前先只打印日志
+        // 以后这里可以根据工具类型分发功能：
+        // Knife -> 切菜
+        // Broom -> 清理污渍
+        // Plate -> 盛菜
+        if (debugLog)
+            Debug.Log($"[Interactor] Use equipped tool: {equippedTool.name}");
     }
 }
