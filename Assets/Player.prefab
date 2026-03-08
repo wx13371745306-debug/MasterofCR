@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 5065241873860849287}
   - component: {fileID: 7438931653536133098}
   - component: {fileID: 7056257228943624956}
-  - component: {fileID: 7091086708018899730}
+  - component: {fileID: 1547345450132018411}
   m_Layer: 3
   m_Name: InteractSensor
   m_TagString: Untagged
@@ -113,7 +113,7 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &7091086708018899730
+--- !u!114 &1547345450132018411
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -122,17 +122,20 @@ MonoBehaviour:
   m_GameObject: {fileID: 2525401135929231730}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3dddcdf2b76ab27439ebd980b870d145, type: 3}
+  m_Script: {fileID: 11500000, guid: 4bf61da4e35fb144284c82478fa0d007, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: '::'
-  dishMask:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInteractionSensor
+  itemMask:
     serializedVersion: 2
     m_Bits: 8
-  surfaceMask:
+  placePointMask:
+    serializedVersion: 2
+    m_Bits: 8
+  stationMask:
     serializedVersion: 2
     m_Bits: 8
   playerRoot: {fileID: 403802713317666071}
-  interactor: {fileID: 4816611484807128646}
+  interactor: {fileID: 1696173215733838411}
   debugLog: 1
 --- !u!1 &3395358535578018651
 GameObject:
@@ -422,7 +425,7 @@ GameObject:
   - component: {fileID: 4490004652427500856}
   - component: {fileID: 5416572797830121970}
   - component: {fileID: 7354709207012367017}
-  - component: {fileID: 4816611484807128646}
+  - component: {fileID: 1696173215733838411}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -545,7 +548,7 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &4816611484807128646
+--- !u!114 &1696173215733838411
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -554,10 +557,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 8203872156075153258}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cf1084cbe739aed49bd23750166fc3b5, type: 3}
+  m_Script: {fileID: 11500000, guid: b0702f63a2d3b894e8f29adfd4df3fc3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: '::'
-  sensor: {fileID: 7091086708018899730}
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerItemInteractor
+  sensor: {fileID: 1547345450132018411}
   holdPoint: {fileID: 1513223606655305747}
-  equipPoint: {fileID: 774283258971402180}
   debugLog: 1

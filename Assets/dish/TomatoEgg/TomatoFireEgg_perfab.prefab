@@ -10,9 +10,11 @@ GameObject:
   m_Component:
   - component: {fileID: 7479202663658609197}
   - component: {fileID: 4332332324567074220}
-  - component: {fileID: 2394486182820038731}
   - component: {fileID: 3466587725257603228}
-  - component: {fileID: 8489177687515396284}
+  - component: {fileID: 6365564206509797047}
+  - component: {fileID: 8954130523458961126}
+  - component: {fileID: 1681415875495179616}
+  - component: {fileID: 131835214523448993}
   m_Layer: 3
   m_Name: TomatoFireEgg_perfab
   m_TagString: Untagged
@@ -59,28 +61,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.6, y: 0.3, z: 0.6}
   m_Center: {x: 0, y: 0.13, z: 0}
---- !u!114 &2394486182820038731
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5258138650443871965}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 75ecf494a510b894d9a85b3060cd4e39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CarryableDish
-  rb: {fileID: 3466587725257603228}
-  col: {fileID: 4332332324567074220}
-  debugLog: 1
-  currentSurface: {fileID: 0}
-  floorKillMask:
-    serializedVersion: 2
-    m_Bits: 64
-  dirtyStainPrefab: {fileID: 2954757200471179828, guid: de4d2d6cbc5c8e34288c19187766be45, type: 3}
-  breakEffectPrefab: {fileID: 6173812873926439301, guid: d428f36398fdad84cafc787fd279ccb5, type: 3}
-  canBreakOnFloor: 1
 --- !u!54 &3466587725257603228
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -108,7 +88,7 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &8489177687515396284
+--- !u!114 &6365564206509797047
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -117,10 +97,66 @@ MonoBehaviour:
   m_GameObject: {fileID: 5258138650443871965}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d2ab33b3a4329f440aca26b679eef4c3, type: 3}
+  m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DishHighlight
-  highlightRing: {fileID: 135110301284272363}
+  m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
+  rb: {fileID: 3466587725257603228}
+  itemColliders:
+  - {fileID: 4332332324567074220}
+  poseConfig: {fileID: 1681415875495179616}
+  sensorHighlight: {fileID: 8954130523458961126}
+  initialPlacePoint: {fileID: 0}
+  isUsable: 0
+  useHighlightObject: {fileID: 0}
+  debugLog: 1
+--- !u!114 &8954130523458961126
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5258138650443871965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 774e1d7510edc824ca3fafebab287fc3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
+  highlightObject: {fileID: 135110301284272363}
+  debugLog: 1
+--- !u!114 &1681415875495179616
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5258138650443871965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 233c1cd25ed5e5943b715a5fceb1152a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AttachPoseConfig
+  holdLocalPosition: {x: 0, y: 0, z: 0}
+  holdLocalEulerAngles: {x: 0, y: 0, z: 0}
+  equipLocalPosition: {x: 0, y: 0, z: 0}
+  equipLocalEulerAngles: {x: 0, y: 0, z: 0}
+  placeLocalPosition: {x: 0, y: 0, z: 0}
+  placeLocalEulerAngles: {x: 0, y: 0, z: 0}
+--- !u!114 &131835214523448993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5258138650443871965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98bdcf2d39bae344ca49260e1b2fcbd3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BreakOnFloor
+  dirtyStainPrefab: {fileID: 2954757200471179828, guid: de4d2d6cbc5c8e34288c19187766be45, type: 3}
+  breakEffectPrefab: {fileID: 6173812873926439301, guid: d428f36398fdad84cafc787fd279ccb5, type: 3}
+  stainOffset: {x: 0, y: 0.02, z: 0}
+  effectOffset: {x: 0, y: 0, z: 0}
   debugLog: 1
 --- !u!1001 &4046842544540238524
 PrefabInstance:
