@@ -176,13 +176,22 @@ public class Interactor : MonoBehaviour
             CarryableTool tool = heldTool;
             heldTool = null;
 
-            // 目前工具先只做“掉地上”
-            // 如果你以后想让工具也能放到 PlacePoint，
-            // 再给 CarryableTool 增加 PlaceOnSurface() 即可。
-            if (debugLog)
-                Debug.Log($"[Interactor] Drop tool to ground: {tool.name}");
+            PlaceableSurface surface = sensor ? sensor.GetCurrentSurface() : null;
 
-            tool.Drop();
+            if (surface != null && surface.CanPlace())
+            {
+                if (debugLog)
+                    Debug.Log($"[Interactor] Place tool on surface: {tool.name} -> {surface.name}");
+
+                tool.PlaceOnSurface(surface);
+            }
+            else
+            {
+                if (debugLog)
+                    Debug.Log($"[Interactor] Drop tool to ground: {tool.name}");
+
+                tool.Drop();
+            }
             return;
         }
 
