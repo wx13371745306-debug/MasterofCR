@@ -30,24 +30,14 @@ public class PlayerInteractionSensor : MonoBehaviour
         if (interactor.IsHoldingItem())
         {
             ClearCurrentItem();
-            ClearCurrentStation();
             PickNearestPlacePoint();
+            PickNearestStation();
         }
         else
         {
             ClearCurrentPlacePoint();
-
-            // 优先 item，其次 station
             PickNearestItem();
-
-            if (currentItem != null)
-            {
-                ClearCurrentStation();
-            }
-            else
-            {
-                PickNearestStation();
-            }
+            PickNearestStation();
         }
     }
 
@@ -67,11 +57,6 @@ public class PlayerInteractionSensor : MonoBehaviour
             {
                 bestDist = dist;
                 best = item;
-            }
-            else if (Mathf.Abs(dist - bestDist) <= 0.001f && best != null)
-            {
-                if (item.GetInstanceID() < best.GetInstanceID())
-                    best = item;
             }
         }
 
@@ -111,11 +96,6 @@ public class PlayerInteractionSensor : MonoBehaviour
                 bestDist = dist;
                 best = point;
             }
-            else if (Mathf.Abs(dist - bestDist) <= 0.001f && best != null)
-            {
-                if (point.GetInstanceID() < best.GetInstanceID())
-                    best = point;
-            }
         }
 
         if (best != currentPlacePoint)
@@ -145,7 +125,6 @@ public class PlayerInteractionSensor : MonoBehaviour
         foreach (var station in stationCandidates)
         {
             if (station == null) continue;
-            if (!station.CanInteract(interactor)) continue;
 
             MonoBehaviour mb = station as MonoBehaviour;
             if (mb == null) continue;
@@ -155,11 +134,6 @@ public class PlayerInteractionSensor : MonoBehaviour
             {
                 bestDist = dist;
                 best = station;
-            }
-            else if (Mathf.Abs(dist - bestDist) <= 0.001f && best != null)
-            {
-                if (mb.GetInstanceID() < (best as MonoBehaviour).GetInstanceID())
-                    best = station;
             }
         }
 
@@ -176,11 +150,9 @@ public class PlayerInteractionSensor : MonoBehaviour
             if (debugLog)
             {
                 string to = "None";
-                if (best != null)
-                {
-                    MonoBehaviour mb = best as MonoBehaviour;
-                    if (mb != null) to = mb.name;
-                }
+                if (best is MonoBehaviour mb)
+                    to = mb.name;
+
                 Debug.Log($"[PlayerInteractionSensor] Station switch -> {to}");
             }
         }
@@ -201,15 +173,6 @@ public class PlayerInteractionSensor : MonoBehaviour
         {
             currentPlacePoint.SetSensorHighlight(false);
             currentPlacePoint = null;
-        }
-    }
-
-    void ClearCurrentStation()
-    {
-        if (currentStation != null)
-        {
-            currentStation.SetSensorHighlight(false);
-            currentStation = null;
         }
     }
 

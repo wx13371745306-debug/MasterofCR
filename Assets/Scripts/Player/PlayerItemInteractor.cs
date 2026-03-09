@@ -36,25 +36,38 @@ public class PlayerItemInteractor : MonoBehaviour
         {
             if (heldItem == null && activeStation == null)
             {
-                // 优先拿物品，没有物品再与操作台互动
-                if (!TryBeginHold())
-                    TryBeginStationInteract();
+                TryBeginHold();
             }
         }
 
         if (Keyboard.current.kKey.wasPressedThisFrame)
         {
             if (heldItem != null)
+            {
+                if (activeStation != null)
+                    TryEndStationInteract();
+
                 heldItem.TryUse();
-            else if (debugLog)
-                Debug.Log("[PlayerItemInteractor] Use ignored: no held item.");
+            }
+            else
+            {
+                if (activeStation == null)
+                {
+                    bool began = TryBeginStationInteract();
+                    if (!began && debugLog)
+                        Debug.Log("[PlayerItemInteractor] Station interact ignored: no available station.");
+                }
+            }
         }
 
         if (Keyboard.current.jKey.wasReleasedThisFrame)
         {
             if (heldItem != null)
                 TryEndHold();
+        }
 
+        if (Keyboard.current.kKey.wasReleasedThisFrame)
+        {
             if (activeStation != null)
                 TryEndStationInteract();
         }

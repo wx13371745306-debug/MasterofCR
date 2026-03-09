@@ -133,7 +133,7 @@ MonoBehaviour:
     m_Bits: 8
   stationMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 136
   playerRoot: {fileID: 403802713317666071}
   interactor: {fileID: 1696173215733838411}
   debugLog: 1

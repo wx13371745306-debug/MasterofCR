@@ -43,6 +43,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7623274397501153398}
     m_Modifications:
+    - target: {fileID: 5809046655753077150, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6127155401298243510, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_Name
       value: Placepose

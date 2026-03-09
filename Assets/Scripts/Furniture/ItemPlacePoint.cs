@@ -51,6 +51,24 @@ public class ItemPlacePoint : MonoBehaviour
         }
     }
 
+    public bool ForcePlace(CarryableItem item)
+    {
+        if (item == null)
+            return false;
+
+        if (!CanPlace(item))
+            return false;
+
+        // 不自己硬改 transform，不自己硬改物理
+        // 直接复用项目里已经稳定工作的“正式放置流程”
+        bool placed = item.TryReleaseToPoint(this);
+
+        if (debugLog)
+            Debug.Log($"[ItemPlacePoint] ForcePlace: {name} -> {(placed ? item.name : "FAILED")}");
+
+        return placed;
+    }
+
     public void SetSensorHighlight(bool on)
     {
         if (sensorHighlight != null)
