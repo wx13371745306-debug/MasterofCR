@@ -15,6 +15,9 @@ public class CarryableItem : MonoBehaviour
     public AttachPoseConfig poseConfig;
     public InteractableHighlight sensorHighlight;
 
+    [Header("Category")]
+    public ItemCategory categories = ItemCategory.None;
+
     [Header("Placement")]
     public ItemPlacePoint initialPlacePoint;
 
@@ -55,6 +58,14 @@ public class CarryableItem : MonoBehaviour
     {
         if (initialPlacePoint != null)
             ForcePlaceAtStart(initialPlacePoint);
+    }
+
+    public bool HasAnyCategory(ItemCategory mask)
+    {
+        if (mask == ItemCategory.None)
+            return false;
+
+        return (categories & mask) != 0;
     }
 
     public bool CanBePickedUp()
@@ -162,10 +173,8 @@ public class CarryableItem : MonoBehaviour
             currentPlacePoint = null;
         }
 
-        // 从手上/挂点上脱离，但保持当前世界位置
         transform.SetParent(null, true);
 
-        // 恢复物理
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
@@ -174,7 +183,6 @@ public class CarryableItem : MonoBehaviour
             rb.useGravity = true;
         }
 
-        // 恢复正常碰撞
         if (itemColliders != null)
         {
             foreach (var c in itemColliders)
@@ -196,15 +204,27 @@ public class CarryableItem : MonoBehaviour
         PlaceAtPoint(point);
     }
 
-    public void TryUse()
+    public bool TryUse(PlayerItemInteractor interactor, PlayerInteractionSensor sensor)
     {
         if (!isUsable)
         {
             if (debugLog)
                 Debug.Log($"[CarryableItem] Use ignored: {name} is not usable.");
-            return;
+            return false;
         }
 
+        MonoBehaviour[] all = GetComponents<MonoBehaviour>();
+        foreach (var mb in all)
+        {
+            if (mb is IHoldUseTool tool)
+            {
+                bool used = tool.TryUse(interactor, sensor, this);
+                if (used)
+                    return true;
+            }
+        }
+
+        // 没有工具组件接管时，保留你原来的默认行为
         if (useHighlightObject != null)
         {
             bool next = !useHighlightObject.activeSelf;
@@ -212,11 +232,14 @@ public class CarryableItem : MonoBehaviour
 
             if (debugLog)
                 Debug.Log($"[CarryableItem] Use toggled highlight on {name}: {next}");
+
+            return true;
         }
-        else if (debugLog)
-        {
-            Debug.Log($"[CarryableItem] Use called on {name}, but no useHighlightObject assigned.");
-        }
+
+        if (debugLog)
+            Debug.Log($"[CarryableItem] Use called on {name}, but no tool handled it.");
+
+        return false;
     }
 
     public void SetSensorHighlight(bool on)
@@ -225,22 +248,23 @@ public class CarryableItem : MonoBehaviour
             sensorHighlight.SetHighlighted(on);
     }
 
-    void SetAttachedPhysics(bool attached)
+    private void SetAttachedPhysics(bool attached)
     {
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = true;
-            rb.useGravity = false;
+            rb.isKinematic = attached;
+            rb.useGravity = !attached;
         }
 
-        if (itemColliders == null) return;
-
-        foreach (var c in itemColliders)
+        if (itemColliders != null)
         {
-            if (c == null) continue;
-            c.isTrigger = attached;
+            foreach (var c in itemColliders)
+            {
+                if (c == null) continue;
+                c.isTrigger = attached;
+            }
         }
     }
 }

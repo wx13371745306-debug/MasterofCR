@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 8634012162784508832}
   - component: {fileID: 8120342177740024688}
   - component: {fileID: 7742867226209124168}
+  - component: {fileID: 1975719576771897282}
   m_Layer: 3
   m_Name: Tomato
   m_TagString: Untagged
@@ -50,10 +51,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
-  rb: {fileID: 7704604943289434574}
+  rb: {fileID: 1975719576771897282}
   itemColliders: []
   poseConfig: {fileID: 8634012162784508832}
   sensorHighlight: {fileID: 8120342177740024688}
+  categories: 0
   initialPlacePoint: {fileID: 0}
   isUsable: 0
   useHighlightObject: {fileID: 0}
@@ -123,6 +125,33 @@ MonoBehaviour:
   stainOffset: {x: 0, y: 0.02, z: 0}
   effectOffset: {x: 0, y: 0, z: 0}
   debugLog: 1
+--- !u!54 &1975719576771897282
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7096165798621821909}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1001 &2570084359308621065
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -201,9 +230,6 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 89e08f4f4bebaf147a73dc672894981d, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 7704604943289434574}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 89e08f4f4bebaf147a73dc672894981d, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 2659735190237666719}
   m_SourcePrefab: {fileID: 100100000, guid: 89e08f4f4bebaf147a73dc672894981d, type: 3}
 --- !u!4 &2603220664472949474 stripped
@@ -216,33 +242,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 89e08f4f4bebaf147a73dc672894981d, type: 3}
   m_PrefabInstance: {fileID: 2570084359308621065}
   m_PrefabAsset: {fileID: 0}
---- !u!54 &7704604943289434574
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3417018026479683672}
-  serializedVersion: 5
-  m_Mass: 1
-  m_LinearDamping: 0
-  m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!65 &2659735190237666719
 BoxCollider:
   m_ObjectHideFlags: 0

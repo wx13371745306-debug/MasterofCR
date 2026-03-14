@@ -47,7 +47,8 @@ public class PlayerItemInteractor : MonoBehaviour
                 if (activeStation != null)
                     TryEndStationInteract();
 
-                heldItem.TryUse();
+                // 规范形式：Interactor 只负责触发 heldItem 的 use
+                heldItem.TryUse(this, sensor);
             }
             else
             {
@@ -89,9 +90,7 @@ public class PlayerItemInteractor : MonoBehaviour
 
         CarryableItem target = sensor.GetCurrentItem();
         if (target == null)
-        {
             return false;
-        }
 
         target.BeginHold(holdPoint);
         heldItem = target;
@@ -170,5 +169,16 @@ public class PlayerItemInteractor : MonoBehaviour
 
         if (debugLog)
             Debug.Log($"[PlayerItemInteractor] End station interact: {stationName}");
+    }
+
+    // 给工具脚本用的小工具函数：允许工具替换当前手上的物体
+    public void ReplaceHeldItem(CarryableItem newItem)
+    {
+        heldItem = newItem;
+    }
+
+    public Transform GetHoldPoint()
+    {
+        return holdPoint;
     }
 }

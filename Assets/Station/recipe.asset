@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe3990fcf7ea75b4fb466c77e38061bc, type: 3}
+  m_Name: recipe
+  m_EditorClassIdentifier: Assembly-CSharp::FryRecipeDatabase
+  recipes:
+  - recipeName: TomatoFireEgg
+    unlocked: 1
+    ingredients:
+    - ingredient: 1
+      count: 1
+    - ingredient: 2
+      count: 1
+    resultPrefab: {fileID: 5258138650443871965, guid: f6e1839888e9e42439ed417b2d619671, type: 3}

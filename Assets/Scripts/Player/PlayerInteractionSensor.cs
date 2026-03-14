@@ -90,6 +90,14 @@ public class PlayerInteractionSensor : MonoBehaviour
             if (point == null) continue;
             if (heldItem != null && !point.CanPlace(heldItem)) continue;
 
+            // 关键：忽略“当前手里拿着的物体自己身上的 PlacePoint”
+            if (heldItem != null)
+            {
+                CarryableItem ownerItem = point.GetComponentInParent<CarryableItem>();
+                if (ownerItem == heldItem)
+                    continue;
+            }
+
             float dist = Vector3.Distance(origin, point.transform.position);
             if (dist < bestDist - 0.001f)
             {

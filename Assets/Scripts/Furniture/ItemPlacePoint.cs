@@ -2,8 +2,15 @@ using UnityEngine;
 
 public class ItemPlacePoint : MonoBehaviour
 {
+    [Header("Refs")]
     public Transform attachPoint;
     public InteractableHighlight sensorHighlight;
+
+    [Header("Placement Rules")]
+    public bool allowAnyCategory = true;
+    public ItemCategory allowedCategories = ItemCategory.None;
+
+    [Header("Debug")]
     public bool debugLog = true;
 
     public CarryableItem CurrentItem => currentItem;
@@ -29,7 +36,21 @@ public class ItemPlacePoint : MonoBehaviour
 
     public bool CanPlace(CarryableItem item)
     {
-        return currentItem == null || currentItem == item;
+        if (item == null)
+            return false;
+
+        if (currentItem != null && currentItem != item)
+            return false;
+
+        if (allowAnyCategory)
+            return true;
+
+        bool allowed = item.HasAnyCategory(allowedCategories);
+
+        if (debugLog && !allowed)
+            Debug.Log($"[ItemPlacePoint] CanPlace rejected: {item.name} categories={item.categories} not in allowed={allowedCategories} on {name}");
+
+        return allowed;
     }
 
     public void SetOccupant(CarryableItem item)
@@ -59,8 +80,6 @@ public class ItemPlacePoint : MonoBehaviour
         if (!CanPlace(item))
             return false;
 
-        // 不自己硬改 transform，不自己硬改物理
-        // 直接复用项目里已经稳定工作的“正式放置流程”
         bool placed = item.TryReleaseToPoint(this);
 
         if (debugLog)

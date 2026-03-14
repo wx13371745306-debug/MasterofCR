@@ -140,6 +140,7 @@ MonoBehaviour:
   - {fileID: 8802714224369157553}
   poseConfig: {fileID: 4943081493825702524}
   sensorHighlight: {fileID: 6958037079787280545}
+  categories: 4
   initialPlacePoint: {fileID: 0}
   isUsable: 0
   useHighlightObject: {fileID: 0}

@@ -7,7 +7,6 @@ public class ChoppingStation : BaseStation
     [Header("Refs")]
     public ItemPlacePoint placePoint;
     public GameObject usableHighlight;
-    public GameObject placeableHighlight;
 
     [Header("Processing")]
     public ProcessType stationProcessType = ProcessType.Chop;
@@ -57,7 +56,7 @@ public class ChoppingStation : BaseStation
 
         processable.ApplyProgress(stationProcessType, processingSpeed * Time.deltaTime, this);
         UpdateSwingVisual();
-        
+
         if (processable.IsComplete)
         {
             EndInteract(cachedInteractor);
@@ -126,13 +125,9 @@ public class ChoppingStation : BaseStation
         bool canProcess = GetCurrentProcessable() != null;
 
         bool showUsable = isSensorTargeted && !playerHoldingItem && hasPlacedItem && canProcess;
-        bool showPlaceable = isSensorTargeted && playerHoldingItem && !hasPlacedItem;
 
         if (usableHighlight != null)
             usableHighlight.SetActive(showUsable);
-
-        if (placeableHighlight != null)
-            placeableHighlight.SetActive(showPlaceable);
     }
 
     void UpdateSwingVisual()
