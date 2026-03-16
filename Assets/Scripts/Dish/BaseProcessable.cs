@@ -66,34 +66,23 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
         }
 
         CarryableItem oldItem = GetComponent<CarryableItem>();
-        ItemPlacePoint oldPlacePoint = oldItem != null ? oldItem.CurrentPlacePoint : null;
+        ItemPlacePoint point = oldItem != null ? oldItem.CurrentPlacePoint : null;
 
         Vector3 spawnPos = transform.position;
         Quaternion spawnRot = transform.rotation;
         Transform spawnParent = transform.parent;
 
-        // 先生成新物体
+        // 生成新结果物体
         GameObject newObj = Instantiate(resultPrefab, spawnPos, spawnRot, spawnParent);
         CarryableItem newItem = newObj.GetComponent<CarryableItem>();
 
-        // 如果旧物体原本在 PlacePoint 上，就让新物体重新正式放上去
-        if (oldPlacePoint != null)
+        // 如果加工前是在台子上，让台子的放置点接收新物体
+        if (point != null && newItem != null)
         {
-            oldPlacePoint.ClearOccupant(oldItem);
-
-            if (newItem != null)
-            {
-                bool placed = oldPlacePoint.ForcePlace(newItem);
-
-                if (!placed && debugLog)
-                    Debug.LogWarning($"[{GetType().Name}] ForcePlace failed for {newObj.name}");
-            }
-            else if (debugLog)
-            {
-                Debug.LogWarning($"[{GetType().Name}] Result prefab {newObj.name} has no CarryableItem.");
-            }
+            // 旧物体的信息清理已经在 TryAcceptItem 里处理或者即将销毁
+            point.TryAcceptItem(newItem);
         }
 
-        Destroy(gameObject);
+        Destroy(gameObject); // 销毁自身的旧物体
     }
 }

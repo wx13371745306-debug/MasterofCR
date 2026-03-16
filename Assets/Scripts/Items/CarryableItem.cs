@@ -77,22 +77,17 @@ public class CarryableItem : MonoBehaviour
     {
         if (holdPoint == null) return;
 
+        lastPlacePointBeforeHold = currentPlacePoint;
+
         if (currentPlacePoint != null)
         {
-            lastPlacePointBeforeHold = currentPlacePoint;
-            currentPlacePoint.ClearOccupant(this);
+            currentPlacePoint.ClearOccupant();
             currentPlacePoint = null;
         }
-        else if (initialPlacePoint != null)
-        {
-            lastPlacePointBeforeHold = initialPlacePoint;
-        }
 
-        SetSensorHighlight(false);
         SetAttachedPhysics(true);
 
         transform.SetParent(holdPoint, false);
-
         if (poseConfig != null)
         {
             transform.localPosition = poseConfig.holdLocalPosition;
@@ -105,46 +100,20 @@ public class CarryableItem : MonoBehaviour
         }
 
         state = ItemState.Held;
-
-        if (debugLog)
-            Debug.Log($"[CarryableItem] BeginHold: {name}");
+        if (debugLog) Debug.Log($"[CarryableItem] Begin hold: {name}");
     }
 
+    // 放置动作交给目标点位主导
     public bool TryReleaseToPoint(ItemPlacePoint targetPoint)
     {
-        if (targetPoint == null)
-        {
-            if (debugLog)
-                Debug.Log($"[CarryableItem] TryReleaseToPoint failed: targetPoint is null for {name}");
-            return false;
-        }
-
-        if (!targetPoint.CanPlace(this))
-        {
-            if (debugLog)
-                Debug.Log($"[CarryableItem] TryReleaseToPoint failed: targetPoint cannot place {name}");
-            return false;
-        }
-
-        PlaceAtPoint(targetPoint);
-        return true;
+        if (targetPoint == null) return false;
+        return targetPoint.TryAcceptItem(this);
     }
 
-    public void PlaceAtPoint(ItemPlacePoint point)
+    // 仅供 ItemPlacePoint 内部调用的状态切换
+    public void InternalSetPlacedState(ItemPlacePoint point)
     {
-        if (point == null || point.attachPoint == null)
-        {
-            if (debugLog)
-                Debug.LogWarning($"[CarryableItem] PlaceAtPoint failed on {name}: point or attachPoint is null.");
-            return;
-        }
-
-        if (currentPlacePoint != null && currentPlacePoint != point)
-            currentPlacePoint.ClearOccupant(this);
-
         currentPlacePoint = point;
-        currentPlacePoint.SetOccupant(this);
-
         SetAttachedPhysics(true);
         transform.SetParent(point.attachPoint, false);
 
@@ -158,27 +127,29 @@ public class CarryableItem : MonoBehaviour
             transform.localPosition = Vector3.zero;
             transform.localRotation = Quaternion.identity;
         }
-
         state = ItemState.Placed;
+        if (debugLog) Debug.Log($"[CarryableItem] Placed internally: {name} at {point.name}");
+    }
 
-        if (debugLog)
-            Debug.Log($"[CarryableItem] PlaceAtPoint: {name} -> {point.name}");
+    // 仅供 ItemPlacePoint 调用的清除占用
+    public void ClearPlaceState()
+    {
+        currentPlacePoint = null;
+        state = ItemState.Free;
     }
 
     public void DropToGround()
     {
         if (currentPlacePoint != null)
         {
-            currentPlacePoint.ClearOccupant(this);
-            currentPlacePoint = null;
+            currentPlacePoint.ClearOccupant();
         }
 
-        transform.SetParent(null, true);
+        transform.SetParent(null);
+        SetAttachedPhysics(false);
 
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
             rb.isKinematic = false;
             rb.useGravity = true;
         }
@@ -193,23 +164,23 @@ public class CarryableItem : MonoBehaviour
         }
 
         state = ItemState.Free;
-
-        if (debugLog)
-            Debug.Log($"[CarryableItem] Dropped to ground: {name}");
+        if (debugLog) Debug.Log($"[CarryableItem] Dropped to ground: {name}");
     }
 
     public void ForcePlaceAtStart(ItemPlacePoint point)
     {
-        lastPlacePointBeforeHold = point;
-        PlaceAtPoint(point);
+        if (point != null)
+        {
+            lastPlacePointBeforeHold = point;
+            point.TryAcceptItem(this);
+        }
     }
 
     public bool TryUse(PlayerItemInteractor interactor, PlayerInteractionSensor sensor)
     {
         if (!isUsable)
         {
-            if (debugLog)
-                Debug.Log($"[CarryableItem] Use ignored: {name} is not usable.");
+            if (debugLog) Debug.Log($"[CarryableItem] Use ignored: {name} is not usable.");
             return false;
         }
 
@@ -219,26 +190,19 @@ public class CarryableItem : MonoBehaviour
             if (mb is IHoldUseTool tool)
             {
                 bool used = tool.TryUse(interactor, sensor, this);
-                if (used)
-                    return true;
+                if (used) return true;
             }
         }
 
-        // 没有工具组件接管时，保留你原来的默认行为
         if (useHighlightObject != null)
         {
             bool next = !useHighlightObject.activeSelf;
             useHighlightObject.SetActive(next);
-
-            if (debugLog)
-                Debug.Log($"[CarryableItem] Use toggled highlight on {name}: {next}");
-
+            if (debugLog) Debug.Log($"[CarryableItem] Use toggled highlight on {name}: {next}");
             return true;
         }
 
-        if (debugLog)
-            Debug.Log($"[CarryableItem] Use called on {name}, but no tool handled it.");
-
+        if (debugLog) Debug.Log($"[CarryableItem] Use called on {name}, but no tool handled it.");
         return false;
     }
 
@@ -252,10 +216,22 @@ public class CarryableItem : MonoBehaviour
     {
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = attached;
-            rb.useGravity = !attached;
+            if (attached)
+            {
+                // 变成被附着状态：先清空物理动量，再开启运动学
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                rb.isKinematic = true;
+                rb.useGravity = false;
+            }
+            else
+            {
+                // 掉落到物理世界：先关闭运动学，再清空速度
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
         }
 
         if (itemColliders != null)

@@ -15,18 +15,13 @@ public abstract class BaseStation : MonoBehaviour, IInteractiveStation
             cachedInteractor = FindObjectOfType<PlayerItemInteractor>();
     }
 
+    // Interactor 叫我亮我就亮
     public virtual void SetSensorHighlight(bool on)
     {
         isSensorTargeted = on;
 
         if (highlightObject != null)
             highlightObject.SetActive(on);
-
-        OnSensorHighlightChanged();
-    }
-
-    protected virtual void OnSensorHighlightChanged()
-    {
     }
 
     public virtual bool CanInteract(PlayerItemInteractor interactor)

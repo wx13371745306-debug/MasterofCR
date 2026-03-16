@@ -26,21 +26,20 @@ public class ChoppingStation : BaseStation
     {
         if (rotatingPart != null)
             initialRotation = rotatingPart.localRotation;
-
-        RefreshHighlights();
+            
+        if (usableHighlight != null)
+            usableHighlight.SetActive(false); // 初始关闭
     }
 
     void Update()
     {
-        RefreshHighlights();
-
         if (!isInteracting)
         {
             ResetVisualIfNeeded();
             return;
         }
 
-        // 离开范围后停止推进，但不重置进度
+        // 离开范围后停止推进
         if (!isSensorTargeted)
         {
             ResetVisualIfNeeded();
@@ -65,7 +64,8 @@ public class ChoppingStation : BaseStation
 
     public override bool CanInteract(PlayerItemInteractor interactor)
     {
-        return isSensorTargeted && GetCurrentProcessable() != null;
+        // 只要台子上有能被该台子加工的物体，就允许互动
+        return GetCurrentProcessable() != null;
     }
 
     public override void BeginInteract(PlayerItemInteractor interactor)
@@ -77,24 +77,25 @@ public class ChoppingStation : BaseStation
         isInteracting = true;
         currentPhase = 0f;
 
-        if (debugLog)
-            Debug.Log($"[ChoppingStation] Begin interact: {name}");
+        if (debugLog) Debug.Log($"[ChoppingStation] Begin interact: {name}");
     }
 
     public override void EndInteract(PlayerItemInteractor interactor)
     {
-        if (!isInteracting) return;
-
         isInteracting = false;
         ResetVisualIfNeeded();
 
-        if (debugLog)
-            Debug.Log($"[ChoppingStation] End interact: {name}");
+        if (debugLog) Debug.Log($"[ChoppingStation] End interact: {name}");
     }
 
-    protected override void OnSensorHighlightChanged()
+    // 重写基础高亮，接收 Interactor 的高亮指令
+    public override void SetSensorHighlight(bool on)
     {
-        RefreshHighlights();
+        base.SetSensorHighlight(on);
+        
+        // 核心解耦：台子不再自己算要不要亮，Interactor 说合法就亮这个提示
+        if (usableHighlight != null)
+            usableHighlight.SetActive(on);
     }
 
     public CarryableItem GetCurrentPlacedItem()
@@ -116,18 +117,6 @@ public class ChoppingStation : BaseStation
         }
 
         return null;
-    }
-
-    void RefreshHighlights()
-    {
-        bool playerHoldingItem = cachedInteractor != null && cachedInteractor.IsHoldingItem();
-        bool hasPlacedItem = GetCurrentPlacedItem() != null;
-        bool canProcess = GetCurrentProcessable() != null;
-
-        bool showUsable = isSensorTargeted && !playerHoldingItem && hasPlacedItem && canProcess;
-
-        if (usableHighlight != null)
-            usableHighlight.SetActive(showUsable);
     }
 
     void UpdateSwingVisual()

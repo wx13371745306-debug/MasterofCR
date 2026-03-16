@@ -107,6 +107,7 @@ MonoBehaviour:
   ingredientId: 2
   baseRequired: 70
   addedRequired: 50
+  visualInPotPrefab: {fileID: 9042197215933979286, guid: 90671ca829867ca4595759bb2448f9e8, type: 3}
 --- !u!114 &8447624297855418452
 MonoBehaviour:
   m_ObjectHideFlags: 0

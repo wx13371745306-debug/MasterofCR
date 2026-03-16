@@ -55,7 +55,7 @@ MonoBehaviour:
   itemColliders: []
   poseConfig: {fileID: 8634012162784508832}
   sensorHighlight: {fileID: 8120342177740024688}
-  categories: 0
+  categories: 4
   initialPlacePoint: {fileID: 0}
   isUsable: 0
   useHighlightObject: {fileID: 0}

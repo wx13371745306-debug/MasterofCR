@@ -6,98 +6,97 @@ public class PlayerItemInteractor : MonoBehaviour
     [Header("Refs")]
     public PlayerInteractionSensor sensor;
     public Transform holdPoint;
-
-    [Header("Debug")]
     public bool debugLog = true;
 
     private CarryableItem heldItem;
     private IInteractiveStation activeStation;
 
-    public bool IsHoldingItem()
-    {
-        return heldItem != null;
-    }
+    // 【新增】用于追踪当前真正亮起的高亮目标
+    private CarryableItem highlightedItem;
+    private ItemPlacePoint highlightedPlacePoint;
+    private IInteractiveStation highlightedStation;
 
-    public CarryableItem GetHeldItem()
-    {
-        return heldItem;
-    }
-
-    public bool IsInteractingStation()
-    {
-        return activeStation != null;
-    }
+    public bool IsHoldingItem() => heldItem != null;
+    public CarryableItem GetHeldItem() => heldItem;
 
     void Update()
     {
         if (Keyboard.current == null) return;
 
-        if (Keyboard.current.jKey.wasPressedThisFrame)
-        {
-            if (heldItem == null && activeStation == null)
-            {
-                TryBeginHold();
-            }
-        }
+        UpdateHighlights(); // 【新增】每帧计算并控制高亮
+
+        if (Keyboard.current.jKey.wasPressedThisFrame && heldItem == null && activeStation == null)
+            TryBeginHold();
+        
+        if (Keyboard.current.jKey.wasReleasedThisFrame && heldItem != null)
+            TryEndHold();
 
         if (Keyboard.current.kKey.wasPressedThisFrame)
         {
             if (heldItem != null)
             {
-                if (activeStation != null)
-                    TryEndStationInteract();
-
-                // 规范形式：Interactor 只负责触发 heldItem 的 use
+                if (activeStation != null) TryEndStationInteract();
                 heldItem.TryUse(this, sensor);
             }
-            else
+            else if (activeStation == null)
             {
-                if (activeStation == null)
-                {
-                    bool began = TryBeginStationInteract();
-                    if (!began && debugLog)
-                        Debug.Log("[PlayerItemInteractor] Station interact ignored: no available station.");
-                }
+                TryBeginStationInteract();
             }
         }
 
-        if (Keyboard.current.jKey.wasReleasedThisFrame)
-        {
-            if (heldItem != null)
-                TryEndHold();
-        }
+        if (Keyboard.current.kKey.wasReleasedThisFrame && activeStation != null)
+            TryEndStationInteract();
+    }
 
-        if (Keyboard.current.kKey.wasReleasedThisFrame)
+    // 【核心新增模块】统一管理所有高亮
+    void UpdateHighlights()
+    {
+        // 1. 清理上一帧的高亮
+        if (highlightedItem != null) { highlightedItem.SetSensorHighlight(false); highlightedItem = null; }
+        if (highlightedPlacePoint != null) { highlightedPlacePoint.SetSensorHighlight(false); highlightedPlacePoint = null; }
+        if (highlightedStation != null) { highlightedStation.SetSensorHighlight(false); highlightedStation = null; }
+
+        if (sensor == null) return;
+
+        // 2. 根据玩家状态重新计算合法的高亮目标
+        if (!IsHoldingItem())
         {
-            if (activeStation != null)
-                TryEndStationInteract();
+            // 空手状态：可以捡起物体 (J)，可以互动台子 (K)
+            CarryableItem item = sensor.GetCurrentItem();
+            if (item != null && item.CanBePickedUp())
+            {
+                highlightedItem = item;
+                highlightedItem.SetSensorHighlight(true);
+            }
+
+            IInteractiveStation station = sensor.GetCurrentStation();
+            if (station != null && station.CanInteract(this))
+            {
+                highlightedStation = station;
+                highlightedStation.SetSensorHighlight(true);
+            }
+        }
+        else
+        {
+            // 持物状态：可以放下物体 (J)，也可以对台子使用工具 (K)
+            ItemPlacePoint point = sensor.GetCurrentPlacePoint();
+            if (point != null && point.CanPlace(heldItem))
+            {
+                highlightedPlacePoint = point;
+                highlightedPlacePoint.SetSensorHighlight(true);
+            }
+
+            // (如果有特殊的工具对 Station 的互动需求，可以写在这里)
         }
     }
 
     bool TryBeginHold()
     {
-        if (sensor == null)
-        {
-            if (debugLog) Debug.Log("[PlayerItemInteractor] Pick failed: sensor is null.");
-            return false;
-        }
-
-        if (holdPoint == null)
-        {
-            if (debugLog) Debug.Log("[PlayerItemInteractor] Pick failed: holdPoint is null.");
-            return false;
-        }
-
+        // ... (保持你原有代码不变) ...
         CarryableItem target = sensor.GetCurrentItem();
-        if (target == null)
-            return false;
-
+        if (target == null) return false;
         target.BeginHold(holdPoint);
         heldItem = target;
-
-        if (debugLog)
-            Debug.Log($"[PlayerItemInteractor] Begin hold: {target.name}");
-
         return true;
     }
 
@@ -108,77 +107,39 @@ public class PlayerItemInteractor : MonoBehaviour
         ItemPlacePoint targetPoint = sensor != null ? sensor.GetCurrentPlacePoint() : null;
         CarryableItem item = heldItem;
 
+        // 只有在点位合法时才执行放置
         if (targetPoint != null && targetPoint.CanPlace(item))
         {
-            bool released = item.TryReleaseToPoint(targetPoint);
-            if (!released)
+            if (targetPoint.TryAcceptItem(item)) // 【修改点】调用新的放置接口
             {
-                if (debugLog)
-                    Debug.LogWarning($"[PlayerItemInteractor] Release failed for {item.name}.");
+                heldItem = null;
                 return;
             }
-
-            heldItem = null;
-
-            if (debugLog)
-            {
-                string pointName = item.CurrentPlacePoint != null ? item.CurrentPlacePoint.name : "None";
-                Debug.Log($"[PlayerItemInteractor] End hold: {item.name} -> {pointName}");
-            }
-
-            return;
         }
 
+        // 不合法或没对准，掉地上
         item.DropToGround();
         heldItem = null;
-
-        if (debugLog)
-            Debug.Log($"[PlayerItemInteractor] End hold: {item.name} -> Dropped to ground");
     }
 
     bool TryBeginStationInteract()
     {
         if (sensor == null) return false;
-
         IInteractiveStation station = sensor.GetCurrentStation();
-        if (station == null) return false;
-        if (!station.CanInteract(this)) return false;
+        if (station == null || !station.CanInteract(this)) return false;
 
         activeStation = station;
         activeStation.BeginInteract(this);
-
-        if (debugLog)
-        {
-            MonoBehaviour mb = activeStation as MonoBehaviour;
-            string stationName = mb != null ? mb.name : "UnknownStation";
-            Debug.Log($"[PlayerItemInteractor] Begin station interact: {stationName}");
-        }
-
         return true;
     }
 
     void TryEndStationInteract()
     {
         if (activeStation == null) return;
-
-        MonoBehaviour mb = activeStation as MonoBehaviour;
-        string stationName = mb != null ? mb.name : "UnknownStation";
-
         activeStation.EndInteract(this);
         activeStation = null;
-
-        if (debugLog)
-            Debug.Log($"[PlayerItemInteractor] End station interact: {stationName}");
     }
 
-    // 给工具脚本用的小工具函数：允许工具替换当前手上的物体
-    public void ReplaceHeldItem(CarryableItem newItem)
-    {
-        heldItem = newItem;
-    }
-
-    public Transform GetHoldPoint()
-    {
-        return holdPoint;
-    }
+    public void ReplaceHeldItem(CarryableItem newItem) { heldItem = newItem; }
+    public Transform GetHoldPoint() { return holdPoint; }
 }

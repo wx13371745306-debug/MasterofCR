@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &115602836604664770
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3609355152998014210}
+  m_Layer: 0
+  m_Name: VisualPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3609355152998014210
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 115602836604664770}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6602689520350195235}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1167071975523497877
 GameObject:
   m_ObjectHideFlags: 0
@@ -36,6 +67,7 @@ Transform:
   - {fileID: 286999321455244926}
   - {fileID: 7311540683888798972}
   - {fileID: 5795223890792235174}
+  - {fileID: 3609355152998014210}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &128855980478163344
@@ -102,6 +134,8 @@ MonoBehaviour:
   recipeDatabase: {fileID: 11400000, guid: 730e8ac883ba229498c2807b9329f4bd, type: 2}
   failedDishPrefab: {fileID: 5202189278729499199, guid: 8d8f9fb0e3ee07945be2be1b36e6dd4f, type: 3}
   ingredientPlacePoint: {fileID: 3097156959792590957}
+  visualContainer: {fileID: 3609355152998014210}
+  spawnRandomRange: 0
   currentProgress: 0
   requiredProgress: 0
   cookingFinished: 0
@@ -123,7 +157,7 @@ MonoBehaviour:
   sensorHighlight: {fileID: 2851158150767036173}
   allowAnyCategory: 0
   allowedCategories: 1
-  debugLog: 1
+  debugLog: 0
 --- !u!1001 &320064681276559765
 PrefabInstance:
   m_ObjectHideFlags: 0
