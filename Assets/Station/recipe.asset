@@ -22,3 +22,9 @@ MonoBehaviour:
       count: 1
     resultPrefab: {fileID: 5258138650443871965, guid: f6e1839888e9e42439ed417b2d619671, type: 3}
     finishedVisualPrefab: {fileID: 1154329586283223756, guid: 53c444075b9da73499cd79d1a67721c2, type: 3}
+  failedDishRecipe:
+    recipeName: Faileddish
+    unlocked: 1
+    ingredients: []
+    resultPrefab: {fileID: 5202189278729499199, guid: 8d8f9fb0e3ee07945be2be1b36e6dd4f, type: 3}
+    finishedVisualPrefab: {fileID: 5009015618275011947, guid: a644a631703b08c419692f7a10460924, type: 3}

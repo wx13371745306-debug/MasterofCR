@@ -66,23 +66,44 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
         }
 
         CarryableItem oldItem = GetComponent<CarryableItem>();
-        ItemPlacePoint point = oldItem != null ? oldItem.CurrentPlacePoint : null;
+        ItemPlacePoint oldPlacePoint = oldItem != null ? oldItem.CurrentPlacePoint : null;
 
         Vector3 spawnPos = transform.position;
         Quaternion spawnRot = transform.rotation;
         Transform spawnParent = transform.parent;
 
-        // 生成新结果物体
+        // 1. 先生成新物体
         GameObject newObj = Instantiate(resultPrefab, spawnPos, spawnRot, spawnParent);
         CarryableItem newItem = newObj.GetComponent<CarryableItem>();
 
-        // 如果加工前是在台子上，让台子的放置点接收新物体
-        if (point != null && newItem != null)
+        // 【核心修复】：让新生成的物体继承放置点记录
+        if (newItem != null && oldItem != null)
         {
-            // 旧物体的信息清理已经在 TryAcceptItem 里处理或者即将销毁
-            point.TryAcceptItem(newItem);
+            // 继承原来的初始放置点
+            newItem.initialPlacePoint = oldPlacePoint; 
         }
 
-        Destroy(gameObject); // 销毁自身的旧物体
+        // 2. 如果旧物体原本在 PlacePoint 上，就让新物体重新正式放上去
+        if (oldPlacePoint != null)
+        {
+            // 【修正1】：使用新架构的无参清空方法
+            oldPlacePoint.ClearOccupant(); 
+
+            if (newItem != null)
+            {
+                // 【修正2】：使用新架构的 TryAcceptItem 替代原来的 ForcePlace
+                bool placed = oldPlacePoint.TryAcceptItem(newItem); 
+
+                if (!placed && debugLog)
+                    Debug.LogWarning($"[{GetType().Name}] TryAcceptItem failed for {newObj.name}");
+            }
+            else if (debugLog)
+            {
+                Debug.LogWarning($"[{GetType().Name}] Result prefab {newObj.name} has no CarryableItem.");
+            }
+        }
+
+        // 3. 销毁旧物体
+        Destroy(gameObject);
     }
 }

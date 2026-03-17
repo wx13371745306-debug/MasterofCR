@@ -56,7 +56,7 @@ public class CarryableItem : MonoBehaviour
 
     void Start()
     {
-        if (initialPlacePoint != null)
+        if (state == ItemState.Free && initialPlacePoint != null)
             ForcePlaceAtStart(initialPlacePoint);
     }
 
