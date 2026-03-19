@@ -27,7 +27,7 @@ public class PlayerItemInteractor : MonoBehaviour
 
         if (Keyboard.current.jKey.wasPressedThisFrame && heldItem == null && activeStation == null)
             TryBeginHold();
-        
+
         if (Keyboard.current.jKey.wasReleasedThisFrame && heldItem != null)
             TryEndHold();
 
@@ -92,11 +92,35 @@ public class PlayerItemInteractor : MonoBehaviour
 
     bool TryBeginHold()
     {
-        // ... (保持你原有代码不变) ...
+        if (sensor == null)
+        {
+            if (debugLog) Debug.Log("[PlayerItemInteractor] Pick failed: sensor is null.");
+            return false;
+        }
+
+        if (holdPoint == null)
+        {
+            if (debugLog) Debug.Log("[PlayerItemInteractor] Pick failed: holdPoint is null.");
+            return false;
+        }
+
         CarryableItem target = sensor.GetCurrentItem();
-        if (target == null) return false;
+
+        // 【核心修复】：不仅要目标不为空，还要目标真的能被捡起来！
+        if (target == null || !target.CanBePickedUp())
+            return false;
+
         target.BeginHold(holdPoint);
         heldItem = target;
+
+
+
+        if (debugLog)
+            Debug.Log($"[PlayerItemInteractor] Begin hold: {target.name}");
+
+        if (debugLog)
+            Debug.Log($"<color=#FF00FF>[大脑 拿取]</color> 按下J键拿起了: {target.name}。它的父级瞬间从原来的变成了 -> <b>{target.transform.parent.name}</b>");
+
         return true;
     }
 

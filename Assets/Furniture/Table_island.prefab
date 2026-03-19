@@ -311,13 +311,39 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: sensorHighlight
+      value: 
+      objectReference: {fileID: 921904845872613019}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5809046655753077150, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 921904845872613019}
   m_SourcePrefab: {fileID: 100100000, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
 --- !u!4 &1923901796079299551 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8411682267671080671, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
   m_PrefabInstance: {fileID: 7930660861938910464}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &4508876384631981214 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5809046655753077150, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 7930660861938910464}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &921904845872613019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4508876384631981214}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 774e1d7510edc824ca3fafebab287fc3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
+  highlightObject: {fileID: 4508876384631981214}
+  debugLog: 1

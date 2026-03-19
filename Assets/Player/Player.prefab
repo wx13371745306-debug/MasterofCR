@@ -104,6 +104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4bf61da4e35fb144284c82478fa0d007, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInteractionSensor
+  detectionCollider: {fileID: 5723978199418187113}
   itemMask:
     serializedVersion: 2
     m_Bits: 8
@@ -116,6 +117,7 @@ MonoBehaviour:
   playerRoot: {fileID: 403802713317666071}
   sensorOrigin: {fileID: 7745429072234897360}
   interactor: {fileID: 1696173215733838411}
+  debugLog: 1
 --- !u!65 &5723978199418187113
 BoxCollider:
   m_ObjectHideFlags: 0

@@ -68,6 +68,7 @@ GameObject:
   - component: {fileID: 1681415875495179616}
   - component: {fileID: 131835214523448993}
   - component: {fileID: 3466587725257603228}
+  - component: {fileID: 5445143976260632277}
   m_Layer: 0
   m_Name: TomatoFireEgg_perfab
   m_TagString: Untagged
@@ -176,6 +177,19 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &5445143976260632277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5258138650443871965}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb4ae4c4baa6a2d4dbb5740bc0fbcd4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DishRecipeTag
+  recipeName: TomatoFireEgg
 --- !u!1001 &614758039073409601
 PrefabInstance:
   m_ObjectHideFlags: 0

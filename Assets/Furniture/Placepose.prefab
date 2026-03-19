@@ -152,7 +152,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8411682267671080671}
-  - component: {fileID: 4578393910544704456}
   - component: {fileID: 8420451183136531120}
   m_Layer: 3
   m_Name: Placepose
@@ -179,20 +178,6 @@ Transform:
   - {fileID: 6617531176701991716}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &4578393910544704456
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6127155401298243510}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 774e1d7510edc824ca3fafebab287fc3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
-  highlightObject: {fileID: 5809046655753077150}
-  debugLog: 1
 --- !u!114 &8420451183136531120
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -206,8 +191,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ItemPlacePoint
   attachPoint: {fileID: 8411682267671080671}
-  sensorHighlight: {fileID: 4578393910544704456}
-  debugLog: 1
+  sensorHighlight: {fileID: 0}
+  allowAnyCategory: 1
+  allowedCategories: 0
 --- !u!1001 &6655344940494126287
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -307,11 +293,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
---- !u!1 &5809046655753077150 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
-  m_PrefabInstance: {fileID: 6655344940494126287}
-  m_PrefabAsset: {fileID: 0}
 --- !u!4 &6617531176701991716 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}

@@ -23,6 +23,7 @@ public class CarryableItem : MonoBehaviour
 
     [Header("Use")]
     public bool isUsable = true;
+    public bool isPickable = true;
     public GameObject useHighlightObject;
 
     [Header("Debug")]
@@ -70,7 +71,7 @@ public class CarryableItem : MonoBehaviour
 
     public bool CanBePickedUp()
     {
-        return state != ItemState.Held;
+        return isPickable && state != ItemState.Held;
     }
 
     public void BeginHold(Transform holdPoint)

@@ -9,6 +9,7 @@ public class ItemPlacePoint : MonoBehaviour
     [Header("Placement Rules")]
     public bool allowAnyCategory = true;
     public ItemCategory allowedCategories = ItemCategory.None;
+    
 
     // 【新增事件】：当有物体合法放上来时触发，取代 Update 轮询！
     public event System.Action<CarryableItem> OnItemPlacedEvent;

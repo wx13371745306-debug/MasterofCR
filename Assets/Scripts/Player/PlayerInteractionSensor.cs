@@ -38,13 +38,14 @@ public class PlayerInteractionSensor : MonoBehaviour
 
     void PickNearestItem(Vector3 originPos)
     {
-        // 强化清理：如果物体被销毁或被隐藏，踢出列表
         itemCandidates.RemoveWhere(i => i == null || !i.gameObject.activeInHierarchy);
 
         CarryableItem best = null;
         float bestDist = float.MaxValue;
         foreach (var item in itemCandidates)
         {
+            if (!item.CanBePickedUp()) continue; 
+
             float dist = Vector3.Distance(originPos, item.transform.position);
             if (dist < bestDist - 0.001f) { bestDist = dist; best = item; }
         }
@@ -69,9 +70,6 @@ public class PlayerInteractionSensor : MonoBehaviour
 
             float dist = Vector3.Distance(originPos, point.transform.position);
 
-            // 【新增的智能优先级逻辑】
-            // 如果玩家手里拿着东西，我们给“空闲”的放置点一点距离优势（比如减去 0.1 米）
-            // 这样当桌子点（被占用）和切菜台点（空闲）距离一样时，切菜台会赢。
             float effectiveDist = dist;
             if (heldItem != null && point.CurrentItem == null)
             {
@@ -112,7 +110,11 @@ public class PlayerInteractionSensor : MonoBehaviour
         if (((1 << other.gameObject.layer) & placePointMask) != 0)
         {
             ItemPlacePoint point = other.GetComponentInParent<ItemPlacePoint>();
-            if (point != null) placePointCandidates.Add(point);
+            if (point != null) 
+            {
+                placePointCandidates.Add(point);
+                if (debugLog) Debug.Log($"<color=#00FF00>[Sensor 进入]</color> 发现放置点: <b>{point.name}</b>。触发它的碰撞体是: {other.name} (Layer: {LayerMask.LayerToName(other.gameObject.layer)})。当前列表数量: {placePointCandidates.Count}");
+            }
         }
         if (((1 << other.gameObject.layer) & stationMask) != 0)
         {
@@ -126,8 +128,21 @@ public class PlayerInteractionSensor : MonoBehaviour
         CarryableItem item = other.GetComponentInParent<CarryableItem>();
         if (item != null) itemCandidates.Remove(item);
 
+        // 【这里是抓幽灵的关键区域】
         ItemPlacePoint point = other.GetComponentInParent<ItemPlacePoint>();
-        if (point != null) placePointCandidates.Remove(point);
+        if (point != null) 
+        {
+            bool removed = placePointCandidates.Remove(point);
+            if (debugLog) Debug.Log($"<color=#FF9900>[Sensor 离开]</color> 移除放置点: <b>{point.name}</b>。触发者: {other.name}。是否成功移除: {removed}。当前列表数量: {placePointCandidates.Count}");
+        }
+        else
+        {
+            // 如果一个碰撞体出去了，但它身上已经找不到 PlacePoint 了，这极有可能是父子层级被改变导致的泄漏！
+            if (((1 << other.gameObject.layer) & placePointMask) != 0)
+            {
+                if (debugLog) Debug.LogWarning($"<color=#FF0000>[幽灵警告]</color> 属于 PlacePoint 层的碰撞体 '{other.name}' 离开了雷达，但现在从它身上 GetComponentInParent 已经找不到 ItemPlacePoint 了！它可能变成幽灵了！");
+            }
+        }
 
         IInteractiveStation station = other.GetComponentInParent<IInteractiveStation>();
         if (station != null) stationCandidates.Remove(station);
@@ -136,10 +151,9 @@ public class PlayerInteractionSensor : MonoBehaviour
     public CarryableItem GetCurrentItem() => currentItem;
     public ItemPlacePoint GetCurrentPlacePoint() => currentPlacePoint;
     public IInteractiveStation GetCurrentStation() => currentStation;
-
-    // ==========================================
-    // 🛠️ 以下为终极 Debug 专属代码
-    // ==========================================
+    
+    // 省略 OnGUI 和 OnDrawGizmos (保留你原先的即可) ...
+    // ...
 
     private void OnGUI()
     {

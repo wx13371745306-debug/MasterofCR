@@ -128,6 +128,7 @@ MonoBehaviour:
   categories: 1
   initialPlacePoint: {fileID: 0}
   isUsable: 0
+  isPickable: 1
   useHighlightObject: {fileID: 0}
   debugLog: 1
 --- !u!54 &996826852220600099
@@ -221,6 +222,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: cf181d3bc0997024281b3588af1f3362, type: 2}
     - target: {fileID: 919132149155446097, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded
@@ -303,6 +308,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: cf181d3bc0997024281b3588af1f3362, type: 2}
     - target: {fileID: 919132149155446097, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded (2)
@@ -499,6 +508,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: cf181d3bc0997024281b3588af1f3362, type: 2}
     - target: {fileID: 919132149155446097, guid: eae709c1f730bf94f9c93a487e205213, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded (1)

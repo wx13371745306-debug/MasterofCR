@@ -30,18 +30,37 @@ public class FryPot : MonoBehaviour
     private List<GameObject> spawnedIngredientVisuals = new List<GameObject>();
     private GameObject spawnedFinishedVisual;
 
-    void Update()
+    void OnEnable()
     {
-        TryConsumePlacedIngredient();
+        // 订阅事件：当有物品放到锅的专属放置点时，自动触发吸收逻辑
+        if (ingredientPlacePoint != null)
+        {
+            ingredientPlacePoint.OnItemPlacedEvent += OnIngredientPlaced;
+        }
     }
 
-    void TryConsumePlacedIngredient()
+    void OnDisable()
     {
-        // ... (保持之前的视觉生成和进度累加逻辑，这部分无需修改)
-        if (ingredientPlacePoint == null || cookingFinished) return;
+        // 取消订阅，防止内存泄漏
+        if (ingredientPlacePoint != null)
+        {
+            ingredientPlacePoint.OnItemPlacedEvent -= OnIngredientPlaced;
+        }
+    }
 
-        CarryableItem item = ingredientPlacePoint.CurrentItem;
-        if (item == null) return;
+    void Start()
+    {
+        // 游戏开始时，检查一下锅里是不是已经有东西了（初始化兜底）
+        if (ingredientPlacePoint != null && ingredientPlacePoint.CurrentItem != null)
+        {
+            OnIngredientPlaced(ingredientPlacePoint.CurrentItem);
+        }
+    }
+
+    // 当有食材被放置进来时，由 ItemPlacePoint 的事件主动调用这个方法
+    void OnIngredientPlaced(CarryableItem item)
+    {
+        if (item == null || cookingFinished) return;
 
         FryableItem fry = item.GetComponent<FryableItem>();
         if (fry == null) return;
