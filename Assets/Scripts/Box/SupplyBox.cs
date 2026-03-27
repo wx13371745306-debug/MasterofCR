@@ -84,10 +84,12 @@ public class SupplyBox : BaseStation
                 
                 // 数量恢复了，可能重新 > 1，更新显示和放置点状态
                 UpdateMultipleItemsVisual(); 
-                UpdatePlacePointState(); 
             }
         }
         
+        // 无论打开还是关闭，都更新一次放置点状态
+        UpdatePlacePointState(); 
+
         // 【新增】：无论打开还是关闭，都刷新一次 UI 状态
         UpdateUIVisual(); 
     }
@@ -149,8 +151,8 @@ public class SupplyBox : BaseStation
     {
         if (internalPlacePoint != null)
         {
-            // 如果没存货了（变成了 0），强制关掉 allowAnyCategory，彻底封死玩家放回来的可能性
-            internalPlacePoint.allowAnyCategory = (currentCount > 0);
+            // 只有当箱子打开时，才允许放入
+            internalPlacePoint.allowAnyCategory = isOpened;
         }
     }
 
