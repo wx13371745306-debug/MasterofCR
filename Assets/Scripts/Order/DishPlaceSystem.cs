@@ -17,11 +17,34 @@ public class DishPlaceSystem : MonoBehaviour
     private readonly List<PlacedDish> servedDrink = new List<PlacedDish>();
     private readonly Dictionary<Transform, Coroutine> moveRoutines = new Dictionary<Transform, Coroutine>();
 
-    public void AcceptDish(CarryableItem dish, DishSize size)
+    public bool AcceptDish(CarryableItem dish, DishSize size)
+    {
+        if (dish == null) return false;
+
+        DishPoint[] points = GetComponentsInChildren<DishPoint>(includeInactive: true);
+        int drinkSlots = 0, foodSlots = 0;
+        foreach (var p in points) { if (p.slotSize == DishSize.D) drinkSlots++; else foodSlots++; }
+
+        int activeDrink = 0, activeFood = 0;
+        foreach(var d in servedDrink) if (d.itemObj != null && d.itemObj.activeSelf) activeDrink++;
+        foreach(var d in servedFood) if (d.itemObj != null && d.itemObj.activeSelf) activeFood++;
+
+        bool isFull = (size == DishSize.D) ? (activeDrink >= drinkSlots) : (activeFood >= foodSlots);
+        if (isFull) 
+        {
+            Debug.Log($"[DishPlaceSystem] 无法正常放入 {dish.name}，对应大类满载。");
+            return false;
+        }
+
+        ForceAcceptDish(dish, size);
+        return true;
+    }
+
+    public void ForceAcceptDish(CarryableItem dish, DishSize size)
     {
         if (dish == null) return;
 
-        Debug.Log($"[DishPlaceSystem] 接收到新菜品: {dish.name}, 尺寸: {size}");
+        Debug.Log($"[DishPlaceSystem] 接收/强制放入菜品: {dish.name}, 尺寸: {size}");
 
         // 1. 禁用所有碰撞体
         if (dish.itemColliders != null)
@@ -42,8 +65,8 @@ public class DishPlaceSystem : MonoBehaviour
         // 保存对 GameObject 的引用
         GameObject dishObj = dish.gameObject;
 
-        // 4. 彻底销毁 CarryableItem 组件
-        Destroy(dish);
+        // 4. 失活 CarryableItem 组件而不是销毁它，因为 OrderResponse 还需要这个引用
+        dish.enabled = false;
 
         dishObj.transform.SetParent(transform, true);
 
@@ -125,8 +148,11 @@ public class DishPlaceSystem : MonoBehaviour
             if (servedDrink[i].itemObj == null) servedDrink.RemoveAt(i);
         }
 
-        AssignListToPoints(servedFood, foodPoints, "餐食");
-        AssignListToPoints(servedDrink, drinkPoints, "饮品");
+        var activeFood = servedFood.FindAll(d => d.itemObj != null && d.itemObj.activeSelf);
+        var activeDrink = servedDrink.FindAll(d => d.itemObj != null && d.itemObj.activeSelf);
+
+        AssignListToPoints(activeFood, foodPoints, "餐食");
+        AssignListToPoints(activeDrink, drinkPoints, "饮品");
     }
 
     private void AssignListToPoints(List<PlacedDish> dishes, List<DishPoint> points, string logTag)

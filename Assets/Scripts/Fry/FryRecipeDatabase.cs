@@ -22,6 +22,8 @@ public class FryRecipeDatabase : ScriptableObject
         public GameObject resultPrefab; 
         [Tooltip("烹饪完成后，留在锅里的模型预制体")]
         public GameObject finishedVisualPrefab; 
+        [Tooltip("吃完后的空盘子预制体")]
+        public GameObject eatenPrefab;
 
         [Header("订单与结算")]
         // 菜品占用的桌面槽位类型：S/M/L 为餐食，D 为饮品

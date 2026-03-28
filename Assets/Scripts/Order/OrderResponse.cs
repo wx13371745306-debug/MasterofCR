@@ -44,8 +44,17 @@ public class OrderResponse : BaseStation
     public float requiredOrderTime = 2f;
 
     private readonly List<FryRecipeDatabase.FryRecipe> currentOrder = new List<FryRecipeDatabase.FryRecipe>();
-    private readonly List<FryRecipeDatabase.FryRecipe> servedThisRound = new List<FryRecipeDatabase.FryRecipe>();
     private Coroutine eatRoutine;
+
+    [System.Serializable]
+    public class PlacedDishRecord
+    {
+        public FryRecipeDatabase.FryRecipe recipe; // 配方数据
+        public CarryableItem physicalItem;         // 场景里真实的物理盘子物体
+        public bool isCorrectOrder;                // 标记：上对的还是白送的？
+    }
+
+    private readonly List<PlacedDishRecord> dishesOnTable = new List<PlacedDishRecord>();
 
     private bool isInteracting = false;
 
@@ -144,7 +153,7 @@ public class OrderResponse : BaseStation
         currentOrderProgress = requiredOrderTime;
 
         currentOrder.Clear();
-        servedThisRound.Clear();
+        dishesOnTable.Clear();
 
         if (orderGenerator != null)
         {
@@ -162,43 +171,105 @@ public class OrderResponse : BaseStation
 
     void OnItemPlaced(CarryableItem item)
     {
-        if (item == null || currentState != TableState.WaitingForFood)
+        if (item == null) return;
+        
+        // 1. 拦截非 WaitingForFood 状态的放置
+        if (currentState != TableState.WaitingForFood)
         {
+            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 当前不在等菜状态，忽略放置！");
             itemPlacePoint.ClearOccupant();
             return;
         }
 
+        // 2. 解析 item 对应的 recipe
         FryRecipeDatabase.FryRecipe recipe = ResolveRecipeFromDish(item);
         if (recipe == null)
         {
+            Debug.LogWarning($"[OrderResponse] 无法解析放置物 {item.name} 的配方！销毁物品。");
             itemPlacePoint.ClearOccupant();
             Destroy(item.gameObject);
             return;
         }
 
-        bool isFulfilled = GlobalOrderManager.Instance != null &&
-                           GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
-
-        if (!isFulfilled)
-        {
-            itemPlacePoint.ClearOccupant();
-            Destroy(item.gameObject);
-            return;
-        }
-
+        // 3. 判断是否在 currentOrder 中
         int idx = FindInOrder(recipe);
-        if (idx >= 0) currentOrder.RemoveAt(idx);
+        bool isCorrectOrder = false;
 
-        servedThisRound.Add(recipe);
-        if (MoneyManager.Instance != null) MoneyManager.Instance.AddMoney(recipe.price);
+        if (idx >= 0)
+        {
+            isCorrectOrder = true;
+            if (GlobalOrderManager.Instance != null)
+            {
+                GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
+            }
+            if (MoneyManager.Instance != null) MoneyManager.Instance.AddMoney(recipe.price);
+            currentOrder.RemoveAt(idx);
+            Debug.Log($"[OrderResponse] 桌号 {tableId} 成功上对菜: {recipe.recipeName}。剩 {currentOrder.Count} 道菜！消单加钱！");
+        }
+        else
+        {
+            isCorrectOrder = false;
+            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 上错菜惩罚: {recipe.recipeName} 不在订单中！当做白送！");
+        }
+
+        // 4. 尝试放入并防溢出
+        if (dishPlaceSystem != null)
+        {
+            bool placed = dishPlaceSystem.AcceptDish(item, recipe.size);
+            if (!placed)
+            {
+                Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 物理槽满载，触发防溢出，寻找最老的同类菜品隐藏腾位...");
+                
+                // 遍历 dishesOnTable 找到有数据且最老(activeSelf==true)的一盘对应形态的被隐者
+                foreach (var d in dishesOnTable)
+                {
+                    if (d.physicalItem != null && d.physicalItem.gameObject.activeSelf)
+                    {
+                        bool isBothDrink = (recipe.size == DishSize.D && d.recipe.size == DishSize.D);
+                        bool isBothFood = (recipe.size != DishSize.D && d.recipe.size != DishSize.D);
+                        
+                        if (isBothDrink || isBothFood)
+                        {
+                            Debug.Log($"[OrderResponse] 隐藏最先放上来的视觉模型: {d.physicalItem.gameObject.name}，释放自身占用！");
+                            d.physicalItem.gameObject.SetActive(false);
+                            break;
+                        }
+                    }
+                }
+                
+                // 此时直接强制塞入新菜由于原本在位置的已被 SetActive(false) ，会在下一次 DishPlaceSystem 中分配给这个新菜
+                dishPlaceSystem.ForceAcceptDish(item, recipe.size);
+            }
+        }
+        else
+        {
+            item.transform.SetParent(transform);
+        }
 
         itemPlacePoint.ClearOccupant();
-        if (dishPlaceSystem != null) dishPlaceSystem.AcceptDish(item, recipe.size);
 
+        // 5. 封装记录
+        PlacedDishRecord record = new PlacedDishRecord
+        {
+            recipe = recipe,
+            physicalItem = item,
+            isCorrectOrder = isCorrectOrder
+        };
+        dishesOnTable.Add(record);
+
+        // 6. 判断是否点菜全齐
         if (currentOrder.Count == 0)
         {
             float totalEatTime = 0f;
-            foreach (var r in servedThisRound) totalEatTime += Mathf.Max(0f, r.eatTime);
+            foreach (var d in dishesOnTable)
+            {
+                if (d.isCorrectOrder && d.recipe != null)
+                {
+                    totalEatTime += Mathf.Max(0f, d.recipe.eatTime);
+                }
+            }
+            
+            Debug.Log($"[OrderResponse] 桌号 {tableId} 菜品全齐！进入 Eating 状态，总耗时估算: {totalEatTime}s");
             currentState = TableState.Eating;
             eatRoutine = StartCoroutine(EatCountdown(totalEatTime));
         }
@@ -225,6 +296,38 @@ public class OrderResponse : BaseStation
     {
         float t = Mathf.Max(0f, seconds);
         while (t > 0f) { t -= Time.deltaTime; yield return null; }
+        
+        Debug.Log($"[OrderResponse] 桌号 {tableId} 用餐完毕，执行吃完变空盘动画...");
+        
+        // --- 吃完变空盘 ---
+        foreach(var d in dishesOnTable)
+        {
+            if (d.physicalItem == null) continue;
+            GameObject dishObj = d.physicalItem.gameObject;
+
+            // 1. 跳过被隐藏的盘子
+            if (!dishObj.activeSelf) continue;
+
+            // 2. 隐藏 physicalItem 下代表食物的子网格（安全的做法：关闭所有现存子对象的挂载显示）
+            foreach(Transform child in dishObj.transform)
+            {
+                child.gameObject.SetActive(false);
+            }
+            // 兜底直接挂载在主体的 MeshRenderer
+            Renderer[] rootRenderers = dishObj.GetComponents<Renderer>();
+            foreach(var r in rootRenderers) r.enabled = false;
+
+            // 3. 实例化生成空盘子子物体
+            if (d.recipe != null && d.recipe.eatenPrefab != null)
+            {
+                GameObject emptyPlate = Instantiate(d.recipe.eatenPrefab, dishObj.transform);
+                emptyPlate.transform.localPosition = Vector3.zero;
+                emptyPlate.transform.localRotation = Quaternion.identity;
+                // 由于是在新生成的树结构下，Active 为 true，不会受之前上面逻辑干扰
+            }
+        }
+
+        // 4. 将桌子状态转为 WaitingForCleanup
         currentState = TableState.WaitingForCleanup;
         eatRoutine = null;
     }
@@ -232,6 +335,7 @@ public class OrderResponse : BaseStation
     public void CleanUpTable()
     {
         if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
+        dishesOnTable.Clear(); // 清理记录
         currentState = TableState.Empty; 
         
         // 【新增】：客人吃完走人，桌子解开预定锁
