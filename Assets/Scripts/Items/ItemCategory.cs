@@ -10,5 +10,7 @@ public enum ItemCategory
     Container = 1 << 3,
     StationLike = 1 << 4,
     ContainerContent = 1 << 5,
+    DirtyPlate = 1 << 6,
+    CleanPlate = 1 << 7,
     Any = ~0
 }

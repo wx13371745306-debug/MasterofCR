@@ -20,6 +20,8 @@ public class OrderResponse : BaseStation
     public DishPlaceSystem dishPlaceSystem;
     public OrderGenerator orderGenerator;
     public FryRecipeDatabase recipeDatabase;
+    [Tooltip("生成的整体脏盘子堆预制体")]
+    public DirtyPlateStack dirtyPlateStackPrefab;
 
     [Header("Table Identity")]
     public int tableId = 0;
@@ -27,6 +29,7 @@ public class OrderResponse : BaseStation
     [Header("State (ReadOnly)")]
     public TableState currentState = TableState.Empty;
     public float currentOrderProgress = 0f;
+    public float currentEatTime = 0f; // 当前剩余用餐时间
     
     // 【新增】：预定锁。只要被分配了哪怕人还没到，这桌也不能再接客了
     public bool isReserved = false;
@@ -94,6 +97,21 @@ public class OrderResponse : BaseStation
             if (currentOrderProgress >= requiredOrderTime)
             {
                 CompleteOrdering();
+            }
+        }
+
+        // 玩家端走脏盘子堆后，桌子彻底空出
+        if (currentState == TableState.WaitingForCleanup)
+        {
+            if (itemPlacePoint != null && itemPlacePoint.CurrentItem == null)
+            {
+                // 玩家按下J把大坨脏盘子拿走后，才真正销毁留在桌子上的各个独立空盘子模型
+                if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
+                dishesOnTable.Clear();
+
+                currentState = TableState.Empty;
+                isReserved = false;
+                Debug.Log($"[OrderResponse] 桌号 {tableId} 脏盘堆被收走，桌子重置为 Empty 空闲状态！");
             }
         }
     }
@@ -257,6 +275,9 @@ public class OrderResponse : BaseStation
         };
         dishesOnTable.Add(record);
 
+        // 【新增】：将该 dish 设置为不可拿取
+        item.isPickable = false;
+
         // 6. 判断是否点菜全齐
         if (currentOrder.Count == 0)
         {
@@ -294,40 +315,58 @@ public class OrderResponse : BaseStation
 
     private IEnumerator EatCountdown(float seconds)
     {
-        float t = Mathf.Max(0f, seconds);
-        while (t > 0f) { t -= Time.deltaTime; yield return null; }
+        currentEatTime = Mathf.Max(0f, seconds);
+        while (currentEatTime > 0f) 
+        { 
+            currentEatTime -= Time.deltaTime; 
+            yield return null; 
+        }
+        currentEatTime = 0f;
         
-        Debug.Log($"[OrderResponse] 桌号 {tableId} 用餐完毕，执行吃完变空盘动画...");
+        Debug.Log($"[OrderResponse] 桌号 {tableId} 用餐完毕，生成各个空盘模型以及整体的隐形脏盘子堆...");
         
-        // --- 吃完变空盘 ---
-        foreach(var d in dishesOnTable)
+        int dirtyCount = 0;
+        foreach (var d in dishesOnTable)
         {
+            if (d.physicalItem != null) dirtyCount++;
+            
+            // --- 恢复你想要的单个菜的“盘子剥离并生成变空盘子”独立逻辑 ---
             if (d.physicalItem == null) continue;
             GameObject dishObj = d.physicalItem.gameObject;
 
-            // 1. 跳过被隐藏的盘子
             if (!dishObj.activeSelf) continue;
 
-            // 2. 隐藏 physicalItem 下代表食物的子网格（安全的做法：关闭所有现存子对象的挂载显示）
             foreach(Transform child in dishObj.transform)
             {
                 child.gameObject.SetActive(false);
             }
-            // 兜底直接挂载在主体的 MeshRenderer
             Renderer[] rootRenderers = dishObj.GetComponents<Renderer>();
             foreach(var r in rootRenderers) r.enabled = false;
 
-            // 3. 实例化生成空盘子子物体
             if (d.recipe != null && d.recipe.eatenPrefab != null)
             {
                 GameObject emptyPlate = Instantiate(d.recipe.eatenPrefab, dishObj.transform);
                 emptyPlate.transform.localPosition = Vector3.zero;
                 emptyPlate.transform.localRotation = Quaternion.identity;
-                // 由于是在新生成的树结构下，Active 为 true，不会受之前上面逻辑干扰
             }
         }
 
-        // 4. 将桌子状态转为 WaitingForCleanup
+        // 注意：不在这里调用 ClearAllDishes，把散落的空盘继续留在桌上给玩家看
+
+        // 2. 生成一个代表整体的脏盘子堆，直接放在桌子的中心放置点上
+        if (dirtyCount > 0 && dirtyPlateStackPrefab != null)
+        {
+            DirtyPlateStack stack = Instantiate(dirtyPlateStackPrefab, transform.position, Quaternion.identity);
+            stack.SetPlateCount(dirtyCount);
+            stack.HideVisualsForTable(); // 关键修正：强制它在被拿起前绝对隐身！
+            
+            if (itemPlacePoint != null)
+            {
+                itemPlacePoint.TryAcceptItem(stack); 
+            }
+        }
+
+        // 3. 将桌子状态转为 WaitingForCleanup，ui 显示待清理
         currentState = TableState.WaitingForCleanup;
         eatRoutine = null;
     }

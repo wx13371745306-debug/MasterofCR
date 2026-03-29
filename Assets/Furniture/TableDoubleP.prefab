@@ -354,9 +354,11 @@ MonoBehaviour:
   dishPlaceSystem: {fileID: 7479316593837386389}
   orderGenerator: {fileID: 0}
   recipeDatabase: {fileID: 11400000, guid: 730e8ac883ba229498c2807b9329f4bd, type: 2}
+  dirtyPlateStackPrefab: {fileID: 4430841268297836081, guid: cf8b2abf0b92e0844b30889cab3c6fdd, type: 3}
   tableId: 0
   currentState: 0
   currentOrderProgress: 0
+  currentEatTime: 0
   isReserved: 0
   approachPoint: {fileID: 9066875306593602634}
   chairs:

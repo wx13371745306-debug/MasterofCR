@@ -44,7 +44,7 @@ public class CarryableItem : MonoBehaviour
         itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
     }
 
-    void Awake()
+    protected virtual void Awake()
     {
         if (itemColliders == null || itemColliders.Length == 0)
             itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
@@ -55,7 +55,7 @@ public class CarryableItem : MonoBehaviour
         SetSensorHighlight(false);
     }
 
-    void Start()
+    protected virtual void Start()
     {
         if (state == ItemState.Free && initialPlacePoint != null)
             ForcePlaceAtStart(initialPlacePoint);
