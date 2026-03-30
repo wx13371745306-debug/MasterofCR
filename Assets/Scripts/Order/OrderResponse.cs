@@ -59,6 +59,9 @@ public class OrderResponse : BaseStation
 
     private readonly List<PlacedDishRecord> dishesOnTable = new List<PlacedDishRecord>();
 
+    // 【新增】：用来存储纯净无害的“吃完后”独立视觉模型，防止跟物理逻辑产生任何藕断丝连
+    private readonly List<GameObject> activeEatenModels = new List<GameObject>();
+
     private bool isInteracting = false;
 
     void OnEnable() { if (itemPlacePoint != null) itemPlacePoint.OnItemPlacedEvent += OnItemPlaced; }
@@ -105,13 +108,18 @@ public class OrderResponse : BaseStation
         {
             if (itemPlacePoint != null && itemPlacePoint.CurrentItem == null)
             {
-                // 玩家按下J把大坨脏盘子拿走后，才真正销毁留在桌子上的各个独立空盘子模型
-                if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
-                dishesOnTable.Clear();
+                Debug.Log($"[Debug-Update] ⚠️ 触发清空桌面条件！状态为 WaitingForCleanup 且中心放置点为空！准备销毁 {activeEatenModels.Count} 个独立残羹视觉模型...");
+
+                // 此时巡回清除散落在桌上的，那些毫无物理属性的纯“残羹”视觉模型
+                foreach (var model in activeEatenModels)
+                {
+                    if (model != null) Destroy(model);
+                }
+                activeEatenModels.Clear();
 
                 currentState = TableState.Empty;
                 isReserved = false;
-                Debug.Log($"[OrderResponse] 桌号 {tableId} 脏盘堆被收走，桌子重置为 Empty 空闲状态！");
+                Debug.Log($"[OrderResponse] 桌号 {tableId} 脏盘堆被收走，独立残羹销毁，桌子重置为 Empty 空闲状态！");
             }
         }
     }
@@ -191,6 +199,10 @@ public class OrderResponse : BaseStation
     {
         if (item == null) return;
         
+        // 【关键防护】：由于生成大脏盘堆并放入中心点时也会触发此事件，
+        // 且它不属于“上餐”行为，所以遇到脏盘堆直接放行，切勿执行拦截拒收和订单判定逻辑！
+        if (item is DirtyPlateStack) return;
+
         // 1. 拦截非 WaitingForFood 状态的放置
         if (currentState != TableState.WaitingForFood)
         {
@@ -323,51 +335,56 @@ public class OrderResponse : BaseStation
         }
         currentEatTime = 0f;
         
-        Debug.Log($"[OrderResponse] 桌号 {tableId} 用餐完毕，生成各个空盘模型以及整体的隐形脏盘子堆...");
+        Debug.Log($"[Debug-Eat] 桌号 {tableId} 开始执行用餐完毕逻辑，当前桌上记录菜品数量: {dishesOnTable.Count}");
         
         int dirtyCount = 0;
+
         foreach (var d in dishesOnTable)
         {
-            if (d.physicalItem != null) dirtyCount++;
-            
-            // --- 恢复你想要的单个菜的“盘子剥离并生成变空盘子”独立逻辑 ---
+            string recipeName = d.recipe != null ? d.recipe.recipeName : "未知菜品";
+            Debug.Log($"[Debug-Eat] 处理桌上菜品: {recipeName}, physicalItem 是否为空: {d.physicalItem == null}");
+
             if (d.physicalItem == null) continue;
-            GameObject dishObj = d.physicalItem.gameObject;
+            dirtyCount++;
 
-            if (!dishObj.activeSelf) continue;
+            // 提取原来菜品精确定位好的物理网格位置与旋转
+            Vector3 pos = d.physicalItem.transform.position;
+            Quaternion rot = d.physicalItem.transform.rotation;
 
-            foreach(Transform child in dishObj.transform)
+            bool hasEatenPrefab = (d.recipe != null && d.recipe.eatenPrefab != null);
+            Debug.Log($"[Debug-Eat] - {recipeName} 物理坐标: {pos}, 是否有吃完模型(eatenPrefab): {hasEatenPrefab}");
+
+            // 只需要管 Instantiate 独立并且不带标签也没有逻辑的纯视觉预制体
+            if (hasEatenPrefab)
             {
-                child.gameObject.SetActive(false);
-            }
-            Renderer[] rootRenderers = dishObj.GetComponents<Renderer>();
-            foreach(var r in rootRenderers) r.enabled = false;
-
-            if (d.recipe != null && d.recipe.eatenPrefab != null)
-            {
-                GameObject emptyPlate = Instantiate(d.recipe.eatenPrefab, dishObj.transform);
-                emptyPlate.transform.localPosition = Vector3.zero;
-                emptyPlate.transform.localRotation = Quaternion.identity;
+                GameObject cleanEatenVisual = Instantiate(d.recipe.eatenPrefab, pos, rot, this.transform);
+                activeEatenModels.Add(cleanEatenVisual);
+                Debug.Log($"[Debug-Eat] - 成功生成【{cleanEatenVisual.name}】并加入 activeEatenModels 列表。当前列表总量: {activeEatenModels.Count}");
             }
         }
 
-        // 注意：不在这里调用 ClearAllDishes，把散落的空盘继续留在桌上给玩家看
+        // --- 破而后立：毫不留情地切断一切旧物引用，秒删 ---
+        Debug.Log($"[Debug-Eat] 开始清理 DishPlaceSystem 原物理菜品...");
+        if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
+        dishesOnTable.Clear();
 
-        // 2. 生成一个代表整体的脏盘子堆，直接放在桌子的中心放置点上
+        // 2. 生成包含数据总和的脏盘堆，并放入中心点位
+        Debug.Log($"[Debug-Eat] 准备生成脏盘堆，共计 {dirtyCount} 个盘子。dirtyPlateStackPrefab 是否为空: {dirtyPlateStackPrefab == null}");
         if (dirtyCount > 0 && dirtyPlateStackPrefab != null)
         {
             DirtyPlateStack stack = Instantiate(dirtyPlateStackPrefab, transform.position, Quaternion.identity);
             stack.SetPlateCount(dirtyCount);
-            stack.HideVisualsForTable(); // 关键修正：强制它在被拿起前绝对隐身！
+            stack.ForceHideUntilPickedUp();
             
             if (itemPlacePoint != null)
             {
-                itemPlacePoint.TryAcceptItem(stack); 
+                bool accepted = itemPlacePoint.TryAcceptItem(stack); 
+                Debug.Log($"[Debug-Eat] 将新生成的 DirtyPlateStack 放入中心点位，是否成功放入(TryAcceptItem): {accepted}");
             }
         }
 
-        // 3. 将桌子状态转为 WaitingForCleanup，ui 显示待清理
         currentState = TableState.WaitingForCleanup;
+        Debug.Log($"[Debug-Eat] 切换状态为 WaitingForCleanup。流程结束。");
         eatRoutine = null;
     }
 
@@ -375,6 +392,13 @@ public class OrderResponse : BaseStation
     {
         if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
         dishesOnTable.Clear(); // 清理记录
+        
+        foreach (var model in activeEatenModels)
+        {
+            if (model != null) Destroy(model);
+        }
+        activeEatenModels.Clear();
+
         currentState = TableState.Empty; 
         
         // 【新增】：客人吃完走人，桌子解开预定锁

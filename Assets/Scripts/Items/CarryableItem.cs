@@ -74,7 +74,7 @@ public class CarryableItem : MonoBehaviour
         return isPickable && state != ItemState.Held;
     }
 
-    public void BeginHold(Transform holdPoint)
+    public virtual void BeginHold(Transform holdPoint)
     {
         if (holdPoint == null) return;
 
@@ -139,7 +139,7 @@ public class CarryableItem : MonoBehaviour
         state = ItemState.Free;
     }
 
-    public void DropToGround()
+    public virtual void DropToGround()
     {
         if (currentPlacePoint != null)
         {

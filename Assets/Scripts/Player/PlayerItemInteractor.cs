@@ -25,11 +25,13 @@ public class PlayerItemInteractor : MonoBehaviour
 
         UpdateHighlights(); // 【新增】每帧计算并控制高亮
 
-        if (Keyboard.current.jKey.wasPressedThisFrame && heldItem == null && activeStation == null)
-            TryBeginHold();
-
-        if (Keyboard.current.jKey.wasReleasedThisFrame && heldItem != null)
-            TryEndHold();
+        if (Keyboard.current.jKey.wasPressedThisFrame)
+        {
+            if (heldItem == null && activeStation == null)
+                TryBeginHold();
+            else if (heldItem != null)
+                TryEndHold();
+        }
 
         if (Keyboard.current.kKey.wasPressedThisFrame)
         {

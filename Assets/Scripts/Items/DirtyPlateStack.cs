@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 [RequireComponent(typeof(BoxCollider))]
 public class DirtyPlateStack : CarryableItem
@@ -13,10 +12,11 @@ public class DirtyPlateStack : CarryableItem
     [Tooltip("存放所有视觉盘子的父节点")]
     public Transform visualRoot;
 
-    private List<GameObject> visualPlates = new List<GameObject>();
     private BoxCollider stackCollider;
     private float baseColliderSizeY = 0.05f;
     private float baseColliderCenterY = 0.025f;
+
+    private bool forcedHidden = false; // 终极隐身锁，只有被玩家确切拿到手里才会解除
 
     protected override void Awake()
     {
@@ -36,15 +36,19 @@ public class DirtyPlateStack : CarryableItem
             visualRoot.localRotation = Quaternion.identity;
         }
 
-        // 初始化自身类别，确保能放到通用的或者专门只收脏盘子的桌面上
         categories |= ItemCategory.DirtyPlate;
     }
 
     protected override void Start()
     {
         base.Start();
-        // 初始渲染一次模型
         UpdateVisuals();
+
+        // 如果在初始化前就被施加了隐身锁，确保它生效
+        if (forcedHidden && visualRoot != null)
+        {
+            visualRoot.gameObject.SetActive(false);
+        }
     }
 
     public void SetPlateCount(int count)
@@ -53,62 +57,51 @@ public class DirtyPlateStack : CarryableItem
         UpdateVisuals();
     }
 
-
-
-    private bool hiddenByTable = false;
-
-    // 允许外界（如餐桌）强制让它进入隐身高阶状态，直到被拿起
-    public void HideVisualsForTable()
+    // 由餐桌在吃完饭时调用，施加终极隐身锁
+    public void ForceHideUntilPickedUp()
     {
-        hiddenByTable = true;
+        forcedHidden = true;
         if (visualRoot != null) visualRoot.gameObject.SetActive(false);
     }
 
-    private void Update()
+    // J键拿取时，CarryableItem基类会触发该方法
+    public override void BeginHold(Transform holdPoint)
     {
-        if (visualRoot == null) return;
+        base.BeginHold(holdPoint);
         
-        if (hiddenByTable)
-        {
-            if (State == ItemState.Held || State == ItemState.Free)
-            {
-                // 一旦被玩家拿走或者脱落，立马现原形
-                hiddenByTable = false; 
-                if (!visualRoot.gameObject.activeSelf) visualRoot.gameObject.SetActive(true);
-            }
-            else
-            {
-                // 只要还放在那儿，就藏着
-                if (visualRoot.gameObject.activeSelf) visualRoot.gameObject.SetActive(false);
-            }
-            return;
-        }
+        // 瞬间解除隐身锁
+        forcedHidden = false;
+        if (visualRoot != null) visualRoot.gameObject.SetActive(true);
+    }
 
-        // 普通状态下始终显示
-        if (!visualRoot.gameObject.activeSelf) visualRoot.gameObject.SetActive(true);
+    public override void DropToGround()
+    {
+        base.DropToGround();
+        
+        // 如果中途掉落，也确保现形
+        forcedHidden = false;
+        if (visualRoot != null) visualRoot.gameObject.SetActive(true);
     }
 
     private void UpdateVisuals()
     {
-        if (singlePlatePrefab == null) return;
+        if (singlePlatePrefab == null || visualRoot == null) return;
 
-        // 清理旧网格
-        foreach (var p in visualPlates)
+        // 清理旧渲染
+        foreach (Transform child in visualRoot)
         {
-            if (p != null) Destroy(p);
+            Destroy(child.gameObject);
         }
-        visualPlates.Clear();
 
-        // 实例化新网格叠放
+        // 创建新网格
         for (int i = 0; i < plateCount; i++)
         {
             GameObject plate = Instantiate(singlePlatePrefab, visualRoot);
             plate.transform.localPosition = new Vector3(0, i * stackYOffset, 0);
             plate.transform.localRotation = Quaternion.identity;
-            visualPlates.Add(plate);
         }
 
-        // 动态扩大碰撞体的高度和中心，使其包裹住所有垒起来的盘子
+        // 刷新碰撞体
         if (stackCollider != null)
         {
             float newSizeY = baseColliderSizeY + (plateCount - 1) * stackYOffset;
