@@ -24,6 +24,7 @@ public class PlayerInteractionSensor : MonoBehaviour
     private CarryableItem currentItem;
     private ItemPlacePoint currentPlacePoint;
     private IInteractiveStation currentStation;
+    private CarryableItem currentStackTarget; // 【新增】当前可堆叠的目标（持物状态下）
 
     void Update()
     {
@@ -34,6 +35,7 @@ public class PlayerInteractionSensor : MonoBehaviour
         PickNearestItem(originPos);
         PickNearestPlacePoint(originPos);
         PickNearestStation(originPos);
+        PickNearestStackTarget(originPos); // 【新增】搜索可堆叠的目标
     }
 
     void PickNearestItem(Vector3 originPos)
@@ -44,7 +46,8 @@ public class PlayerInteractionSensor : MonoBehaviour
         float bestDist = float.MaxValue;
         foreach (var item in itemCandidates)
         {
-            if (!item.CanBePickedUp()) continue; 
+            // 只排除正在被别人拿着的物品，其余的交给 Interactor 判断（如 DirtyPlateStack 虽不可直接拾取但需要被检测到）
+            if (item.State == CarryableItem.ItemState.Held) continue;
 
             float dist = Vector3.Distance(originPos, item.transform.position);
             if (dist < bestDist - 0.001f) { bestDist = dist; best = item; }
@@ -100,6 +103,59 @@ public class PlayerInteractionSensor : MonoBehaviour
         currentStation = best;
     }
 
+    /// <summary>
+    /// 【新增】当玩家手持物品时，在已有的 itemCandidates 池中搜索可堆叠的目标。
+    /// 目标可以是：
+    ///   1. 另一个拥有 StackableProp 且类别匹配的独立物品 → 合并成新堆
+    ///   2. 一个已有的 DynamicItemStack 且还有空位 → 放入已有堆
+    /// 手里没有东西时，或者手里的东西没有 StackableProp，stackTarget = null。
+    /// </summary>
+    void PickNearestStackTarget(Vector3 originPos)
+    {
+        currentStackTarget = null;
+        
+        CarryableItem heldItem = interactor != null ? interactor.GetHeldItem() : null;
+        if (heldItem == null) return; // 空手时不搜索
+
+        // 手持物品必须有 StackableProp 或者自己就是 Stack（不太可能但做防御）
+        StackableProp heldStackable = heldItem.GetComponent<StackableProp>();
+        if (heldStackable == null) return; // 手里的东西不可堆叠
+
+        CarryableItem best = null;
+        float bestDist = float.MaxValue;
+
+        foreach (var candidate in itemCandidates)
+        {
+            if (candidate == null || candidate == heldItem) continue;
+            if (!candidate.gameObject.activeInHierarchy) continue;
+
+            // 情况1：候选是一个已有的 DynamicItemStack
+            DynamicItemStack existingStack = candidate as DynamicItemStack;
+            if (existingStack != null)
+            {
+                if (existingStack.CanAccept(heldItem))
+                {
+                    float dist = Vector3.Distance(originPos, candidate.transform.position);
+                    if (dist < bestDist - 0.001f) { bestDist = dist; best = candidate; }
+                }
+                continue;
+            }
+
+            // 情况2：候选是一个落单的、拥有 StackableProp 的同类物品
+            StackableProp candidateStackable = candidate.GetComponent<StackableProp>();
+            if (candidateStackable != null && candidateStackable.CanStackWith(heldItem))
+            {
+                // 候选不能正在被别人拿着
+                if (candidate.State == CarryableItem.ItemState.Held) continue;
+
+                float dist = Vector3.Distance(originPos, candidate.transform.position);
+                if (dist < bestDist - 0.001f) { bestDist = dist; best = candidate; }
+            }
+        }
+
+        currentStackTarget = best;
+    }
+
     void OnTriggerEnter(Collider other)
     {
         if (((1 << other.gameObject.layer) & itemMask) != 0)
@@ -151,6 +207,25 @@ public class PlayerInteractionSensor : MonoBehaviour
     public CarryableItem GetCurrentItem() => currentItem;
     public ItemPlacePoint GetCurrentPlacePoint() => currentPlacePoint;
     public IInteractiveStation GetCurrentStation() => currentStation;
+    public CarryableItem GetCurrentStackTarget() => currentStackTarget; // 【新增】
+
+    /// <summary>
+    /// 【新增】让运行时动态生成的 CarryableItem（如 DynamicItemStack）手动注册到 Sensor 里。
+    /// 解决在 Sensor 范围内原地创建时 OnTriggerEnter 不会触发的问题。
+    /// </summary>
+    public void RegisterItem(CarryableItem item)
+    {
+        if (item != null)
+        {
+            itemCandidates.Add(item);
+            if (debugLog) Debug.Log($"<color=#00FFFF>[Sensor]</color> 手动注册了 Item: {item.name}");
+        }
+    }
+
+    public void UnregisterItem(CarryableItem item)
+    {
+        if (item != null) itemCandidates.Remove(item);
+    }
     
     // 省略 OnGUI 和 OnDrawGizmos (保留你原先的即可) ...
     // ...
@@ -202,6 +277,12 @@ public class PlayerInteractionSensor : MonoBehaviour
             string prefix = (i == currentItem) ? "<b><color=yellow>[BEST]</color></b> " : "";
             GUILayout.Label($"{prefix}{i.name} | Dist: {dist:F2}", new GUIStyle(GUI.skin.label) { richText = true });
         }
+        GUILayout.Space(10);
+
+        // 4.【新增】打印 Stack Target 状态
+        string stackTargetText = currentStackTarget != null ? currentStackTarget.name : "无";
+        GUILayout.Label($"<b>--- Stack Target ---</b>", new GUIStyle(GUI.skin.label) { richText = true, normal = new GUIStyleState() { textColor = Color.magenta } });
+        GUILayout.Label($"当前堆叠目标: <b>{stackTargetText}</b>", new GUIStyle(GUI.skin.label) { richText = true });
 
         GUILayout.EndArea();
     }

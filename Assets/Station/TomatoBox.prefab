@@ -553,8 +553,15 @@ MonoBehaviour:
   highlightObject: {fileID: 4007742793928181756}
   debugLog: 1
   itemPrefab: {fileID: 7096165798621821909, guid: 9e14f77e39e257c4a9f6db9eb446fad6, type: 3}
-  maxCount: 5
+  maxCount: 10
   currentCount: 0
+  stackPrefab: {fileID: 0}
+  stackSize: 4
+  stackLayout: 1
+  stackOffset: 0.05
+  gridColumns: 2
+  gridRows: 2
+  gridSpacing: 0.15
   closedModel: {fileID: 9120369421023626978}
   openedModel: {fileID: 4392564521464489681}
   multipleItemsModel: {fileID: 2398232860571627429}

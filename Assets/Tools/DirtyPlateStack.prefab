@@ -108,13 +108,15 @@ MonoBehaviour:
   categories: 64
   initialPlacePoint: {fileID: 0}
   isUsable: 0
-  isPickable: 1
+  isPickable: 0
   useHighlightObject: {fileID: 0}
   debugLog: 1
   plateCount: 1
   singlePlatePrefab: {fileID: 2333114217492066870, guid: 49cebbdedb4494b4cb6ed420cf96d610, type: 3}
+  stackPrefab: {fileID: 0}
   stackYOffset: 0.05
   visualRoot: {fileID: 5447718609551752888}
+  maxDispensePerStack: 5
 --- !u!54 &8922402952605187616
 Rigidbody:
   m_ObjectHideFlags: 0

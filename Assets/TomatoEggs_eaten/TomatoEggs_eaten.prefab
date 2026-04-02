@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 383610000130337319}
+  - component: {fileID: 4022685978680151470}
   m_Layer: 0
   m_Name: TomatoEggs_eaten
   m_TagString: Untagged
@@ -33,6 +34,28 @@ Transform:
   - {fileID: 5027339601440215937}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4022685978680151470
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 826299552825601382}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
+  rb: {fileID: 0}
+  itemColliders: []
+  poseConfig: {fileID: 0}
+  sensorHighlight: {fileID: 0}
+  categories: 0
+  initialPlacePoint: {fileID: 0}
+  isUsable: 1
+  isPickable: 1
+  useHighlightObject: {fileID: 0}
+  debugLog: 1
 --- !u!1001 &4777769200718738538
 PrefabInstance:
   m_ObjectHideFlags: 0
