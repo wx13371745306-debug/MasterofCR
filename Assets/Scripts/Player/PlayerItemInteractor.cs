@@ -221,7 +221,7 @@ public class PlayerItemInteractor : MonoBehaviour
             DynamicItemStack existingStack = stackTarget as DynamicItemStack;
             if (existingStack != null)
             {
-                if (existingStack.PushItem(item))
+                if (existingStack.PushItem(item, sensor))
                 {
                     heldItem = null;
                     if (debugLog) Debug.Log($"<color=#00FF00>[大脑 放下]</color> 将 {item.name} 推入已有的 Stack: {existingStack.name}");

@@ -123,9 +123,10 @@ public class DynamicItemStack : CarryableItem
     /// <summary>
     /// 外部接口：尝试向堆中推入一个物品。
     /// 由 PlayerItemInteractor 在 TryEndHold 中调用。
+    /// 传入 sensor 以便将被吸收的物品从检测列表中注销（防止幽灵残留）。
     /// 返回 true 表示成功吸收。
     /// </summary>
-    public bool PushItem(CarryableItem item)
+    public bool PushItem(CarryableItem item, PlayerInteractionSensor sensor = null)
     {
         if (item == null) return false;
 
@@ -135,7 +136,6 @@ public class DynamicItemStack : CarryableItem
             return false;
         }
 
-        // 检查类别是否匹配
         if (!item.HasAnyCategory(categories))
         {
             if (debugLog) Debug.LogWarning($"<color=#FF0000>[DynamicItemStack]</color> 类别不匹配！Stack 是 {categories}，物品是 {item.categories}");
@@ -146,6 +146,12 @@ public class DynamicItemStack : CarryableItem
 
         PushItemSilently(item);
         UpdateVisuals();
+
+        if (sensor != null)
+        {
+            sensor.UnregisterItem(item);
+        }
+
         return true;
     }
 
@@ -188,6 +194,10 @@ public class DynamicItemStack : CarryableItem
                 if (c != null) c.enabled = false;
             }
         }
+
+        // 禁用 StackableProp，防止堆内物品仍被当作独立堆叠目标
+        StackableProp stackable = item.GetComponent<StackableProp>();
+        if (stackable != null) stackable.enabled = false;
 
         stackedItems.Add(item);
     }
@@ -264,6 +274,9 @@ public class DynamicItemStack : CarryableItem
                 if (c != null) c.enabled = true;
             }
         }
+
+        StackableProp stackable = item.GetComponent<StackableProp>();
+        if (stackable != null) stackable.enabled = true;
     }
 
     private void UpdateVisuals()

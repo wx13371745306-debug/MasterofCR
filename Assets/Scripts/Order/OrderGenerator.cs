@@ -5,8 +5,9 @@ public class OrderGenerator : MonoBehaviour
 {
     [Header("Refs")]
     public FryRecipeDatabase recipeDatabase;
+    public DrinkRecipeDatabase drinkRecipeDatabase;
+    public GameConfigSO gameConfig;
 
-    // 核心生成方法，由每个桌子的 OrderResponse 调用
     public List<FryRecipeDatabase.FryRecipe> GenerateOrder(int min, int max, DishPlaceSystem system)
     {
         var order = new List<FryRecipeDatabase.FryRecipe>();
@@ -31,13 +32,13 @@ public class OrderGenerator : MonoBehaviour
             return order;
         }
 
-        // 2. 确定要生成几个菜
+        // 2. 确定要生成几个菜（仅餐食）
         int finalMin = Mathf.Max(1, min);
         int finalMax = Mathf.Max(finalMin, max);
         int targetCount = Random.Range(finalMin, finalMax + 1);
         Debug.Log($"[OrderGenerator] 开始生成订单，目标菜品数：{targetCount}。可用槽位数量：{remainingSlots.Count}。");
 
-        // 3. 准备题库（只选已解锁的）
+        // 3. 准备餐食题库（只选已解锁的）
         var candidates = new List<FryRecipeDatabase.FryRecipe>();
         foreach (var r in recipeDatabase.recipes)
         {
@@ -49,26 +50,46 @@ public class OrderGenerator : MonoBehaviour
 
         if (candidates.Count == 0) return order;
 
-        // 4. 开始抽卡（加入了防止死循环的安全退出机制）
+        // 4. 抽取餐食
         int safety = 0;
         while (order.Count < targetCount && remainingSlots.Count > 0 && safety < 500)
         {
             safety++;
 
-            // 随机抽一道菜（不从 candidates 里 Remove，允许点两份一样的菜）
             int idx = Random.Range(0, candidates.Count);
             var pick = candidates[idx];
 
-            // 尝试把这道菜塞进槽位里
             if (!TryConsumeSlotFor(pick.size, remainingSlots))
             {
                 Debug.Log($"[OrderGenerator] 尝试添加 {pick.recipeName}({pick.size}) 失败：没有合适的空余槽位。");
-                // 如果塞不进去（比如抽到了大菜，但桌上只有小槽了），就跳过，重抽
                 continue; 
             }
 
             Debug.Log($"[OrderGenerator] 成功添加 {pick.recipeName}({pick.size})，剩余可用槽位：{remainingSlots.Count}");
             order.Add(pick);
+        }
+
+        // 5. 独立掷骰：是否追加一杯饮料
+        if (drinkRecipeDatabase != null && gameConfig != null)
+        {
+            float roll = Random.value;
+            if (roll < gameConfig.drinkOrderProbability)
+            {
+                var drinkCandidates = drinkRecipeDatabase.GetUnlockedRecipes();
+                if (drinkCandidates.Count > 0)
+                {
+                    var drinkPick = drinkCandidates[Random.Range(0, drinkCandidates.Count)];
+                    if (TryConsumeSlotFor(DishSize.D, remainingSlots))
+                    {
+                        order.Add(drinkPick);
+                        Debug.Log($"[OrderGenerator] 顾客加点了饮料: {drinkPick.recipeName}");
+                    }
+                    else
+                    {
+                        Debug.Log($"[OrderGenerator] 顾客想点饮料但没有可用的饮品槽位。");
+                    }
+                }
+            }
         }
 
         Debug.Log($"[OrderGenerator] 订单生成完毕，最终菜品数：{order.Count}。");

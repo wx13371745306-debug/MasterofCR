@@ -11,8 +11,10 @@ public class GlobalOrderManager : MonoBehaviour
     // 单例模式，方便全场景任意脚本呼叫它
     public static GlobalOrderManager Instance { get; private set; }
 
+    [Header("饮料菜谱（供各桌自动获取）")]
+    public DrinkRecipeDatabase drinkRecipeDatabase;
+
     [Header("实时订单数据 (仅供观察)")]
-    // 存储当前所有未完成的订单。在 Inspector 里可以看到，方便 Debug
     public List<OrderInstance> activeOrders = new List<OrderInstance>();
 
     // ================== 【核心事件：解耦 UI 的关键】 ==================

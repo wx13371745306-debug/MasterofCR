@@ -20,6 +20,7 @@ public class OrderResponse : BaseStation
     public DishPlaceSystem dishPlaceSystem;
     public OrderGenerator orderGenerator;
     public FryRecipeDatabase recipeDatabase;
+    public DrinkRecipeDatabase drinkRecipeDatabase;
     [Tooltip("生成的整体脏盘子堆预制体")]
     public DirtyPlateStack dirtyPlateStackPrefab;
 
@@ -88,6 +89,12 @@ public class OrderResponse : BaseStation
 
         if (recipeDatabase == null && orderGenerator != null)
             recipeDatabase = orderGenerator.recipeDatabase;
+
+        if (drinkRecipeDatabase == null && orderGenerator != null)
+            drinkRecipeDatabase = orderGenerator.drinkRecipeDatabase;
+
+        if (drinkRecipeDatabase == null && GlobalOrderManager.Instance != null)
+            drinkRecipeDatabase = GlobalOrderManager.Instance.drinkRecipeDatabase;
 
         currentState = TableState.Empty;
     }
@@ -310,9 +317,14 @@ public class OrderResponse : BaseStation
 
     private FryRecipeDatabase.FryRecipe ResolveRecipeFromDish(CarryableItem dish)
     {
-        if (dish == null || recipeDatabase == null) return null;
+        if (dish == null) return null;
         DishRecipeTag tag = dish.GetComponent<DishRecipeTag>() ?? dish.GetComponentInParent<DishRecipeTag>();
-        return tag != null ? recipeDatabase.FindByName(tag.recipeName) : null;
+        if (tag == null) return null;
+
+        var recipe = recipeDatabase != null ? recipeDatabase.FindByName(tag.recipeName) : null;
+        if (recipe != null) return recipe;
+
+        return drinkRecipeDatabase != null ? drinkRecipeDatabase.FindByName(tag.recipeName) : null;
     }
 
     private int FindInOrder(FryRecipeDatabase.FryRecipe recipe)
@@ -345,9 +357,16 @@ public class OrderResponse : BaseStation
             Debug.Log($"[Debug-Eat] 处理桌上菜品: {recipeName}, physicalItem 是否为空: {d.physicalItem == null}");
 
             if (d.physicalItem == null) continue;
+
+            // 饮料被餐桌"吸收"，不计入脏盘、不生成残羹模型
+            if (d.recipe != null && d.recipe.size == DishSize.D)
+            {
+                Debug.Log($"[Debug-Eat] - {recipeName} 是饮料，直接吸收，不产生脏杯子。");
+                continue;
+            }
+
             dirtyCount++;
 
-            // 提取原来菜品精确定位好的物理网格位置与旋转
             Vector3 pos = d.physicalItem.transform.position;
             Quaternion rot = d.physicalItem.transform.rotation;
 
