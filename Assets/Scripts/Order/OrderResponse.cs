@@ -46,6 +46,7 @@ public class OrderResponse : BaseStation
     public int minDishes = 1;
     public int maxDishes = 2;
     public float requiredOrderTime = 2f;
+    [HideInInspector] public int currentCustomerCount = 1;
 
     private readonly List<FryRecipeDatabase.FryRecipe> currentOrder = new List<FryRecipeDatabase.FryRecipe>();
     private Coroutine eatRoutine;
@@ -190,7 +191,7 @@ public class OrderResponse : BaseStation
 
         if (orderGenerator != null)
         {
-            var next = orderGenerator.GenerateOrder(minDishes, maxDishes, dishPlaceSystem);
+            var next = orderGenerator.GenerateOrder(minDishes, maxDishes, dishPlaceSystem, currentCustomerCount);
             currentOrder.AddRange(next);
 
             if (GlobalOrderManager.Instance != null)
@@ -393,11 +394,12 @@ public class OrderResponse : BaseStation
         {
             DirtyPlateStack stack = Instantiate(dirtyPlateStackPrefab, transform.position, Quaternion.identity);
             stack.SetPlateCount(dirtyCount);
+            stack.BindTable(this);
             stack.ForceHideUntilPickedUp();
-            
+
             if (itemPlacePoint != null)
             {
-                bool accepted = itemPlacePoint.TryAcceptItem(stack); 
+                bool accepted = itemPlacePoint.TryAcceptItem(stack);
                 Debug.Log($"[Debug-Eat] 将新生成的 DirtyPlateStack 放入中心点位，是否成功放入(TryAcceptItem): {accepted}");
             }
         }
@@ -426,4 +428,25 @@ public class OrderResponse : BaseStation
 
     public float GetOrderProgressNormalized() => requiredOrderTime > 0f ? Mathf.Clamp01(currentOrderProgress / requiredOrderTime) : 0f;
     public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder() => currentOrder;
+
+    /// <summary>
+    /// 桌上「特殊残羹」视觉数量（与 DirtyPlateStack.plateCount 应对齐）。
+    /// </summary>
+    public int GetActiveEatenModelCount() => activeEatenModels.Count;
+
+    /// <summary>
+    /// 玩家从本桌的 <see cref="DirtyPlateStack"/> 取走 count 个盘子时调用：按栈顶顺序销毁对应数量的特殊残羹模型。
+    /// </summary>
+    public void OnDirtyPlatesDispensed(int count)
+    {
+        if (count <= 0) return;
+        int remove = Mathf.Min(count, activeEatenModels.Count);
+        for (int i = 0; i < remove; i++)
+        {
+            int idx = activeEatenModels.Count - 1;
+            if (activeEatenModels[idx] != null)
+                Destroy(activeEatenModels[idx]);
+            activeEatenModels.RemoveAt(idx);
+        }
+    }
 }

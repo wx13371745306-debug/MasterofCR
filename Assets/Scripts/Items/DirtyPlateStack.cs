@@ -31,6 +31,11 @@ public class DirtyPlateStack : CarryableItem
 
     private bool forcedHidden = false;
 
+    /// <summary>
+    /// 生成本堆的餐桌；用于与桌上的「特殊残羹」视觉同步，避免短按后出现通用盘堆叠模型叠在残羹上。
+    /// </summary>
+    private OrderResponse boundTable;
+
     // 缓存从单盘预制体上读取的堆叠参数
     private StackLayout dispenseLayout = StackLayout.Vertical;
     private int dispenseGridCols = 1;
@@ -110,6 +115,11 @@ public class DirtyPlateStack : CarryableItem
         if (visualRoot != null) visualRoot.gameObject.SetActive(false);
     }
 
+    public void BindTable(OrderResponse table)
+    {
+        boundTable = table;
+    }
+
     /// <summary>
     /// 玩家对着脏盘堆按 J 时由 PlayerItemInteractor 调用。
     /// isLongPress = false: 拿一个脏盘子
@@ -120,11 +130,10 @@ public class DirtyPlateStack : CarryableItem
         if (plateCount <= 0 || interactor.IsHoldingItem()) return false;
         if (singlePlatePrefab == null) return false;
 
-        // 解除隐身锁（如果还在隐身状态的话）
+        // 解除隐身锁；若桌上仍用「特殊残羹」展示，则不要打开通用 visualRoot，避免叠出第二套盘子模型
         if (forcedHidden)
         {
             forcedHidden = false;
-            if (visualRoot != null) visualRoot.gameObject.SetActive(true);
         }
 
         if (isLongPress && stackPrefab != null && plateCount >= 2)
@@ -151,6 +160,7 @@ public class DirtyPlateStack : CarryableItem
         item.BeginHold(interactor.GetHoldPoint());
         interactor.ReplaceHeldItem(item);
         plateCount--;
+        boundTable?.OnDirtyPlatesDispensed(1);
 
         if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack]</color> 拿取了一个脏盘子，剩余: {plateCount}");
 
@@ -181,6 +191,7 @@ public class DirtyPlateStack : CarryableItem
         stack.BeginHold(interactor.GetHoldPoint());
         interactor.ReplaceHeldItem(stack);
         plateCount -= dispenseCount;
+        boundTable?.OnDirtyPlatesDispensed(dispenseCount);
 
         if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack]</color> 拿取了一个脏盘Stack({dispenseCount}个)，剩余: {plateCount}");
 
@@ -213,7 +224,7 @@ public class DirtyPlateStack : CarryableItem
 
     private void UpdateVisuals()
     {
-        if (singlePlatePrefab == null || visualRoot == null) return;
+        if (visualRoot == null) return;
 
         // 清理旧渲染
         foreach (Transform child in visualRoot)
@@ -221,22 +232,33 @@ public class DirtyPlateStack : CarryableItem
             Destroy(child.gameObject);
         }
 
-        // 创建新网格
-        for (int i = 0; i < plateCount; i++)
-        {
-            GameObject plate = Instantiate(singlePlatePrefab, visualRoot);
-            plate.transform.localPosition = new Vector3(0, i * stackYOffset, 0);
-            plate.transform.localRotation = Quaternion.identity;
+        // 绑定了餐桌且仍有「特殊残羹」视觉时：不生成通用盘堆叠模型（残羹由 OrderResponse.activeEatenModels 负责）
+        bool useGenericStackVisual =
+            singlePlatePrefab != null &&
+            (boundTable == null || boundTable.GetActiveEatenModelCount() == 0);
 
-            // 视觉副本不需要任何逻辑组件，关掉碰撞体等
-            CarryableItem ci = plate.GetComponent<CarryableItem>();
-            if (ci != null) Destroy(ci);
-            StackableProp sp = plate.GetComponent<StackableProp>();
-            if (sp != null) Destroy(sp);
-            Rigidbody rb = plate.GetComponent<Rigidbody>();
-            if (rb != null) Destroy(rb);
-            Collider[] cols = plate.GetComponentsInChildren<Collider>();
-            foreach (var c in cols) Destroy(c);
+        if (useGenericStackVisual)
+        {
+            visualRoot.gameObject.SetActive(true);
+            for (int i = 0; i < plateCount; i++)
+            {
+                GameObject plate = Instantiate(singlePlatePrefab, visualRoot);
+                plate.transform.localPosition = new Vector3(0, i * stackYOffset, 0);
+                plate.transform.localRotation = Quaternion.identity;
+
+                CarryableItem ci = plate.GetComponent<CarryableItem>();
+                if (ci != null) Destroy(ci);
+                StackableProp sp = plate.GetComponent<StackableProp>();
+                if (sp != null) Destroy(sp);
+                Rigidbody rb = plate.GetComponent<Rigidbody>();
+                if (rb != null) Destroy(rb);
+                Collider[] cols = plate.GetComponentsInChildren<Collider>();
+                foreach (var c in cols) Destroy(c);
+            }
+        }
+        else
+        {
+            visualRoot.gameObject.SetActive(false);
         }
 
         // 刷新碰撞体

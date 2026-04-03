@@ -40,7 +40,8 @@ public class PlayerInteractionSensor : MonoBehaviour
 
     void PickNearestItem(Vector3 originPos)
     {
-        itemCandidates.RemoveWhere(i => i == null || !i.gameObject.activeInHierarchy);
+        // enabled = false 的 CarryableItem 表示已被餐桌/系统吞噬，不应再被玩家感知
+        itemCandidates.RemoveWhere(i => i == null || !i.enabled || !i.gameObject.activeInHierarchy);
 
         CarryableItem best = null;
         float bestDist = float.MaxValue;
@@ -184,20 +185,18 @@ public class PlayerInteractionSensor : MonoBehaviour
         CarryableItem item = other.GetComponentInParent<CarryableItem>();
         if (item != null) itemCandidates.Remove(item);
 
-        // 【这里是抓幽灵的关键区域】
         ItemPlacePoint point = other.GetComponentInParent<ItemPlacePoint>();
         if (point != null) 
         {
             bool removed = placePointCandidates.Remove(point);
             if (debugLog) Debug.Log($"<color=#FF9900>[Sensor 离开]</color> 移除放置点: <b>{point.name}</b>。触发者: {other.name}。是否成功移除: {removed}。当前列表数量: {placePointCandidates.Count}");
         }
-        else
+        else if (((1 << other.gameObject.layer) & placePointMask) != 0)
         {
-            // 如果一个碰撞体出去了，但它身上已经找不到 PlacePoint 了，这极有可能是父子层级被改变导致的泄漏！
-            if (((1 << other.gameObject.layer) & placePointMask) != 0)
-            {
-                if (debugLog) Debug.LogWarning($"<color=#FF0000>[幽灵警告]</color> 属于 PlacePoint 层的碰撞体 '{other.name}' 离开了雷达，但现在从它身上 GetComponentInParent 已经找不到 ItemPlacePoint 了！它可能变成幽灵了！");
-            }
+            // 碰撞体属于 PlacePoint 层但 GetComponentInParent 已经找不到了
+            // 说明父子层级被改变（如被 DishPlaceSystem 吞噬后 reparent），按碰撞体实例做暴力清理
+            placePointCandidates.RemoveWhere(p => p == null || !p.gameObject.activeInHierarchy);
+            if (debugLog) Debug.Log($"<color=#FF9900>[Sensor 离开]</color> '{other.name}' 失去了 PlacePoint 父级，已对列表做一次清理。剩余: {placePointCandidates.Count}");
         }
 
         IInteractiveStation station = other.GetComponentInParent<IInteractiveStation>();

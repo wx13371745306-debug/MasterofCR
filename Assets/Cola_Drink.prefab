@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 6070198450057629041}
   - component: {fileID: 3630010133887297413}
   - component: {fileID: 2110759929163039813}
+  - component: {fileID: 7240895007953809885}
   m_Layer: 0
   m_Name: Cola_Drink
   m_TagString: Untagged
@@ -105,6 +106,19 @@ MonoBehaviour:
   gridRows: 3
   gridSpacing: 0.15
   debugLog: 1
+--- !u!114 &7240895007953809885
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6414019995489226693}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb4ae4c4baa6a2d4dbb5740bc0fbcd4b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DishRecipeTag
+  recipeName: Cola
 --- !u!1001 &6209013104196020377
 PrefabInstance:
   m_ObjectHideFlags: 0

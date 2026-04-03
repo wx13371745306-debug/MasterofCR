@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 419ee71c86f4ad348a7f0e3fb57918aa, type: 3}
+  m_Name: drinkOrderProbability
+  m_EditorClassIdentifier: Assembly-CSharp::DrinkRecipeDatabase
+  recipes:
+  - recipeName: Cola
+    unlocked: 1
+    ingredients: []
+    resultPrefab: {fileID: 6414019995489226693, guid: 2e809eeaa9109ca4398704cc8b97ce44, type: 3}
+    finishedVisualPrefab: {fileID: 0}
+    eatenPrefab: {fileID: 0}
+    size: 3
+    dishIcon: {fileID: 21300000, guid: 40071c09ae80eef4595c75e09229acdf, type: 3}
+    price: 15
+    eatTime: 1

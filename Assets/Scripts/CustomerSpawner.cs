@@ -87,6 +87,7 @@ public class CustomerSpawner : MonoBehaviour
         // 1. 动态覆写这桌的点餐范围（把 SO 里的数据传给桌子）
         targetTable.minDishes = wave.minDishes;
         targetTable.maxDishes = wave.maxDishes;
+        targetTable.currentCustomerCount = wave.groupSize;
 
         // 2. 生成小队
         CustomerGroup newGroup = Instantiate(wave.groupPrefab, spawnPoint.position, Quaternion.identity);

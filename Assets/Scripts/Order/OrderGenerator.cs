@@ -8,7 +8,7 @@ public class OrderGenerator : MonoBehaviour
     public DrinkRecipeDatabase drinkRecipeDatabase;
     public GameConfigSO gameConfig;
 
-    public List<FryRecipeDatabase.FryRecipe> GenerateOrder(int min, int max, DishPlaceSystem system)
+    public List<FryRecipeDatabase.FryRecipe> GenerateOrder(int min, int max, DishPlaceSystem system, int customerCount = 1)
     {
         var order = new List<FryRecipeDatabase.FryRecipe>();
 
@@ -69,25 +69,33 @@ public class OrderGenerator : MonoBehaviour
             order.Add(pick);
         }
 
-        // 5. 独立掷骰：是否追加一杯饮料
+        // 5. 每位顾客独立掷骰：是否追加饮料
         if (drinkRecipeDatabase != null && gameConfig != null)
         {
-            float roll = Random.value;
-            if (roll < gameConfig.drinkOrderProbability)
+            float probability = gameConfig.drinkOrderProbability;
+            var drinkCandidates = drinkRecipeDatabase.GetUnlockedRecipes();
+
+            for (int c = 0; c < customerCount; c++)
             {
-                var drinkCandidates = drinkRecipeDatabase.GetUnlockedRecipes();
-                if (drinkCandidates.Count > 0)
+                float roll = Random.value;
+                if (roll >= probability) continue;
+
+                if (drinkCandidates.Count == 0)
                 {
-                    var drinkPick = drinkCandidates[Random.Range(0, drinkCandidates.Count)];
-                    if (TryConsumeSlotFor(DishSize.D, remainingSlots))
-                    {
-                        order.Add(drinkPick);
-                        Debug.Log($"[OrderGenerator] 顾客加点了饮料: {drinkPick.recipeName}");
-                    }
-                    else
-                    {
-                        Debug.Log($"[OrderGenerator] 顾客想点饮料但没有可用的饮品槽位。");
-                    }
+                    Debug.LogWarning("[OrderGenerator] 饮料菜谱中没有已解锁的饮料。");
+                    break;
+                }
+
+                var drinkPick = drinkCandidates[Random.Range(0, drinkCandidates.Count)];
+                if (TryConsumeSlotFor(DishSize.D, remainingSlots))
+                {
+                    order.Add(drinkPick);
+                    Debug.Log($"[OrderGenerator] 顾客 {c + 1}/{customerCount} 加点了饮料: {drinkPick.recipeName}");
+                }
+                else
+                {
+                    Debug.Log($"[OrderGenerator] 顾客 {c + 1}/{customerCount} 想点饮料但没有可用的 D 槽位，后续顾客跳过。");
+                    break;
                 }
             }
         }
