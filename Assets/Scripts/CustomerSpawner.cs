@@ -4,6 +4,9 @@ using UnityEngine;
 public class CustomerSpawner : MonoBehaviour
 {
     [Header("Level Data")]
+    [Tooltip("若设置了周配置，则按天覆盖 currentLevelConfig")]
+    public WeekLevelConfigSO weekLevelConfig;
+
     public LevelConfigSO currentLevelConfig;
     public Transform spawnPoint; // 顾客出生点
 
@@ -15,7 +18,8 @@ public class CustomerSpawner : MonoBehaviour
 
     private float levelTimer = 0f;
     private int currentWaveIndex = 0;
-    
+    private bool spawningPaused;
+
     // 缓存场景里所有的桌子
     private OrderResponse[] allTables;
 
@@ -23,16 +27,50 @@ public class CustomerSpawner : MonoBehaviour
     {
         // 游戏开始时，找到场景里所有的桌子
         allTables = FindObjectsOfType<OrderResponse>();
-        
-        if (currentLevelConfig == null)
+
+        if (currentLevelConfig == null && weekLevelConfig == null)
         {
-            Debug.LogError("<color=#FF0000>[Spawner]</color> 未配置关卡数据 (LevelConfigSO)！");
+            Debug.LogError("<color=#FF0000>[Spawner]</color> 未配置关卡数据 (LevelConfigSO / WeekLevelConfigSO)！");
         }
     }
 
+    /// <summary>
+    /// 由 DayCycleManager 在新的一天调用：切换当日 LevelConfigSO 并重置波次计时。
+    /// </summary>
+    public void ConfigureForDay(int dayIndex)
+    {
+        if (weekLevelConfig != null)
+        {
+            LevelConfigSO dayCfg = weekLevelConfig.GetDay(dayIndex);
+            if (dayCfg != null)
+                currentLevelConfig = dayCfg;
+        }
+
+        levelTimer = 0f;
+        currentWaveIndex = 0;
+        if (debugLog)
+            Debug.Log($"[Spawner] ConfigureForDay index={dayIndex}, waves={(currentLevelConfig != null ? currentLevelConfig.waves.Count : 0)}");
+    }
+
+    /// <summary>
+    /// 根据周配置或回退的 currentLevelConfig，计算某日计划生成的顾客总数（各波 groupSize 之和）。
+    /// </summary>
+    public int GetPlannedGuestCountForDay(int dayIndex)
+    {
+        LevelConfigSO cfg = null;
+        if (weekLevelConfig != null)
+            cfg = weekLevelConfig.GetDay(dayIndex);
+        if (cfg == null)
+            cfg = currentLevelConfig;
+        return cfg != null ? cfg.GetTotalPlannedGuestCount() : 0;
+    }
+
+    public void SetSpawningPaused(bool paused) => spawningPaused = paused;
+
     void Update()
     {
-        if (currentLevelConfig == null || currentWaveIndex >= currentLevelConfig.waves.Count) 
+        if (spawningPaused) return;
+        if (currentLevelConfig == null || currentWaveIndex >= currentLevelConfig.waves.Count)
             return; // 关卡配置为空或所有波次已出完，停止运行
 
         // 计时器推进

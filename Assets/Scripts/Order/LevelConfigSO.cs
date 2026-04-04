@@ -8,6 +8,18 @@ public class LevelConfigSO : ScriptableObject
     [Header("关卡波次设置")]
     [Tooltip("按时间顺序排列的顾客生成计划")]
     public List<WaveData> waves = new List<WaveData>();
+
+    /// <summary>本关配置下计划生成的顾客总人数（各波 groupSize 之和）。</summary>
+    public int GetTotalPlannedGuestCount()
+    {
+        if (waves == null) return 0;
+        int n = 0;
+        foreach (var w in waves)
+        {
+            if (w != null) n += w.groupSize;
+        }
+        return n;
+    }
 }
 
 // 序列化此类，使其能在 Inspector 中显示

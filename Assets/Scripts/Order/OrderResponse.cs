@@ -89,6 +89,7 @@ public class OrderResponse : BaseStation
     private bool isInteracting = false;
     private CustomerGroup boundGroup;
     private bool isAbandoningPatience;
+    private Coroutine readingMenuCoroutine;
 
     public void RegisterCustomerGroup(CustomerGroup group) => boundGroup = group;
 
@@ -199,7 +200,9 @@ public class OrderResponse : BaseStation
 
         // 【修改点】：不再直接等待点单，而是进入看菜单状态
         currentState = TableState.ReadingMenu;
-        StartCoroutine(ReadingMenuRoutine());
+        if (readingMenuCoroutine != null)
+            StopCoroutine(readingMenuCoroutine);
+        readingMenuCoroutine = StartCoroutine(ReadingMenuRoutine());
         Debug.Log($"[OrderResponse] 桌号 {tableId} 顾客已落座，正在看菜单...");
     }
 
@@ -208,6 +211,7 @@ public class OrderResponse : BaseStation
     {
         float waitTime = Random.Range(2f, 5f);
         yield return new WaitForSeconds(waitTime);
+        readingMenuCoroutine = null;
 
         currentState = TableState.WaitingToOrder;
         currentOrderProgress = 0f;
@@ -237,6 +241,9 @@ public class OrderResponse : BaseStation
         {
             currentState = TableState.WaitingToOrder; // 松手退回等待图标状态
         }
+
+        if (DayCycleManager.Instance != null && DayCycleManager.Instance.Phase == DayCyclePhase.ExtendedBusiness)
+            TryForceLeaveForBusinessEnd();
     }
 
     // ================== 【核心业务逻辑】 ==================
@@ -302,12 +309,20 @@ public class OrderResponse : BaseStation
                 GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
             }
             if (MoneyManager.Instance != null) MoneyManager.Instance.AddMoney(recipe.price);
+            if (DayStatsTracker.Instance != null)
+            {
+                DayStatsTracker.Instance.RegisterPlacedItem(true, recipe.size == DishSize.D);
+                if (DayCycleManager.Instance != null && DayCycleManager.Instance.ShouldRecordOrderRevenue())
+                    DayStatsTracker.Instance.RegisterRevenue(recipe.price);
+            }
             currentOrder.RemoveAt(idx);
             Debug.Log($"[OrderResponse] 桌号 {tableId} 成功上对菜: {recipe.recipeName}。剩 {currentOrder.Count} 道菜！消单加钱！");
         }
         else
         {
             isCorrectOrder = false;
+            if (DayStatsTracker.Instance != null)
+                DayStatsTracker.Instance.RegisterPlacedItem(false, recipe.size == DishSize.D);
             Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 上错菜惩罚: {recipe.recipeName} 不在订单中！当做白送！");
         }
 
@@ -468,7 +483,20 @@ public class OrderResponse : BaseStation
         }
 
         currentState = TableState.WaitingForCleanup;
+        if (DayStatsTracker.Instance != null)
+            DayStatsTracker.Instance.RegisterGuestsServed(currentCustomerCount);
         Debug.Log($"[Debug-Eat] 切换状态为 WaitingForCleanup。流程结束。");
+
+        // 用餐完毕须主动通知顾客组离场；此前仅耐心/营业结束会走 PerformTableResetAndCustomerLeave → BeginLeaveGroup，
+        // 正常吃完进入 WaitingForCleanup 时若不调此处，顾客会永远坐在原地。
+        if (boundGroup != null)
+        {
+            Debug.Log($"[OrderResponse] 桌号 {tableId} 用餐完毕，触发顾客离场 (BeginLeaveGroup)");
+            boundGroup.BeginLeaveGroup();
+        }
+        else
+            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 用餐完毕但 boundGroup 为空，顾客无法离场");
+
         eatRoutine = null;
     }
 
@@ -503,7 +531,39 @@ public class OrderResponse : BaseStation
         if (currentState != TableState.WaitingToOrder && currentState != TableState.WaitingForFood) return;
 
         isAbandoningPatience = true;
-        PatienceLeaveDbg($"Abandon 开始 | boundGroup={(boundGroup != null ? boundGroup.name : "NULL — 顾客不会走路离场，请查 CustomerGroup.InitGroup 是否 RegisterCustomerGroup")}");
+        if (DayStatsTracker.Instance != null)
+            DayStatsTracker.Instance.RegisterGuestsFailed(currentCustomerCount);
+        PerformTableResetAndCustomerLeave("耐心离场");
+    }
+
+    /// <summary>
+    /// 延迟营业：未进入 WaitingForFood 的桌离场；点菜中且按住 K 则本帧跳过。
+    /// </summary>
+    public void TryForceLeaveForBusinessEnd()
+    {
+        if (isAbandoningPatience) return;
+        if (currentState == TableState.Empty) return;
+        if (currentState == TableState.WaitingForFood || currentState == TableState.Eating ||
+            currentState == TableState.WaitingForCleanup)
+            return;
+        if (currentState == TableState.Ordering && isInteracting) return;
+
+        isAbandoningPatience = true;
+        if (DayStatsTracker.Instance != null)
+            DayStatsTracker.Instance.RegisterGuestsFailed(currentCustomerCount);
+
+        if (readingMenuCoroutine != null)
+        {
+            StopCoroutine(readingMenuCoroutine);
+            readingMenuCoroutine = null;
+        }
+
+        PerformTableResetAndCustomerLeave("营业结束强制离场");
+    }
+
+    void PerformTableResetAndCustomerLeave(string dbgReason)
+    {
+        PatienceLeaveDbg($"{dbgReason} 开始 | boundGroup={(boundGroup != null ? boundGroup.name : "NULL")}");
 
         if (eatRoutine != null)
         {
@@ -548,7 +608,7 @@ public class OrderResponse : BaseStation
         }
         else
         {
-            PatienceLeaveDbg("无 boundGroup，已直接 isReserved=false（若预期应离场，说明本桌未绑定顾客组）");
+            PatienceLeaveDbg("无 boundGroup，已直接 isReserved=false");
             isReserved = false;
             isAbandoningPatience = false;
         }

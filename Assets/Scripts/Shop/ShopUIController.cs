@@ -22,9 +22,16 @@ public class ShopUIController : MonoBehaviour
 
     [Header("Delivery")]
     public ShopDeliverySpawner deliverySpawner;
+    [Tooltip("若赋值，则准备阶段按 DayCycleManager 规则延迟/分批交货；否则沿用下方即时交货")]
+    [SerializeField] private ShopDeliveryQueue shopDeliveryQueue;
+    [SerializeField] private DayCycleManager dayCycleManager;
 
     [Header("Cursor")]
     public bool unlockCursorWhenOpen = true;
+
+    [Header("ComputerStation · 打开时锁定位移")]
+    [Tooltip("从 ComputerStation 打开且未传入 PlayerMoveRB 时，用此引用锁定水平移动")]
+    [SerializeField] private PlayerMoveRB playerMoveFallback;
 
     [Header("Debug")]
     [Tooltip("勾选后在 Console 输出商品卡/购物车行调试日志；取消勾选则不输出")]
@@ -34,6 +41,8 @@ public class ShopUIController : MonoBehaviour
 
     private CursorLockMode savedLockMode;
     private bool savedCursorVisible;
+
+    private PlayerMoveRB activeLockedPlayerMove;
 
     public bool IsOpen => shopPanelRoot != null && shopPanelRoot.activeSelf;
 
@@ -55,12 +64,23 @@ public class ShopUIController : MonoBehaviour
     public void Toggle()
     {
         if (IsOpen) Close();
-        else Open();
+        else Open(false, null);
     }
 
-    public void Open()
+    /// <param name="freezePlayerPosition">为 true 时锁定玩家水平位置（由 ComputerStation 打开商店时使用）</param>
+    /// <param name="playerMoveOverride">优先使用的玩家移动组件；为空则用 playerMoveFallback</param>
+    public void Open(bool freezePlayerPosition = false, PlayerMoveRB playerMoveOverride = null)
     {
         if (shopPanelRoot == null) return;
+
+        if (freezePlayerPosition)
+        {
+            activeLockedPlayerMove = playerMoveOverride != null ? playerMoveOverride : playerMoveFallback;
+            if (activeLockedPlayerMove != null)
+                activeLockedPlayerMove.SetHorizontalPositionLocked(true);
+        }
+        else
+            activeLockedPlayerMove = null;
 
         if (unlockCursorWhenOpen)
         {
@@ -82,6 +102,12 @@ public class ShopUIController : MonoBehaviour
         if (shopPanelRoot == null) return;
 
         shopPanelRoot.SetActive(false);
+
+        if (activeLockedPlayerMove != null)
+        {
+            activeLockedPlayerMove.SetHorizontalPositionLocked(false);
+            activeLockedPlayerMove = null;
+        }
 
         if (unlockCursorWhenOpen)
         {
@@ -199,7 +225,9 @@ public class ShopUIController : MonoBehaviour
             return;
         }
 
-        if (deliverySpawner == null)
+        bool hasDelivery = deliverySpawner != null ||
+            (shopDeliveryQueue != null && shopDeliveryQueue.DeliverySpawner != null);
+        if (!hasDelivery)
         {
             ShowError("交货点未配置");
             return;
@@ -211,9 +239,39 @@ public class ShopUIController : MonoBehaviour
             return;
         }
 
-        deliverySpawner.SpawnPurchases(cart, catalog);
+        var dcm = dayCycleManager != null ? dayCycleManager : DayCycleManager.Instance;
+        if (dcm != null && dcm.Phase == DayCyclePhase.DayZero && shopDeliveryQueue != null && catalog != null)
+        {
+            var copy = new Dictionary<string, int>(cart, StringComparer.Ordinal);
+            shopDeliveryQueue.EnqueueDayZeroCart(copy);
+        }
+        else if (dcm != null && dcm.Phase == DayCyclePhase.Prep && shopDeliveryQueue != null && catalog != null)
+        {
+            var copy = new Dictionary<string, int>(cart, StringComparer.Ordinal);
+            shopDeliveryQueue.EnqueueOrSpawn(copy, catalog, dcm.PrepElapsed, dcm.ShopDeliveryDelayFromPrepStart);
+        }
+        else
+        {
+            ShopDeliverySpawner sp = deliverySpawner;
+            if (sp == null && shopDeliveryQueue != null)
+                sp = shopDeliveryQueue.DeliverySpawner;
+            if (sp == null)
+            {
+                ShowError("交货点未配置");
+                return;
+            }
+            sp.SpawnPurchases(cart, catalog);
+        }
 
         cart.Clear();
+        RefreshCartUI();
+        RefreshTotals();
+        ClearError();
+    }
+
+    /// <summary>由商店界面「关闭」按钮在 Inspector 中绑定。</summary>
+    public void OnCloseShopClicked()
+    {
         Close();
     }
 

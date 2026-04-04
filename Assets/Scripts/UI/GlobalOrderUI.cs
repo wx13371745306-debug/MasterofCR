@@ -15,6 +15,12 @@ public class GlobalOrderUI : MonoBehaviour
 
     private Dictionary<string, GameObject> activeCards = new Dictionary<string, GameObject>();
 
+    public void SetOrdersVisible(bool visible)
+    {
+        if (cardContainer != null)
+            cardContainer.gameObject.SetActive(visible);
+    }
+
     void OnEnable()
     {
         GlobalOrderManager.OnOrderAdded += HandleOrderAdded;

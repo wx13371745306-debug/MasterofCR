@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 public class CustomerGroup : MonoBehaviour
 {
+    public static int ActiveGroupCount { get; private set; }
+
     [Header("Settings")]
     [Tooltip("单个顾客的预制体（必须挂有 CustomerAI 和 NavMeshAgent）")]
     public GameObject customerPrefab;
@@ -60,6 +62,19 @@ public class CustomerGroup : MonoBehaviour
         }
 
         table.RegisterCustomerGroup(this);
+        ActiveGroupCount++;
+
+        if (actualSpawnCount > 0)
+        {
+            var dcm = DayCycleManager.Instance;
+            if (dcm == null || dcm.Phase == DayCyclePhase.Business)
+                DayStatsTracker.Instance?.RegisterFootfall(actualSpawnCount);
+        }
+    }
+
+    void OnDestroy()
+    {
+        ActiveGroupCount = Mathf.Max(0, ActiveGroupCount - 1);
     }
 
     /// <summary>

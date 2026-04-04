@@ -10,6 +10,22 @@ public class PlayerMoveRB : MonoBehaviour
     private Rigidbody rb;
     private Vector2 moveInput; // WASD 输入 (-1..1)
 
+    private bool horizontalPositionLocked;
+    private Vector2 lockedXZ;
+
+    /// <summary>锁定水平位置（X/Z），Y 仍受重力等影响。用于商店等界面。</summary>
+    public void SetHorizontalPositionLocked(bool locked)
+    {
+        horizontalPositionLocked = locked;
+        if (locked && rb != null)
+        {
+            Vector3 p = rb.position;
+            lockedXZ = new Vector2(p.x, p.z);
+        }
+    }
+
+    public bool IsHorizontalPositionLocked => horizontalPositionLocked;
+
     private void Start()
     {
         rb.linearVelocity = Vector3.zero;   // 如果报错就用 rb.velocity
@@ -41,6 +57,21 @@ public class PlayerMoveRB : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (horizontalPositionLocked)
+        {
+            Vector3 p = rb.position;
+            p.x = lockedXZ.x;
+            p.z = lockedXZ.y;
+            rb.position = p;
+
+            Vector3 v = rb.linearVelocity;
+            v.x = 0f;
+            v.z = 0f;
+            rb.linearVelocity = v;
+            rb.angularVelocity = Vector3.zero;
+            return;
+        }
+
         // 目标水平速度（不动 y，保留重力和被撞飞的竖直速度）
         Vector3 currentVel = rb.linearVelocity;
         Vector3 targetVel = new Vector3(moveInput.x * moveSpeed, currentVel.y, moveInput.y * moveSpeed);
