@@ -20,6 +20,7 @@ public class CustomerAI : MonoBehaviour
     private Transform targetChair;
     private Action onSeatedCallback; 
     private bool isSittingDown = false;
+    private bool isLeaving;
 
     void Awake()
     {
@@ -42,6 +43,8 @@ public class CustomerAI : MonoBehaviour
 
     void Update()
     {
+        if (isLeaving) return;
+
         // 【修改点】：将 agent.stoppingDistance 替换成我们自定义的 arrivalRadius
         if (!isSittingDown && !agent.pathPending && agent.remainingDistance <= arrivalRadius)
         {
@@ -104,5 +107,66 @@ public class CustomerAI : MonoBehaviour
         if (debugLog) Debug.Log($"<color=#00FF00>[CustomerAI]</color> {gameObject.name} 完美落座完毕！");
 
         onSeatedCallback?.Invoke();
+    }
+
+    /// <summary>
+    /// 离座并走向消失点，到达后销毁自身并回调（用于耐心归零）。
+    /// </summary>
+    public void BeginLeave(Transform exit, Action onDestroyed)
+    {
+        if (isLeaving) return;
+        isLeaving = true;
+        StopAllCoroutines();
+        StartCoroutine(LeaveRoutine(exit, onDestroyed));
+    }
+
+    private IEnumerator LeaveRoutine(Transform exit, Action onDestroyed)
+    {
+        transform.SetParent(null);
+
+        if (exit == null)
+        {
+            if (debugLog) Debug.Log($"[PatienceLeave][{name}] 消失点为 NULL → 原地销毁（若需走路，请在 CustomerSpawner 配置 customerExitPoint）");
+            onDestroyed?.Invoke();
+            Destroy(gameObject);
+            yield break;
+        }
+
+        if (aiCollider != null) aiCollider.enabled = true;
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            bool sampled = NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas);
+            if (debugLog)
+            {
+                Debug.Log($"[PatienceLeave][{name}] 离场目标={exit.name} | NavMesh.SamplePosition={(sampled ? "OK" : "失败")} | isOnNavMesh={agent.isOnNavMesh}");
+            }
+            if (sampled)
+                agent.Warp(hit.position);
+            if (!agent.isOnNavMesh && debugLog)
+                Debug.LogWarning($"[PatienceLeave][{name}] Agent 不在 NavMesh 上，可能无法走向消失点，请检查椅子旁采样/烘焙。");
+            agent.SetDestination(exit.position);
+        }
+        else if (debugLog)
+        {
+            Debug.LogWarning($"[PatienceLeave][{name}] NavMeshAgent 为空，无法走路离场");
+        }
+
+        const float arriveDist = 0.75f;
+        float timeout = 45f;
+        while (agent != null && agent.enabled && agent.isOnNavMesh && timeout > 0f)
+        {
+            if (!agent.pathPending && agent.hasPath && agent.remainingDistance <= arriveDist)
+                break;
+            timeout -= Time.deltaTime;
+            yield return null;
+        }
+
+        if (debugLog && timeout <= 0f && agent != null)
+            Debug.LogWarning($"[PatienceLeave][{name}] 离场超时(45s)，仍销毁。remainingDist={agent.remainingDistance:F2} pathPending={agent.pathPending}");
+
+        onDestroyed?.Invoke();
+        Destroy(gameObject);
     }
 }

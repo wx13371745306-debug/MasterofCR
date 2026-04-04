@@ -331,8 +331,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 153.5, y: -50}
-  m_SizeDelta: {x: 307, y: 100}
+  m_AnchoredPosition: {x: 153.5, y: -25}
+  m_SizeDelta: {x: 307, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2635146410142428956
 CanvasRenderer:
@@ -367,7 +367,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.506
+  m_FillAmount: 1
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -474,6 +474,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb584cc9a3834c5489dad1f7b24035ab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DishPlaceSystem
+  debugLog: 0
   moveDuration: 0.12
 --- !u!1 &3861130284228040374
 GameObject:
@@ -502,8 +503,8 @@ RectTransform:
   m_GameObject: {fileID: 3861130284228040374}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.02, y: 0.02, z: 0.02}
-  m_ConstrainProportionsScale: 1
+  m_LocalScale: {x: 0.015, y: 0.02, z: 0.02}
+  m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3482328668624338786}
   - {fileID: 1727434023130062242}
@@ -512,7 +513,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 307, y: 100}
+  m_SizeDelta: {x: 307, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1725052685259056617
 MonoBehaviour:
@@ -623,6 +624,7 @@ MonoBehaviour:
   dishPlaceSystem: {fileID: 1555752012405196064}
   orderGenerator: {fileID: 0}
   recipeDatabase: {fileID: 11400000, guid: 730e8ac883ba229498c2807b9329f4bd, type: 2}
+  drinkRecipeDatabase: {fileID: 0}
   dirtyPlateStackPrefab: {fileID: 4430841268297836081, guid: cf8b2abf0b92e0844b30889cab3c6fdd, type: 3}
   tableId: 0
   currentState: 0
@@ -635,9 +637,20 @@ MonoBehaviour:
   - {fileID: 2748222400992165489}
   - {fileID: 4255766357206022944}
   - {fileID: 2360844861025500424}
+  maxPatienceOrder: 100
+  lossPerSecondOrder: 10
+  maxPatienceFood: 100
+  lossPerSecondFood: 5
+  servePatienceBonus: 60
+  maxPatienceCap: 100
+  impatientThreshold: 40
+  currentPatienceOrder: 0
+  currentPatienceFood: 0
+  debugPatienceLeave: 0
   minDishes: 3
   maxDishes: 6
   requiredOrderTime: 2
+  currentCustomerCount: 1
 --- !u!1 &4362147225365365236
 GameObject:
   m_ObjectHideFlags: 0
@@ -672,7 +685,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 0, y: -50}
+  m_AnchoredPosition: {x: 0, y: -25}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2545438813369964258
@@ -825,6 +838,81 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.5104259, y: 0.50761825, z: 1.7491535}
   m_Center: {x: 0.0027150512, y: 0.24619088, z: 0.00026792288}
+--- !u!1 &4758533523647195706
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2859387199833431392}
+  - component: {fileID: 4499368438962441359}
+  - component: {fileID: 9089493537071184207}
+  m_Layer: 5
+  m_Name: Impatient_Image
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &2859387199833431392
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4758533523647195706}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5070519084314795170}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &4499368438962441359
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4758533523647195706}
+  m_CullTransparentMesh: 1
+--- !u!114 &9089493537071184207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4758533523647195706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 7c169c5253f0e3c4294425c675f4499e, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 0
+  m_FillAmount: 0
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
 --- !u!1 &5294040843332090006
 GameObject:
   m_ObjectHideFlags: 0
@@ -859,6 +947,7 @@ RectTransform:
   m_Children:
   - {fileID: 8568359420949943241}
   - {fileID: 6342414378732181375}
+  - {fileID: 2859387199833431392}
   m_Father: {fileID: 6036509594682362176}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -943,8 +1032,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TableOrderProgressUI
   canvas: {fileID: 552864857732780163}
   callIconObj: {fileID: 7184394121361452406}
+  callIconImage: {fileID: 1357864851096905064}
   progressBarObj: {fileID: 3861130284228040374}
   fillImage: {fileID: 1452837296386651832}
+  waitingFoodImpatientIconObj: {fileID: 4758533523647195706}
+  waitingFoodImpatientImage: {fileID: 9089493537071184207}
+  patienceColorStressStart: 50
+  patienceColorStressEnd: 10
+  patienceStressColor: {r: 1, g: 0.14901961, b: 0.14901961, a: 1}
   tableResponse: {fileID: 1503073513108131411}
   alwaysFaceCamera: 1
   debugLog: 0
@@ -1140,7 +1235,7 @@ GameObject:
   - component: {fileID: 6745587167032031697}
   - component: {fileID: 1357864851096905064}
   m_Layer: 5
-  m_Name: Call_Image
+  m_Name: OrderCall_Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

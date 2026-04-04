@@ -513,7 +513,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 0
+  m_Constraints: 80
   m_CollisionDetection: 0
 --- !u!114 &1191365486440998169
 MonoBehaviour:
@@ -555,7 +555,7 @@ MonoBehaviour:
   itemPrefab: {fileID: 7096165798621821909, guid: 9e14f77e39e257c4a9f6db9eb446fad6, type: 3}
   maxCount: 10
   currentCount: 0
-  stackPrefab: {fileID: 0}
+  stackPrefab: {fileID: 2923466580099044001, guid: 412759ef71c51db448bddee28bdb1a10, type: 3}
   stackSize: 4
   stackLayout: 1
   stackOffset: 0.05

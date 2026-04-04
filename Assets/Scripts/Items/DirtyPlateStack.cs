@@ -246,10 +246,11 @@ public class DirtyPlateStack : CarryableItem
                 plate.transform.localPosition = new Vector3(0, i * stackYOffset, 0);
                 plate.transform.localRotation = Quaternion.identity;
 
-                CarryableItem ci = plate.GetComponent<CarryableItem>();
-                if (ci != null) Destroy(ci);
+                // StackableProp 依赖 CarryableItem，必须先删依赖组件再删 CarryableItem，否则会报 Can't remove CarryableItem...
                 StackableProp sp = plate.GetComponent<StackableProp>();
                 if (sp != null) Destroy(sp);
+                CarryableItem ci = plate.GetComponent<CarryableItem>();
+                if (ci != null) Destroy(ci);
                 Rigidbody rb = plate.GetComponent<Rigidbody>();
                 if (rb != null) Destroy(rb);
                 Collider[] cols = plate.GetComponentsInChildren<Collider>();

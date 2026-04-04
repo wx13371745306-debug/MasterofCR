@@ -7,6 +7,9 @@ public class CustomerSpawner : MonoBehaviour
     public LevelConfigSO currentLevelConfig;
     public Transform spawnPoint; // 顾客出生点
 
+    [Tooltip("耐心耗尽等情况下顾客走向并消失的位置；全场景共配一处即可，不必每张桌子单独拖")]
+    public Transform customerExitPoint;
+
     [Header("Debug")]
     public bool debugLog = true;
 
@@ -93,9 +96,13 @@ public class CustomerSpawner : MonoBehaviour
         CustomerGroup newGroup = Instantiate(wave.groupPrefab, spawnPoint.position, Quaternion.identity);
         
         // 3. 初始化（寻路会自动开始）
-        newGroup.InitGroup(wave.groupSize, targetTable, spawnPoint);
+        newGroup.InitGroup(wave.groupSize, targetTable, spawnPoint, customerExitPoint);
 
-        if (debugLog) 
+        if (debugLog)
+        {
             Debug.Log($"<color=#00FFFF>[Spawner]</color> 游戏时间 {levelTimer:F1}s: 生成了 {wave.groupSize} 人小队，分配到桌号 {targetTable.tableId}。点餐范围: {wave.minDishes}-{wave.maxDishes}。");
+            if (customerExitPoint == null)
+                Debug.LogWarning("[Spawner][PatienceLeave] customerExitPoint 未设置：耐心耗尽时顾客会原地销毁而不会走向消失点。");
+        }
     }
 }

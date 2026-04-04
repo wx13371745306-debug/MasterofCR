@@ -84,6 +84,22 @@ public class GlobalOrderManager : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// 顾客愤怒离场等情况下，移除该桌在全局队列中的全部订单并通知 UI。
+    /// </summary>
+    public void RemoveAllOrdersForTable(int tableId)
+    {
+        for (int i = activeOrders.Count - 1; i >= 0; i--)
+        {
+            var order = activeOrders[i];
+            if (order == null || order.tableId != tableId) continue;
+
+            activeOrders.RemoveAt(i);
+            OnOrderRemoved?.Invoke(order);
+            Debug.Log($"[GlobalOrderManager] 整桌撤单: 桌号 {tableId}, 菜品 {(order.recipe != null ? order.recipe.recipeName : "?")}, ID: {order.orderId}");
+        }
+    }
+
     // ================== 【工程化小工具：一键分配桌号】 ==================
 #if UNITY_EDITOR
     [ContextMenu("自动分配场景中的桌号 (Auto Assign Table IDs)")]

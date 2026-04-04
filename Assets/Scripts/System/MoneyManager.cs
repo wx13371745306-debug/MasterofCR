@@ -34,4 +34,17 @@ public class MoneyManager : MonoBehaviour
 
         OnMoneyChanged?.Invoke(currentMoney);
     }
+
+    /// <summary>
+    /// 扣除金钱；余额不足时返回 false 且不修改当前金额。
+    /// </summary>
+    public bool TrySpendMoney(int amount)
+    {
+        if (amount <= 0) return false;
+        if (currentMoney < amount) return false;
+
+        currentMoney -= amount;
+        OnMoneyChanged?.Invoke(currentMoney);
+        return true;
+    }
 }

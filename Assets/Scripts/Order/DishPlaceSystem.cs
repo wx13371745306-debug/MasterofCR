@@ -4,8 +4,14 @@ using UnityEngine;
 
 public class DishPlaceSystem : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = true;
+
     [Header("动画")]
     [Min(0f)] public float moveDuration = 0.12f;
+
+    void Log(string msg) { if (debugLog) Debug.Log(msg); }
+    void LogWarn(string msg) { if (debugLog) Debug.LogWarning(msg); }
 
     struct PlacedDish
     {
@@ -32,7 +38,7 @@ public class DishPlaceSystem : MonoBehaviour
         bool isFull = (size == DishSize.D) ? (activeDrink >= drinkSlots) : (activeFood >= foodSlots);
         if (isFull) 
         {
-            Debug.Log($"[DishPlaceSystem] 无法正常放入 {dish.name}，对应大类满载。");
+            Log($"[DishPlaceSystem] 无法正常放入 {dish.name}，对应大类满载。");
             return false;
         }
 
@@ -44,7 +50,7 @@ public class DishPlaceSystem : MonoBehaviour
     {
         if (dish == null) return;
 
-        Debug.Log($"[DishPlaceSystem] 接收/强制放入菜品: {dish.name}, 尺寸: {size}");
+        Log($"[DishPlaceSystem] 接收/强制放入菜品: {dish.name}, 尺寸: {size}");
 
         // 1. 禁用所有碰撞体
         if (dish.itemColliders != null)
@@ -74,13 +80,13 @@ public class DishPlaceSystem : MonoBehaviour
         {
             servedDrink.Add(new PlacedDish { itemObj = dishObj, size = size });
             SortPlaced(servedDrink);
-            Debug.Log($"[DishPlaceSystem] 饮品列表更新，当前饮品数量: {servedDrink.Count}");
+            Log($"[DishPlaceSystem] 饮品列表更新，当前饮品数量: {servedDrink.Count}");
         }
         else
         {
             servedFood.Add(new PlacedDish { itemObj = dishObj, size = size });
             SortPlaced(servedFood);
-            Debug.Log($"[DishPlaceSystem] 餐食列表更新，当前餐食数量: {servedFood.Count}");
+            Log($"[DishPlaceSystem] 餐食列表更新，当前餐食数量: {servedFood.Count}");
         }
 
         ReassignAll();
@@ -88,7 +94,7 @@ public class DishPlaceSystem : MonoBehaviour
 
     public void ClearAllDishes()
     {
-        Debug.Log($"[DishPlaceSystem] 清理桌面：销毁所有已上菜品，共 {servedFood.Count + servedDrink.Count} 份。");
+        Log($"[DishPlaceSystem] 清理桌面：销毁所有已上菜品，共 {servedFood.Count + servedDrink.Count} 份。");
         for (int i = 0; i < servedFood.Count; i++)
         {
             if (servedFood[i].itemObj != null)
@@ -124,7 +130,7 @@ public class DishPlaceSystem : MonoBehaviour
 
     private void ReassignAll()
     {
-        Debug.Log($"[DishPlaceSystem] 开始重新分配餐点位置...");
+        Log($"[DishPlaceSystem] 开始重新分配餐点位置...");
         DishPoint[] allPoints = GetComponentsInChildren<DishPoint>(includeInactive: true);
         var foodPoints = new List<DishPoint>();
         var drinkPoints = new List<DishPoint>();
@@ -160,7 +166,7 @@ public class DishPlaceSystem : MonoBehaviour
         int count = Mathf.Min(dishes.Count, points.Count);
         if (dishes.Count > points.Count)
         {
-            Debug.LogWarning($"[DishPlaceSystem] 警告：{logTag} 数量 ({dishes.Count}) 超出可用位置 ({points.Count})！多出的菜品将堆叠。");
+            LogWarn($"[DishPlaceSystem] 警告：{logTag} 数量 ({dishes.Count}) 超出可用位置 ({points.Count})！多出的菜品将堆叠。");
         }
 
         for (int i = 0; i < dishes.Count; i++)
@@ -170,7 +176,7 @@ public class DishPlaceSystem : MonoBehaviour
 
             Transform targetPoint = (i < points.Count) ? points[i].transform : transform;
 
-            Debug.Log($"[DishPlaceSystem] 分配 {logTag}: {d.itemObj.name} -> 点位 {targetPoint.name}");
+            Log($"[DishPlaceSystem] 分配 {logTag}: {d.itemObj.name} -> 点位 {targetPoint.name}");
 
             if (moveRoutines.TryGetValue(d.itemObj.transform, out Coroutine routine) && routine != null)
             {

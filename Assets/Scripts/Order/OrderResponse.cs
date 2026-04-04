@@ -42,6 +42,28 @@ public class OrderResponse : BaseStation
     [Tooltip("这桌拥有的椅子位置（把椅子子物体拖进来）")]
     public List<Transform> chairs = new List<Transform>();
 
+    [Header("Patience")]
+    [Tooltip("等待点菜阶段初始耐心")]
+    public float maxPatienceOrder = 100f;
+    [Tooltip("等待点菜阶段每秒损失")]
+    public float lossPerSecondOrder = 10f;
+    [Tooltip("等上菜阶段初始耐心")]
+    public float maxPatienceFood = 100f;
+    [Tooltip("等上菜阶段每秒损失")]
+    public float lossPerSecondFood = 5f;
+    [Tooltip("任意菜品上桌后增加的耐心（封顶见 maxPatienceCap）")]
+    public float servePatienceBonus = 60f;
+    public float maxPatienceCap = 100f;
+    [Tooltip("低于此值时显示「不耐烦」图标（等上菜阶段）")]
+    public float impatientThreshold = 40f;
+
+    public float currentPatienceOrder;
+    public float currentPatienceFood;
+
+    [Header("Debug")]
+    [Tooltip("勾选后在 Console 输出耐心归零、顾客离场相关日志（排查不走向消失点等问题）")]
+    public bool debugPatienceLeave;
+
     [Header("Order Settings")]
     public int minDishes = 1;
     public int maxDishes = 2;
@@ -65,6 +87,19 @@ public class OrderResponse : BaseStation
     private readonly List<GameObject> activeEatenModels = new List<GameObject>();
 
     private bool isInteracting = false;
+    private CustomerGroup boundGroup;
+    private bool isAbandoningPatience;
+
+    public void RegisterCustomerGroup(CustomerGroup group) => boundGroup = group;
+
+    /// <summary>顾客组离场结束后由 <see cref="CustomerGroup"/> 调用。</summary>
+    public void NotifyPatienceLeaveComplete()
+    {
+        PatienceLeaveDbg("NotifyPatienceLeaveComplete：顾客组已离场，桌子预定解锁");
+        boundGroup = null;
+        isReserved = false;
+        isAbandoningPatience = false;
+    }
 
     void OnEnable() { if (itemPlacePoint != null) itemPlacePoint.OnItemPlacedEvent += OnItemPlaced; }
     void OnDisable()
@@ -111,6 +146,30 @@ public class OrderResponse : BaseStation
             }
         }
 
+        if (!isAbandoningPatience)
+        {
+            if (currentState == TableState.WaitingToOrder)
+            {
+                currentPatienceOrder -= lossPerSecondOrder * Time.deltaTime;
+                if (currentPatienceOrder <= 0f)
+                {
+                    currentPatienceOrder = 0f;
+                    PatienceLeaveDbg("耐心1 归零，触发 AbandonTableDueToPatience");
+                    AbandonTableDueToPatience();
+                }
+            }
+            else if (currentState == TableState.WaitingForFood)
+            {
+                currentPatienceFood -= lossPerSecondFood * Time.deltaTime;
+                if (currentPatienceFood <= 0f)
+                {
+                    currentPatienceFood = 0f;
+                    PatienceLeaveDbg("耐心2 归零，触发 AbandonTableDueToPatience");
+                    AbandonTableDueToPatience();
+                }
+            }
+        }
+
         // 玩家端走脏盘子堆后，桌子彻底空出
         if (currentState == TableState.WaitingForCleanup)
         {
@@ -152,6 +211,7 @@ public class OrderResponse : BaseStation
 
         currentState = TableState.WaitingToOrder;
         currentOrderProgress = 0f;
+        currentPatienceOrder = maxPatienceOrder;
         Debug.Log($"[OrderResponse] 桌号 {tableId} 顾客看完了，头顶亮起图标请求点单！");
     }
 
@@ -185,6 +245,7 @@ public class OrderResponse : BaseStation
         currentState = TableState.WaitingForFood;
         isInteracting = false;
         currentOrderProgress = requiredOrderTime;
+        currentPatienceFood = maxPatienceFood;
 
         currentOrder.Clear();
         dishesOnTable.Clear();
@@ -297,6 +358,8 @@ public class OrderResponse : BaseStation
 
         // 【新增】：将该 dish 设置为不可拿取
         item.isPickable = false;
+
+        currentPatienceFood = Mathf.Min(maxPatienceCap, currentPatienceFood + servePatienceBonus);
 
         // 6. 判断是否点菜全齐
         if (currentOrder.Count == 0)
@@ -423,10 +486,82 @@ public class OrderResponse : BaseStation
         currentState = TableState.Empty; 
         
         // 【新增】：客人吃完走人，桌子解开预定锁
-        isReserved = false; 
+        isReserved = false;
+
+        currentPatienceOrder = maxPatienceOrder;
+        currentPatienceFood = maxPatienceFood;
+    }
+
+    void PatienceLeaveDbg(string msg)
+    {
+        if (debugPatienceLeave) Debug.Log($"[PatienceLeave][桌{tableId}] {msg}");
+    }
+
+    void AbandonTableDueToPatience()
+    {
+        if (isAbandoningPatience) return;
+        if (currentState != TableState.WaitingToOrder && currentState != TableState.WaitingForFood) return;
+
+        isAbandoningPatience = true;
+        PatienceLeaveDbg($"Abandon 开始 | boundGroup={(boundGroup != null ? boundGroup.name : "NULL — 顾客不会走路离场，请查 CustomerGroup.InitGroup 是否 RegisterCustomerGroup")}");
+
+        if (eatRoutine != null)
+        {
+            StopCoroutine(eatRoutine);
+            eatRoutine = null;
+        }
+
+        if (GlobalOrderManager.Instance != null)
+            GlobalOrderManager.Instance.RemoveAllOrdersForTable(tableId);
+
+        if (dishPlaceSystem != null)
+            dishPlaceSystem.ClearAllDishes();
+
+        foreach (var model in activeEatenModels)
+        {
+            if (model != null) Destroy(model);
+        }
+        activeEatenModels.Clear();
+
+        dishesOnTable.Clear();
+        currentOrder.Clear();
+
+        if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
+        {
+            var occ = itemPlacePoint.CurrentItem;
+            itemPlacePoint.ClearOccupant();
+            if (occ != null) Destroy(occ.gameObject);
+        }
+
+        isInteracting = false;
+        currentOrderProgress = 0f;
+        currentEatTime = 0f;
+        currentPatienceOrder = maxPatienceOrder;
+        currentPatienceFood = maxPatienceFood;
+
+        currentState = TableState.Empty;
+
+        if (boundGroup != null)
+        {
+            PatienceLeaveDbg("调用 CustomerGroup.BeginLeaveGroup()");
+            boundGroup.BeginLeaveGroup();
+        }
+        else
+        {
+            PatienceLeaveDbg("无 boundGroup，已直接 isReserved=false（若预期应离场，说明本桌未绑定顾客组）");
+            isReserved = false;
+            isAbandoningPatience = false;
+        }
     }
 
     public float GetOrderProgressNormalized() => requiredOrderTime > 0f ? Mathf.Clamp01(currentOrderProgress / requiredOrderTime) : 0f;
+
+    /// <summary>等待点菜阶段：始终显示「呼叫点餐」Icon（颜色由 UI 根据耐心值渐变）。</summary>
+    public bool ShouldShowWaitingToOrderCallIcon => currentState == TableState.WaitingToOrder;
+
+    /// <summary>等上菜阶段：耐心低于阈值时显示不耐烦 Icon（颜色由 UI 根据耐心值渐变）。</summary>
+    public bool ShouldShowWaitingFoodImpatientIcon =>
+        currentState == TableState.WaitingForFood && currentPatienceFood < impatientThreshold;
     public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder() => currentOrder;
 
     /// <summary>
