@@ -258,7 +258,7 @@ MonoBehaviour:
   requiredProgress: 60
   currentProgress: 0
   resultPrefab: {fileID: 8385399957628962730, guid: c9ea390c22e553d4eb1553b247acaca8, type: 3}
-  debugLog: 1
+  debugLog: 0
 --- !u!114 &8634012162784508832
 MonoBehaviour:
   m_ObjectHideFlags: 0

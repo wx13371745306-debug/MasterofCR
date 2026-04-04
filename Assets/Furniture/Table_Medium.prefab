@@ -619,7 +619,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OrderResponse
   highlightObject: {fileID: 2393099836936566051}
-  debugLog: 1
+  debugLog: 0
   itemPlacePoint: {fileID: 6942653017616375842}
   dishPlaceSystem: {fileID: 1555752012405196064}
   orderGenerator: {fileID: 0}
@@ -638,9 +638,9 @@ MonoBehaviour:
   - {fileID: 4255766357206022944}
   - {fileID: 2360844861025500424}
   maxPatienceOrder: 100
-  lossPerSecondOrder: 10
+  lossPerSecondOrder: 2
   maxPatienceFood: 100
-  lossPerSecondFood: 5
+  lossPerSecondFood: 2
   servePatienceBonus: 60
   maxPatienceCap: 100
   impatientThreshold: 40
