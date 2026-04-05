@@ -24,7 +24,7 @@ public class FryPot : MonoBehaviour
     [Header("Debug")]
     public bool debugLog = true;
 
-    private readonly Dictionary<FryIngredientId, int> materials = new Dictionary<FryIngredientId, int>();
+    private readonly Dictionary<string, int> materials = new Dictionary<string, int>(System.StringComparer.Ordinal);
     private FryRecipeDatabase.FryRecipe finishedRecipe;
 
     private List<GameObject> spawnedIngredientVisuals = new List<GameObject>();
@@ -62,8 +62,30 @@ public class FryPot : MonoBehaviour
     {
         if (item == null || cookingFinished) return;
 
+        FryIngredientTag tag = item.GetComponent<FryIngredientTag>();
+        if (tag == null)
+        {
+            if (debugLog) Debug.LogWarning($"[FryPot] 物体 '{item.name}' 没有 FryIngredientTag，被忽略", item);
+            return;
+        }
+
+        string id = tag.NormalizedIngredientId;
+        if (string.IsNullOrEmpty(id))
+        {
+            Debug.LogWarning(
+                $"[FryPot] 物体带有 FryIngredientTag 但 ingredientId 为空或仅空白，无法识别为食材: {item.name}",
+                item);
+            return;
+        }
+
         FryableItem fry = item.GetComponent<FryableItem>();
-        if (fry == null) return;
+        if (fry == null)
+        {
+            Debug.LogWarning(
+                $"[FryPot] 物体带有 FryIngredientTag 但缺少 FryableItem，无法下锅: {item.name} (ingredientId={id})",
+                item);
+            return;
+        }
 
         if (fry.visualInPotPrefab != null && visualContainer != null)
         {
@@ -76,11 +98,16 @@ public class FryPot : MonoBehaviour
         int addValue = materials.Count == 0 ? fry.baseRequired : fry.addedRequired;
         requiredProgress += addValue;
 
-        if (!materials.ContainsKey(fry.ingredientId)) materials[fry.ingredientId] = 0;
-        materials[fry.ingredientId]++;
+        if (!materials.ContainsKey(id)) materials[id] = 0;
+        materials[id]++;
 
         ingredientPlacePoint.ClearOccupant();
-        if (debugLog) Debug.Log($"[FryPot] Consumed: {item.name}");
+        if (debugLog)
+        {
+            Debug.Log($"[FryPot] 吸收食材: '{item.name}' → ingredientId='{id}'  " +
+                      $"当前锅内: {DumpMaterials()}  " +
+                      $"进度: {currentProgress}/{requiredProgress}", this);
+        }
         Destroy(item.gameObject);
     }
 
@@ -111,23 +138,38 @@ public class FryPot : MonoBehaviour
             return;
         }
 
-        // --- 核心修改：此时 FindMatch 一定会返回一个配方（要么成功，要么兜底的 FailedDish）---
+        if (debugLog)
+        {
+            Debug.Log($"[FryPot] === 开始匹配菜谱 ===  锅内材料({materials.Count}种): {DumpMaterials()}", this);
+        }
+
         finishedRecipe = recipeDatabase.FindMatch(materials);
 
         if (finishedRecipe == null)
         {
-            // 只有当你的 Database 连 failedDishRecipe 都没有配置时才会进入这里
-            if (debugLog) Debug.LogWarning("[FryPot] Resolve failed: No matched recipe and no fallback FailedDish config!");
+            Debug.LogWarning("[FryPot] 匹配失败: 无匹配菜谱，且未配置兜底 FailedDish!", this);
             return;
         }
 
-        // 统一处理视觉生成：无论是佛跳墙还是黑暗料理，都按配方的 visual 生成
+        if (debugLog)
+        {
+            bool isFallback = (finishedRecipe == recipeDatabase.failedDishRecipe);
+            Debug.Log($"[FryPot] 匹配结果: '{finishedRecipe.recipeName}' " +
+                      (isFallback ? "(兜底/失败菜)" : "(正常菜谱)"), this);
+        }
+
         if (finishedRecipe.finishedVisualPrefab != null && visualContainer != null)
         {
             spawnedFinishedVisual = Instantiate(finishedRecipe.finishedVisualPrefab, visualContainer);
         }
+    }
 
-        if (debugLog) Debug.Log($"[FryPot] Resolve result: {finishedRecipe.recipeName}");
+    public bool CanDump() => HasAnyIngredient() || cookingFinished;
+
+    public void ForceClear()
+    {
+        if (debugLog) Debug.Log("[FryPot] ForceClear: 玩家清空了锅。");
+        ResetPot();
     }
 
     public bool CanServe() => cookingFinished;
@@ -167,5 +209,17 @@ public class FryPot : MonoBehaviour
             if (v != null) Destroy(v);
         }
         spawnedIngredientVisuals.Clear();
+    }
+
+    private string DumpMaterials()
+    {
+        if (materials.Count == 0) return "(空)";
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in materials)
+        {
+            if (sb.Length > 0) sb.Append(", ");
+            sb.Append($"'{kv.Key}'×{kv.Value}");
+        }
+        return sb.ToString();
     }
 }

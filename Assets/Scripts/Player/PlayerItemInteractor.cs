@@ -69,7 +69,16 @@ public class PlayerItemInteractor : MonoBehaviour
             if (heldItem != null)
             {
                 if (activeStation != null) TryEndStationInteract();
-                heldItem.TryUse(this, sensor);
+
+                IInteractiveStation nearStation = sensor != null ? sensor.GetCurrentStation() : null;
+                if (nearStation is BinStation bin && bin.TryDumpHeldItem(this, heldItem))
+                {
+                    // BinStation 已处理（清空锅 / 菜品转盘子）
+                }
+                else
+                {
+                    heldItem.TryUse(this, sensor);
+                }
             }
             else if (activeStation == null)
             {
@@ -119,12 +128,20 @@ public class PlayerItemInteractor : MonoBehaviour
                 highlightedPlacePoint.SetSensorHighlight(true);
             }
 
-            // 【新增】持物状态下也检查堆叠目标（另一个同类物体 或 已有的 Stack）
+            // 持物状态下也检查堆叠目标（另一个同类物体 或 已有的 Stack）
             CarryableItem stackTarget = sensor.GetCurrentStackTarget();
             if (stackTarget != null)
             {
                 highlightedItem = stackTarget;
                 highlightedItem.SetSensorHighlight(true);
+            }
+
+            // 持物状态下高亮 BinStation（提示玩家可以按 K 清空/丢弃）
+            IInteractiveStation station = sensor.GetCurrentStation();
+            if (station is BinStation)
+            {
+                highlightedStation = station;
+                highlightedStation.SetSensorHighlight(true);
             }
         }
     }

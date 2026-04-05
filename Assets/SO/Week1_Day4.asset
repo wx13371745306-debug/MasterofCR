@@ -13,18 +13,23 @@ MonoBehaviour:
   m_Name: Week1_Day4
   m_EditorClassIdentifier: Assembly-CSharp::LevelConfigSO
   waves:
-  - spawnTime: 3
+  - spawnTime: 4
+    groupSize: 4
+    groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
+    minDishes: 3
+    maxDishes: 4
+  - spawnTime: 100
     groupSize: 2
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
     minDishes: 1
     maxDishes: 2
-  - spawnTime: 7
+  - spawnTime: 160
     groupSize: 2
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
     minDishes: 1
-    maxDishes: 3
-  - spawnTime: 7
-    groupSize: 4
+    maxDishes: 2
+  - spawnTime: 200
+    groupSize: 2
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
-    minDishes: 3
-    maxDishes: 5
+    minDishes: 1
+    maxDishes: 2

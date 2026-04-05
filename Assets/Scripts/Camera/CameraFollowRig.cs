@@ -12,9 +12,12 @@ public class CameraFollowRig : MonoBehaviour
     public float smoothTime = 0.25f;
     [Tooltip("Max rig movement speed (units/sec). SmoothDamp caps velocity at this. Use 0 for no cap.")]
     public float maxFollowSpeed = 12f;
+    [Tooltip("When enabled, the camera always follows the player without needing to hold Space.")]
+    public bool alwaysFollow = false;
 
     private float fixedHeight;
     private Vector3 smoothVelocity;
+    private bool wasFollowing;
 
     private void Awake()
     {
@@ -26,15 +29,29 @@ public class CameraFollowRig : MonoBehaviour
         if (target == null)
             return;
 
-        var k = Keyboard.current;
-        if (k == null || !k.spaceKey.isPressed)
+        bool following;
+        if (alwaysFollow)
+        {
+            following = true;
+        }
+        else
+        {
+            var k = Keyboard.current;
+            following = k != null && k.spaceKey.isPressed;
+        }
+
+        if (!following)
+        {
+            wasFollowing = false;
             return;
+        }
 
         Vector3 c = transform.position;
         Vector3 p = target.position;
 
-        if (k.spaceKey.wasPressedThisFrame)
+        if (!wasFollowing)
             smoothVelocity = Vector3.zero;
+        wasFollowing = true;
 
         Vector2 delta = new Vector2(p.x - c.x, p.z - c.z);
         float dist = delta.magnitude;

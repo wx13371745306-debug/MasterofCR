@@ -6,7 +6,8 @@ using UnityEngine;
 ///   - 点按 J：拿一个物品
 ///   - 长按 J：直接生成一个 Stack 到玩家手中
 /// 箱子内不再生成物理实体，彻底避免碰撞弹飞。
-/// 只剩最后一个时，隐藏箱内的装饰模型，生成一个真实的可拿取物品放在内部放置点上。
+/// 剩余 >1 时显示 multipleItemsModel，剩余 ==1 时显示 lastItemModel，
+/// 所有拿取均在视线外实例化后送到玩家手上。
 /// </summary>
 public class SupplyBox : BaseStation
 {
@@ -19,6 +20,8 @@ public class SupplyBox : BaseStation
     public int currentCount;
 
     [Header("Stack Settings")]
+    [Tooltip("是否允许长按拿取整组 Stack")]
+    public bool enableStackDispense = false;
     [Tooltip("通用的 DynamicItemStack 预制体")]
     public GameObject stackPrefab;
     [Tooltip("一个 Stack 里装多少个（从物品的 StackableProp 读取，这里为手动兜底值）")]
@@ -39,8 +42,8 @@ public class SupplyBox : BaseStation
     [Tooltip("当剩余数量 > 1 时显示的额外装饰模型（请务必将其设为 openedModel 的子物体）")]
     public GameObject multipleItemsModel;
 
-    [Tooltip("箱子内部生成最后一个物品的放置点")]
-    public ItemPlacePoint internalPlacePoint;
+    [Tooltip("当剩余数量 == 1 时显示的最后一个物品装饰模型（请务必将其设为 openedModel 的子物体）")]
+    public GameObject lastItemModel;
 
     [Header("UI References")]
     [Tooltip("箱子上方显示的菜品图标（如：番茄图片）")]
@@ -68,8 +71,7 @@ public class SupplyBox : BaseStation
         if (closedModel != null) closedModel.SetActive(true);
         if (openedModel != null) openedModel.SetActive(false);
 
-        UpdateMultipleItemsVisual(); 
-        UpdatePlacePointState(); 
+        UpdateItemVisuals(); 
         UpdateUIVisual();
     }
 
@@ -123,18 +125,9 @@ public class SupplyBox : BaseStation
 
             // 关闭箱子时恢复可搬运
             if (boxCarryable != null) boxCarryable.isPickable = true;
-
-            // 如果箱子关闭时，内部点位上还有没被拿走的物品，回收
-            if (internalPlacePoint != null && internalPlacePoint.CurrentItem != null)
-            {
-                Destroy(internalPlacePoint.CurrentItem.gameObject);
-                internalPlacePoint.ClearOccupant();
-                currentCount++;
-                UpdateMultipleItemsVisual(); 
-            }
         }
         
-        UpdatePlacePointState(); 
+        UpdateItemVisuals(); 
         UpdateUIVisual(); 
     }
 
@@ -152,7 +145,7 @@ public class SupplyBox : BaseStation
         if (!isOpened || currentCount <= 0 || interactor.IsHoldingItem()) return false;
         if (itemPrefab == null) return false;
 
-        if (isLongPress && stackPrefab != null && currentCount >= 2)
+        if (isLongPress && enableStackDispense && stackPrefab != null && currentCount >= 2)
         {
             return DispenseStack(interactor);
         }
@@ -167,23 +160,6 @@ public class SupplyBox : BaseStation
     /// </summary>
     bool DispenseSingle(PlayerItemInteractor interactor)
     {
-        // 如果是最后一个且内部放置点上已经有实体了，直接让玩家拿那个
-        if (currentCount == 1 && internalPlacePoint != null && internalPlacePoint.CurrentItem != null)
-        {
-            CarryableItem lastItem = internalPlacePoint.CurrentItem;
-            internalPlacePoint.ClearOccupant();
-            lastItem.BeginHold(interactor.GetHoldPoint());
-            interactor.ReplaceHeldItem(lastItem);
-            currentCount--;
-
-            UpdateMultipleItemsVisual();
-            UpdatePlacePointState();
-            UpdateUIVisual();
-            if (debugLog) Debug.Log($"<color=#FFA500>[SupplyBox]</color> 拿取了最后一个物品: {lastItem.name}，箱子已空");
-            return true;
-        }
-
-        // 在远离场景的位置实例化，避免物理碰撞
         GameObject obj = Instantiate(itemPrefab, Vector3.one * -9999f, Quaternion.identity);
         CarryableItem item = obj.GetComponent<CarryableItem>();
         if (item == null)
@@ -192,23 +168,14 @@ public class SupplyBox : BaseStation
             return false;
         }
 
-        // 直接送到玩家手上
         item.BeginHold(interactor.GetHoldPoint());
         interactor.ReplaceHeldItem(item);
         currentCount--;
 
-        UpdateMultipleItemsVisual();
-        UpdatePlacePointState();
+        UpdateItemVisuals();
         UpdateUIVisual();
 
         if (debugLog) Debug.Log($"<color=#FFA500>[SupplyBox]</color> 拿取了一个 {item.name}，剩余: {currentCount}");
-
-        // 如果取完之后只剩1个了，在内部点位上生成最后一个实体
-        if (currentCount == 1)
-        {
-            SpawnLastItem();
-        }
-
         return true;
     }
 
@@ -238,67 +205,23 @@ public class SupplyBox : BaseStation
             stackSize, stackLayout, stackOffset,
             gridColumns, gridRows, gridSpacing);
 
-        // 直接送到玩家手上
         stack.BeginHold(interactor.GetHoldPoint());
         interactor.ReplaceHeldItem(stack);
         currentCount -= dispenseCount;
 
-        UpdateMultipleItemsVisual();
-        UpdatePlacePointState();
+        UpdateItemVisuals();
         UpdateUIVisual();
 
         if (debugLog) Debug.Log($"<color=#FFA500>[SupplyBox]</color> 拿取了一个 Stack({dispenseCount}个)，剩余: {currentCount}");
-
-        // 如果取完之后只剩1个了
-        if (currentCount == 1)
-        {
-            SpawnLastItem();
-        }
-
         return true;
     }
 
-    /// <summary>
-    /// 当箱子里只剩最后一个时，隐藏装饰模型，在内部生成一个真正的可拿取物品。
-    /// </summary>
-    void SpawnLastItem()
-    {
-        if (itemPrefab == null || internalPlacePoint == null) return;
-        if (internalPlacePoint.CurrentItem != null) return; // 已经有了
-
-        // 隐藏装饰模型
-        if (multipleItemsModel != null) multipleItemsModel.SetActive(false);
-
-        // 生成最后一个实体
-        GameObject obj = Instantiate(itemPrefab, internalPlacePoint.attachPoint.position, internalPlacePoint.attachPoint.rotation);
-        CarryableItem item = obj.GetComponent<CarryableItem>();
-        if (item != null)
-        {
-            item.initialPlacePoint = internalPlacePoint;
-            internalPlacePoint.TryAcceptItem(item);
-            if (debugLog) Debug.Log($"<color=#FFA500>[SupplyBox]</color> 生成了最后一个实体物品: {item.name}");
-        }
-        else
-        {
-            Destroy(obj);
-        }
-    }
-
-    void UpdateMultipleItemsVisual()
+    void UpdateItemVisuals()
     {
         if (multipleItemsModel != null)
-        {
             multipleItemsModel.SetActive(currentCount > 1);
-        }
-    }
-
-    void UpdatePlacePointState()
-    {
-        if (internalPlacePoint != null)
-        {
-            // 只有当箱子打开时，才允许放入
-            internalPlacePoint.allowAnyCategory = isOpened;
-        }
+        if (lastItemModel != null)
+            lastItemModel.SetActive(currentCount == 1);
     }
 
     void UpdateUIVisual()

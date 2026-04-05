@@ -7,9 +7,8 @@ public class FryRecipeDatabase : ScriptableObject
     [System.Serializable]
     public class IngredientEntry
     {
-
-        
-        public FryIngredientId ingredient;
+        [Tooltip("与食材预制体上 FryIngredientTag 的 ID 一致，例如 TomatoChunk")]
+        public string ingredientId = "";
         public int count = 1;
     }
 
@@ -44,28 +43,64 @@ public class FryRecipeDatabase : ScriptableObject
     [Tooltip("当放入的食材不满足任何配方时，默认生成的失败菜品配方")]
     public FryRecipe failedDishRecipe; 
 
-    public FryRecipe FindMatch(Dictionary<FryIngredientId, int> materialCounts)
+    public FryRecipe FindMatch(Dictionary<string, int> materialCounts)
     {
         foreach (var recipe in recipes)
         {
-            if (!recipe.unlocked) continue;
+            if (!recipe.unlocked)
+            {
+                Debug.Log($"[FryRecipeDB] 跳过未解锁菜谱: '{recipe.recipeName}'");
+                continue;
+            }
+            if (recipe.ingredients == null)
+            {
+                Debug.Log($"[FryRecipeDB] 跳过无食材列表的菜谱: '{recipe.recipeName}'");
+                continue;
+            }
+
+            Debug.Log($"[FryRecipeDB] 正在比对菜谱 '{recipe.recipeName}' (需要{recipe.ingredients.Count}种食材)");
+
             bool match = true;
             foreach (var entry in recipe.ingredients)
             {
-                if (!materialCounts.TryGetValue(entry.ingredient, out int count) || count != entry.count)
+                string id = FryIngredientTag.NormalizeId(entry.ingredientId);
+                if (string.IsNullOrEmpty(id))
                 {
+                    Debug.LogWarning($"[FryRecipeDB]   菜谱 '{recipe.recipeName}' 含空的 ingredientId，跳过此菜谱");
                     match = false;
                     break;
                 }
+
+                bool found = materialCounts.TryGetValue(id, out int count);
+                if (!found)
+                {
+                    Debug.Log($"[FryRecipeDB]   需要 '{id}'×{entry.count} → 锅里没有此食材，不匹配");
+                    match = false;
+                    break;
+                }
+                if (count != entry.count)
+                {
+                    Debug.Log($"[FryRecipeDB]   需要 '{id}'×{entry.count} → 锅里有 '{id}'×{count}，数量不匹配");
+                    match = false;
+                    break;
+                }
+                Debug.Log($"[FryRecipeDB]   需要 '{id}'×{entry.count} → 匹配 ✓");
             }
+
             if (!match) continue;
-            if (materialCounts.Count != recipe.ingredients.Count) continue;
-            
-            return recipe; // 找到正常配方，返回
+
+            if (materialCounts.Count != recipe.ingredients.Count)
+            {
+                Debug.Log($"[FryRecipeDB]   食材种类数不一致: 锅里{materialCounts.Count}种 vs 菜谱{recipe.ingredients.Count}种，不匹配");
+                continue;
+            }
+
+            Debug.Log($"[FryRecipeDB] ★ 匹配成功: '{recipe.recipeName}'");
+            return recipe;
         }
 
-        // --- 核心修改：如果没有匹配项，不再返回 null，而是返回失败配方 ---
-        return failedDishRecipe; 
+        Debug.Log($"[FryRecipeDB] 无匹配菜谱，返回兜底: '{(failedDishRecipe != null ? failedDishRecipe.recipeName : "null")}'");
+        return failedDishRecipe;
     }
 
     public FryRecipe FindByName(string targetRecipeName)

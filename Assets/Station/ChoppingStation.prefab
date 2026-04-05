@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 2605668835442819433}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.042, z: 0}
+  m_LocalPosition: {x: 0, y: 0.3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -58,7 +58,7 @@ Transform:
   m_GameObject: {fileID: 7090360246385077322}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0.26, z: -0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
@@ -170,7 +170,7 @@ MonoBehaviour:
   placePoint: {fileID: 2943789578518126812}
   usableHighlight: {fileID: 7528683388947699374}
   stationProcessType: 0
-  processingSpeed: 20
+  processingSpeed: 30
   rotatingPart: {fileID: 6276396686887961473}
   rotateAxis: 1
   angleRange: 45
@@ -192,10 +192,12 @@ MonoBehaviour:
   - {fileID: 4411372568672821604}
   poseConfig: {fileID: 0}
   sensorHighlight: {fileID: 3046444914030582448}
-  categories: 16
+  categories: 0
   initialPlacePoint: {fileID: 0}
   isUsable: 0
+  isPickable: 1
   useHighlightObject: {fileID: 0}
+  disableCollidersOnAttach: 0
   debugLog: 1
 --- !u!114 &2943789578518126812
 MonoBehaviour:
@@ -213,6 +215,7 @@ MonoBehaviour:
   sensorHighlight: {fileID: 6186636812755950510}
   allowAnyCategory: 1
   allowedCategories: -1
+  linkedCarryable: {fileID: 7633457637363568201}
 --- !u!1001 &2773962675120515445
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -239,7 +242,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.154
+      value: 0.731
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z
@@ -419,7 +422,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.116
+      value: 0.693
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z
@@ -537,7 +540,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.076
+      value: 0.65300006
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z

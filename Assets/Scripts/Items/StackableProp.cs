@@ -104,16 +104,6 @@ public class StackableProp : MonoBehaviour
         int effectiveMaxCount = (layoutType == StackLayout.Grid) ? gridColumns * gridRows : maxStackCount;
         newStack.Initialize(myItem, incomingItem, effectiveMaxCount, layoutType, stackYOffset, gridColumns, gridRows, gridSpacing);
 
-        // 5.【关键】手动注册到 Sensor 里，否则原地创建的 Stack 不会被 OnTriggerEnter 检测到
-        if (sensor != null)
-        {
-            // 先注销掉被吸收的两个原始物品（它们现在已经藏在 Stack 内部了）
-            sensor.UnregisterItem(myItem);
-            sensor.UnregisterItem(incomingItem);
-            // 注册新的 Stack
-            sensor.RegisterItem(newStack);
-        }
-
         if (debugLog) Debug.Log($"<color=#00FF00>[StackableProp]</color> 合并完成！{myItem.name} 和 {incomingItem.name} 已归入新的 Stack: {stackObj.name}");
 
         return newStack;

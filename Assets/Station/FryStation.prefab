@@ -53,7 +53,6 @@ MonoBehaviour:
   sensorHighlight: {fileID: 6080675433213093044}
   allowAnyCategory: 1
   allowedCategories: -1
-  debugLog: 0
 --- !u!114 &3159313210947883911
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -69,7 +68,7 @@ MonoBehaviour:
   highlightObject: {fileID: 2847965789766758715}
   debugLog: 1
   potPlacePoint: {fileID: 2710367023097425075}
-  frySpeed: 20
+  frySpeed: 10
   fryEffect: {fileID: 2544061619272865998}
 --- !u!1 &3546353170004422618
 GameObject:
@@ -270,7 +269,6 @@ MonoBehaviour:
   sensorHighlight: {fileID: 5887164243761663021}
   allowAnyCategory: 1
   allowedCategories: -1
-  debugLog: 0
 --- !u!114 &2722990609700297110
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -286,7 +284,7 @@ MonoBehaviour:
   highlightObject: {fileID: 7182562110278373440}
   debugLog: 1
   potPlacePoint: {fileID: 5860164120704872380}
-  frySpeed: 20
+  frySpeed: 10
   fryEffect: {fileID: 5205644292124411876}
 --- !u!1 &8210597215511989994
 GameObject:

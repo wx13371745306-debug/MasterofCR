@@ -9,6 +9,10 @@ public class ItemPlacePoint : MonoBehaviour
     [Header("Placement Rules")]
     public bool allowAnyCategory = true;
     public ItemCategory allowedCategories = ItemCategory.None;
+
+    [Header("Linked Carryable")]
+    [Tooltip("当此放置点被占用时，将该 CarryableItem 设为不可拿取；清空时恢复可拿取")]
+    public CarryableItem linkedCarryable;
     
 
     // 【新增事件】：当有物体合法放上来时触发，取代 Update 轮询！
@@ -39,9 +43,11 @@ public class ItemPlacePoint : MonoBehaviour
             ClearOccupant(); // 挤走旧的
 
         currentItem = item;
-        item.InternalSetPlacedState(this); // 通知物体改变自身状态
+        item.InternalSetPlacedState(this);
         
-        OnItemPlacedEvent?.Invoke(item); // 广播事件（比如通知锅把食材吃掉）
+        if (linkedCarryable != null) linkedCarryable.isPickable = false;
+
+        OnItemPlacedEvent?.Invoke(item);
         return true;
     }
 
@@ -52,6 +58,8 @@ public class ItemPlacePoint : MonoBehaviour
             currentItem.ClearPlaceState();
             currentItem = null;
         }
+
+        if (linkedCarryable != null) linkedCarryable.isPickable = true;
     }
 
     public void SetSensorHighlight(bool on)

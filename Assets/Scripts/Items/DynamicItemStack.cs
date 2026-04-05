@@ -147,11 +147,6 @@ public class DynamicItemStack : CarryableItem
         PushItemSilently(item);
         UpdateVisuals();
 
-        if (sensor != null)
-        {
-            sensor.UnregisterItem(item);
-        }
-
         return true;
     }
 

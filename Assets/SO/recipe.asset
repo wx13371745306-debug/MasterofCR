@@ -16,9 +16,9 @@ MonoBehaviour:
   - recipeName: TomatoFireEgg
     unlocked: 1
     ingredients:
-    - ingredient: {fileID: 11400000, guid: 91a2b3c4d5e6f7890123456789abc001, type: 2}
+    - ingredientId: TomatoChunk
       count: 1
-    - ingredient: {fileID: 11400000, guid: 91a2b3c4d5e6f7890123456789abc002, type: 2}
+    - ingredientId: Egg
       count: 1
     resultPrefab: {fileID: 5258138650443871965, guid: f6e1839888e9e42439ed417b2d619671, type: 3}
     finishedVisualPrefab: {fileID: 1154329586283223756, guid: 53c444075b9da73499cd79d1a67721c2, type: 3}
@@ -30,9 +30,9 @@ MonoBehaviour:
   - recipeName: GreenPepperMeat
     unlocked: 1
     ingredients:
-    - ingredient: {fileID: 11400000, guid: 91a2b3c4d5e6f7890123456789abc003, type: 2}
+    - ingredientId: GreenPepperStrip
       count: 1
-    - ingredient: {fileID: 11400000, guid: 848cc48bf109ffb4b90ec95d460b563a, type: 2}
+    - ingredientId: PorkLoinMeatStrip
       count: 1
     resultPrefab: {fileID: 5258138650443871965, guid: 4e0830c245143fd4994b490ae3277f2e, type: 3}
     finishedVisualPrefab: {fileID: 8602442576936938373, guid: b9a94fd816dd0af499599d9c3509b0db, type: 3}

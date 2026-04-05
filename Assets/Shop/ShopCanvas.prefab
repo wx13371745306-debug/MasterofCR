@@ -541,7 +541,6 @@ GameObject:
   - component: {fileID: 3541813019383340606}
   - component: {fileID: 380755561566576727}
   - component: {fileID: 8115782517903572599}
-  - component: {fileID: 2722043364791960691}
   m_Layer: 0
   m_Name: ShopCanvas
   m_TagString: Untagged
@@ -632,19 +631,6 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &2722043364791960691
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4451822073734336790}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 392b343adcfbaed40a33005ef029d8e3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShopInputToggle
-  shopUI: {fileID: 2783758458198266296}
 --- !u!1 &5443294035408515014
 GameObject:
   m_ObjectHideFlags: 0
@@ -1220,7 +1206,10 @@ MonoBehaviour:
   orderButton: {fileID: 7348711225395509950}
   orderErrorText: {fileID: 4659175404994027564}
   deliverySpawner: {fileID: 0}
+  shopDeliveryQueue: {fileID: 0}
+  dayCycleManager: {fileID: 0}
   unlockCursorWhenOpen: 1
+  playerMoveFallback: {fileID: 0}
   enableShopDebugLogs: 0
 --- !u!1 &6270090712642949979
 GameObject:

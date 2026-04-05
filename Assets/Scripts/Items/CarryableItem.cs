@@ -26,8 +26,12 @@ public class CarryableItem : MonoBehaviour
     public bool isPickable = true;
     public GameObject useHighlightObject;
 
+    [Header("Physics")]
+    [Tooltip("附着时是否将 Collider 切换为 Trigger（关闭则保留原始 Collider 状态）")]
+    public bool disableCollidersOnAttach = false;
+
     [Header("Debug")]
-    public bool debugLog = true;
+    public bool debugLog = false;
 
     public ItemPlacePoint CurrentPlacePoint => currentPlacePoint;
     public ItemState State => state;
@@ -155,7 +159,7 @@ public class CarryableItem : MonoBehaviour
             rb.useGravity = true;
         }
 
-        if (itemColliders != null)
+        if (disableCollidersOnAttach && itemColliders != null)
         {
             foreach (var c in itemColliders)
             {
@@ -235,7 +239,7 @@ public class CarryableItem : MonoBehaviour
             }
         }
 
-        if (itemColliders != null)
+        if (disableCollidersOnAttach && itemColliders != null)
         {
             foreach (var c in itemColliders)
             {

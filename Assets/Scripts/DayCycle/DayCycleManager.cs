@@ -252,24 +252,24 @@ public class DayCycleManager : MonoBehaviour
     {
         if (playerSpawnPoint == null || playerObject == null) return;
 
+        Vector3 pos = playerSpawnPoint.position;
+        Quaternion rot = playerSpawnPoint.rotation;
+
         var cc = playerObject.GetComponent<CharacterController>();
-        if (cc != null)
-        {
-            cc.enabled = false;
-            playerObject.transform.SetPositionAndRotation(playerSpawnPoint.position, playerSpawnPoint.rotation);
-            cc.enabled = true;
-        }
-        else
-        {
-            playerObject.transform.SetPositionAndRotation(playerSpawnPoint.position, playerSpawnPoint.rotation);
-        }
+        if (cc != null) cc.enabled = false;
 
         var rb = playerObject.GetComponent<Rigidbody>();
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            rb.position = pos;
+            rb.rotation = rot;
         }
+
+        playerObject.transform.SetPositionAndRotation(pos, rot);
+
+        if (cc != null) cc.enabled = true;
     }
 
     /// <summary>订单收入等是否记入「今日营业额」（营业与延迟营业期间）。</summary>

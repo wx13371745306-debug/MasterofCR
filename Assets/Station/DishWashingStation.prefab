@@ -466,7 +466,7 @@ MonoBehaviour:
   inputDropPoint: {fileID: 8019887932254479337}
   outputPlacePoint: {fileID: 4901951297686218732}
   cleanPlatePrefab: {fileID: 8858006345147724, guid: 263f8c0af825b024b87bcf60534760e8, type: 3}
-  initialCleanPlates: 5
+  initialCleanPlates: 10
   requiredWashTimePerPlate: 2
   dirtyPlatesInSink: 0
   currentWashProgress: 0
