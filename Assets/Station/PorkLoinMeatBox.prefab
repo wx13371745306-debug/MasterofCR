@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 7450502504320770204}
   - component: {fileID: 8153583046529893096}
   - component: {fileID: 6389674099061558386}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 3309659924037988598}
   - component: {fileID: 6509367962356801871}
   - component: {fileID: 113230796642835578}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Torus
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -189,7 +189,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5892532418675877655}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: TomatoAll
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -227,7 +227,7 @@ GameObject:
   - component: {fileID: 3899933832762253609}
   - component: {fileID: 1191365486440998169}
   - component: {fileID: 4963858730225910187}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: PorkLoinMeatBox
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -304,6 +304,7 @@ MonoBehaviour:
   isUsable: 1
   isPickable: 1
   useHighlightObject: {fileID: 0}
+  disableCollidersOnAttach: 1
   debugLog: 1
 --- !u!114 &4963858730225910187
 MonoBehaviour:
@@ -322,6 +323,7 @@ MonoBehaviour:
   itemPrefab: {fileID: 7096165798621821909, guid: 6ff383c4ddc53e444ae144acbede74ef, type: 3}
   maxCount: 10
   currentCount: 0
+  enableStackDispense: 0
   stackPrefab: {fileID: 2923466580099044001, guid: 412759ef71c51db448bddee28bdb1a10, type: 3}
   stackSize: 0
   stackLayout: 0
@@ -346,7 +348,7 @@ GameObject:
   - component: {fileID: 9041715135128866805}
   - component: {fileID: 8155206409948700987}
   - component: {fileID: 2750004297098495937}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -420,7 +422,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4383564271511461190}
   - component: {fileID: 1331384364303514556}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: UseableHighlight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -469,7 +471,7 @@ GameObject:
   - component: {fileID: 4016743043812015211}
   - component: {fileID: 4940178999260110}
   - component: {fileID: 2879342058981574404}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: ModelBoxOpen
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -561,7 +563,7 @@ GameObject:
   - component: {fileID: 1247983289974118353}
   - component: {fileID: 7090967687168450589}
   - component: {fileID: 2877322394916437770}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: EmptyIcon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -636,7 +638,7 @@ GameObject:
   - component: {fileID: 8321980555247427816}
   - component: {fileID: 344016019243643217}
   - component: {fileID: 6845926476917607524}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Torus
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -726,7 +728,7 @@ GameObject:
   - component: {fileID: 4176626442431950978}
   - component: {fileID: 3437517033776190198}
   - component: {fileID: 450207880051580012}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Cylinder
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -815,7 +817,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7081443575003778392}
   - component: {fileID: 5134211810985632120}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: CarryableHighlight
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -865,7 +867,7 @@ GameObject:
   - component: {fileID: 7319550353525069302}
   - component: {fileID: 3663595934424729894}
   - component: {fileID: 4071910438229277691}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1020,7 +1022,7 @@ GameObject:
   - component: {fileID: 8492063790098193496}
   - component: {fileID: 4789020285121434621}
   - component: {fileID: 7319180464724207415}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: ModelBoxClose
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1167,6 +1169,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: base_basic_shaded (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1244,6 +1250,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1323,6 +1333,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: base_basic_shaded
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1400,6 +1414,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded (4)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1483,6 +1501,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
       propertyPath: m_Name
       value: base_basic_shaded (3)
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4ebd0dc876367f14c85bc9456487308e, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

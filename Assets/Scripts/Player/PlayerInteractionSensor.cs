@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))]
 public class PlayerInteractionSensor : MonoBehaviour
 {
     [Header("Masks")]
@@ -22,38 +23,40 @@ public class PlayerInteractionSensor : MonoBehaviour
     private IInteractiveStation currentStation;
     private CarryableItem currentStackTarget;
 
-    private SphereCollider sensorCollider;
-    private readonly Collider[] overlapBuffer = new Collider[64];
-    private int overlapCount;
+    private readonly HashSet<Collider> collidersInRange = new HashSet<Collider>();
 
-    // Debug 用：记录本帧扫描到的各类去重列表
     private readonly List<CarryableItem> debugItems = new List<CarryableItem>();
     private readonly List<ItemPlacePoint> debugPlacePoints = new List<ItemPlacePoint>();
     private readonly List<IInteractiveStation> debugStations = new List<IInteractiveStation>();
 
     void Awake()
     {
-        sensorCollider = GetComponent<SphereCollider>();
-        if (sensorCollider != null)
-            sensorCollider.enabled = false;
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+        }
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other != null)
+            collidersInRange.Add(other);
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        collidersInRange.Remove(other);
     }
 
     void Update()
     {
         if (playerRoot == null || interactor == null) return;
 
+        collidersInRange.RemoveWhere(c => c == null || !c.enabled || !c.gameObject.activeInHierarchy);
+
         Vector3 originPos = sensorOrigin != null ? sensorOrigin.position : playerRoot.position;
-
-        // 每帧用 SphereCollider 的参数做一次 OverlapSphere 扫描
-        float radius = 2f;
-        if (sensorCollider != null)
-        {
-            Vector3 scale = sensorCollider.transform.lossyScale;
-            radius = sensorCollider.radius * Mathf.Max(scale.x, scale.y, scale.z);
-        }
-
-        LayerMask combinedMask = itemMask | placePointMask | stationMask;
-        overlapCount = Physics.OverlapSphereNonAlloc(originPos, radius, overlapBuffer, combinedMask);
 
         if (debugLog)
         {
@@ -73,10 +76,8 @@ public class PlayerInteractionSensor : MonoBehaviour
         CarryableItem best = null;
         float bestDist = float.MaxValue;
 
-        for (int i = 0; i < overlapCount; i++)
+        foreach (Collider col in collidersInRange)
         {
-            Collider col = overlapBuffer[i];
-            if (col == null) continue;
             if ((1 << col.gameObject.layer & itemMask) == 0) continue;
 
             CarryableItem item = col.GetComponentInParent<CarryableItem>();
@@ -97,10 +98,8 @@ public class PlayerInteractionSensor : MonoBehaviour
         float bestDist = float.MaxValue;
         CarryableItem heldItem = interactor.GetHeldItem();
 
-        for (int i = 0; i < overlapCount; i++)
+        foreach (Collider col in collidersInRange)
         {
-            Collider col = overlapBuffer[i];
-            if (col == null) continue;
             if ((1 << col.gameObject.layer & placePointMask) == 0) continue;
 
             ItemPlacePoint point = col.GetComponentInParent<ItemPlacePoint>();
@@ -135,10 +134,8 @@ public class PlayerInteractionSensor : MonoBehaviour
         IInteractiveStation best = null;
         float bestDist = float.MaxValue;
 
-        for (int i = 0; i < overlapCount; i++)
+        foreach (Collider col in collidersInRange)
         {
-            Collider col = overlapBuffer[i];
-            if (col == null) continue;
             if ((1 << col.gameObject.layer & stationMask) == 0) continue;
 
             IInteractiveStation station = col.GetComponentInParent<IInteractiveStation>();
@@ -167,10 +164,8 @@ public class PlayerInteractionSensor : MonoBehaviour
         CarryableItem best = null;
         float bestDist = float.MaxValue;
 
-        for (int i = 0; i < overlapCount; i++)
+        foreach (Collider col in collidersInRange)
         {
-            Collider col = overlapBuffer[i];
-            if (col == null) continue;
             if ((1 << col.gameObject.layer & itemMask) == 0) continue;
 
             CarryableItem candidate = col.GetComponentInParent<CarryableItem>();
@@ -218,7 +213,7 @@ public class PlayerInteractionSensor : MonoBehaviour
         GUILayout.BeginArea(new Rect(10, 10, 350, Screen.height - 20), GUI.skin.box);
         GUI.color = Color.white;
 
-        GUILayout.Label($"<b>[Sensor Debug]</b> Origin: {originPos}", new GUIStyle(GUI.skin.label) { richText = true });
+        GUILayout.Label($"<b>[Sensor Debug]</b> Origin: {originPos} | Colliders in range: {collidersInRange.Count}", new GUIStyle(GUI.skin.label) { richText = true });
         GUILayout.Space(10);
 
         GUILayout.Label($"<b>--- PlacePoints ({debugPlacePoints.Count}) ---</b>", new GUIStyle(GUI.skin.label) { richText = true, normal = new GUIStyleState() { textColor = Color.green } });

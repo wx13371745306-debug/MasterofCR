@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(menuName = "Cooking/Fry Recipe Database")]
-public class FryRecipeDatabase : ScriptableObject
+public class FryRecipeDatabase : ScriptableObject, IRecipeSource
 {
+    public string CategoryName => "炒菜";
     [System.Serializable]
     public class IngredientEntry
     {
@@ -101,6 +102,17 @@ public class FryRecipeDatabase : ScriptableObject
 
         Debug.Log($"[FryRecipeDB] 无匹配菜谱，返回兜底: '{(failedDishRecipe != null ? failedDishRecipe.recipeName : "null")}'");
         return failedDishRecipe;
+    }
+
+    public List<FryRecipe> GetUnlockedRecipes()
+    {
+        var result = new List<FryRecipe>();
+        foreach (var r in recipes)
+        {
+            if (r != null && r.unlocked)
+                result.Add(r);
+        }
+        return result;
     }
 
     public FryRecipe FindByName(string targetRecipeName)

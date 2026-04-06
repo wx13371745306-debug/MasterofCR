@@ -28,7 +28,7 @@ public class CarryableItem : MonoBehaviour
 
     [Header("Physics")]
     [Tooltip("附着时是否将 Collider 切换为 Trigger（关闭则保留原始 Collider 状态）")]
-    public bool disableCollidersOnAttach = false;
+    public bool disableCollidersOnAttach = true;
 
     [Header("Debug")]
     public bool debugLog = false;
@@ -39,6 +39,7 @@ public class CarryableItem : MonoBehaviour
     private ItemPlacePoint currentPlacePoint;
     private ItemPlacePoint lastPlacePointBeforeHold;
     private ItemState state = ItemState.Free;
+    private int originalLayer;
 
     void Reset()
     {
@@ -50,6 +51,8 @@ public class CarryableItem : MonoBehaviour
 
     protected virtual void Awake()
     {
+        originalLayer = gameObject.layer;
+
         if (itemColliders == null || itemColliders.Length == 0)
             itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
 
@@ -91,6 +94,7 @@ public class CarryableItem : MonoBehaviour
         }
 
         SetAttachedPhysics(true);
+        SetHeldLayer(true);
 
         transform.SetParent(holdPoint, false);
         if (poseConfig != null)
@@ -120,6 +124,7 @@ public class CarryableItem : MonoBehaviour
     {
         currentPlacePoint = point;
         SetAttachedPhysics(true);
+        SetHeldLayer(false);
         transform.SetParent(point.attachPoint, false);
 
         if (poseConfig != null)
@@ -152,6 +157,7 @@ public class CarryableItem : MonoBehaviour
 
         transform.SetParent(null);
         SetAttachedPhysics(false);
+        SetHeldLayer(false);
 
         if (rb != null)
         {
@@ -223,7 +229,6 @@ public class CarryableItem : MonoBehaviour
         {
             if (attached)
             {
-                // 变成被附着状态：先清空物理动量，再开启运动学
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 rb.isKinematic = true;
@@ -231,7 +236,6 @@ public class CarryableItem : MonoBehaviour
             }
             else
             {
-                // 掉落到物理世界：先关闭运动学，再清空速度
                 rb.isKinematic = false;
                 rb.useGravity = true;
                 rb.linearVelocity = Vector3.zero;
@@ -247,5 +251,21 @@ public class CarryableItem : MonoBehaviour
                 c.isTrigger = attached;
             }
         }
+    }
+
+    private void SetHeldLayer(bool held)
+    {
+        int targetLayer = held ? LayerMask.NameToLayer("HeldItem") : originalLayer;
+        if (targetLayer == -1) return;
+        if (debugLog)
+            Debug.Log($"<color=#FFAA00>[CarryableItem]</color> {name} SetHeldLayer({held}) → Layer: {LayerMask.LayerToName(targetLayer)} | 调用来源:\n{System.Environment.StackTrace}");
+        SetLayerRecursively(gameObject, targetLayer);
+    }
+
+    private static void SetLayerRecursively(GameObject obj, int layer)
+    {
+        obj.layer = layer;
+        foreach (Transform child in obj.transform)
+            SetLayerRecursively(child.gameObject, layer);
     }
 }

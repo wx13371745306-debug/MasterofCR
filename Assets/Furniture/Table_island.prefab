@@ -53,7 +53,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.261
+      value: 0.25
       objectReference: {fileID: 0}
     - target: {fileID: 6127155401298243510, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_Name
@@ -103,11 +103,33 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: attachPoint
+      value: 
+      objectReference: {fileID: 1086796800531555332}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: targetCollider
+      value: 
+      objectReference: {fileID: 3660682646354073164}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: switchColliderLayerOnOccupy
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+--- !u!4 &1086796800531555332 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 4567060988651170156}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &3660682646354073164 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 985213809302437664, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 4567060988651170156}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &5466588955336263603 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8411682267671080671, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
@@ -131,7 +153,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.261
+      value: 0.25
       objectReference: {fileID: 0}
     - target: {fileID: 6127155401298243510, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_Name
@@ -181,6 +203,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: attachPoint
+      value: 
+      objectReference: {fileID: 9050483854168855747}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: targetCollider
+      value: 
+      objectReference: {fileID: 4630139720969315979}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: switchColliderLayerOnOccupy
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -189,6 +223,16 @@ PrefabInstance:
 --- !u!4 &4130343204160943988 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8411682267671080671, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 5615321564431686059}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &4630139720969315979 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 985213809302437664, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 5615321564431686059}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &9050483854168855747 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
   m_PrefabInstance: {fileID: 5615321564431686059}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &6187299036193240870
@@ -308,7 +352,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.256
+      value: 0.25
       objectReference: {fileID: 0}
     - target: {fileID: 6127155401298243510, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: m_Name
@@ -359,9 +403,21 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: attachPoint
+      value: 
+      objectReference: {fileID: 6808096980839450728}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: targetCollider
+      value: 
+      objectReference: {fileID: 7179706150675397152}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
       propertyPath: sensorHighlight
       value: 
       objectReference: {fileID: 921904845872613019}
+    - target: {fileID: 8420451183136531120, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+      propertyPath: switchColliderLayerOnOccupy
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -394,3 +450,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
   highlightObject: {fileID: 4508876384631981214}
   debugLog: 1
+--- !u!4 &6808096980839450728 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3491527946234891624, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 7930660861938910464}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &7179706150675397152 stripped
+BoxCollider:
+  m_CorrespondingSourceObject: {fileID: 985213809302437664, guid: 9ae3b47d40a30ac47beae2c343931f55, type: 3}
+  m_PrefabInstance: {fileID: 7930660861938910464}
+  m_PrefabAsset: {fileID: 0}

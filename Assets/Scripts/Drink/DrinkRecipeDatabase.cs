@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "DrinkRecipeDatabase", menuName = "Cooking/Drink Recipe Database")]
-public class DrinkRecipeDatabase : ScriptableObject
+public class DrinkRecipeDatabase : ScriptableObject, IRecipeSource
 {
+    public string CategoryName => "饮品";
     [Header("Drink Recipes")]
     public List<FryRecipeDatabase.FryRecipe> recipes = new List<FryRecipeDatabase.FryRecipe>();
 

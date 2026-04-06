@@ -15,9 +15,9 @@ TagManager:
   - FloorKillZone
   - StationMask
   - Character Preview
-  - 
-  - 
-  - 
+  - HeldItem
+  - Player
+  - Uninteractive
   - 
   - 
   - 

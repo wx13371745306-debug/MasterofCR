@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 7438931653536133098}
   - component: {fileID: 1547345450132018411}
   - component: {fileID: 8892767367112515968}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: InteractSensor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -136,8 +136,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0.000000059604645, z: 0}
+  m_Size: {x: 0.5253514, y: 1, z: 1}
+  m_Center: {x: -0.0145726055, y: 0.000000045898805, z: 0}
 --- !u!1 &3395358535578018651
 GameObject:
   m_ObjectHideFlags: 0
@@ -147,7 +147,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 774283258971402180}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: equipPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -180,7 +180,7 @@ GameObject:
   - component: {fileID: 3433447301807491819}
   - component: {fileID: 8304115961464883233}
   - component: {fileID: 6308646009579818262}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Front
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -268,7 +268,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 9068794019456074039}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: groundCheck
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -299,7 +299,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1513223606655305747}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: HoldPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -315,7 +315,7 @@ Transform:
   m_GameObject: {fileID: 7600583035066541497}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.09, z: 1.023}
+  m_LocalPosition: {x: 0, y: 0.09, z: 0.906}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -332,7 +332,7 @@ GameObject:
   - component: {fileID: 3155038499577871211}
   - component: {fileID: 3482103995668302320}
   - component: {fileID: 8716109282075899168}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Body
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -421,7 +421,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7745429072234897360}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: eye
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -458,7 +458,7 @@ GameObject:
   - component: {fileID: 5416572797830121970}
   - component: {fileID: 7354709207012367017}
   - component: {fileID: 1696173215733838411}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}

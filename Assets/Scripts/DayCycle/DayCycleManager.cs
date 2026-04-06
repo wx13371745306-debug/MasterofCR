@@ -17,7 +17,7 @@ public class DayCycleManager : MonoBehaviour
     [Header("Week")]
     [SerializeField] private string[] weekDayNames =
     {
-        "周一", "周二", "周三", "周四", "周五", "周六", "周日"
+        "周一/Monday", "周二/Tuesday", "周三/Wednesday", "周四/Thursday", "周五/Friday", "周六/Saturday", "周日/Sunday"
     };
 
     [Header("Refs")]

@@ -4,6 +4,7 @@ using UnityEngine;
 public class OrderGenerator : MonoBehaviour
 {
     [Header("Refs")]
+    public MenuSO menuSO;
     public FryRecipeDatabase recipeDatabase;
     public DrinkRecipeDatabase drinkRecipeDatabase;
     public GameConfigSO gameConfig;
@@ -38,13 +39,18 @@ public class OrderGenerator : MonoBehaviour
         int targetCount = Random.Range(finalMin, finalMax + 1);
         Debug.Log($"[OrderGenerator] 开始生成订单，目标菜品数：{targetCount}。可用槽位数量：{remainingSlots.Count}。");
 
-        // 3. 准备餐食题库（只选已解锁的）
+        // 3. 准备餐食题库：优先从 MenuSO 读取，fallback 到数据库全部已解锁菜谱
         var candidates = new List<FryRecipeDatabase.FryRecipe>();
-        foreach (var r in recipeDatabase.recipes)
+        if (menuSO != null && menuSO.selectedRecipes.Count > 0)
         {
-            if (r != null && r.unlocked)
+            candidates.AddRange(menuSO.GetFoodRecipes());
+        }
+        else
+        {
+            foreach (var r in recipeDatabase.recipes)
             {
-                candidates.Add(r);
+                if (r != null && r.unlocked)
+                    candidates.Add(r);
             }
         }
 
@@ -73,7 +79,11 @@ public class OrderGenerator : MonoBehaviour
         if (drinkRecipeDatabase != null && gameConfig != null)
         {
             float probability = gameConfig.drinkOrderProbability;
-            var drinkCandidates = drinkRecipeDatabase.GetUnlockedRecipes();
+            List<FryRecipeDatabase.FryRecipe> drinkCandidates;
+            if (menuSO != null && menuSO.selectedRecipes.Count > 0)
+                drinkCandidates = menuSO.GetDrinkRecipes();
+            else
+                drinkCandidates = drinkRecipeDatabase.GetUnlockedRecipes();
 
             for (int c = 0; c < customerCount; c++)
             {

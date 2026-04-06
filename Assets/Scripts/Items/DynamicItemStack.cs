@@ -161,15 +161,15 @@ public class DynamicItemStack : CarryableItem
         return true;
     }
 
-    // 默默把物体吃进肚子里
     private void PushItemSilently(CarryableItem item)
     {
         if (item == null) return;
-        
-        // 关键逻辑：取消其物理，并把它变成子物体
+
+        if (item.CurrentPlacePoint != null)
+            item.CurrentPlacePoint.ClearOccupant();
+        item.ClearPlaceState();
+
         item.transform.SetParent(visualRoot, false);
-        item.DropToGround(); // 重置它的附加状态
-        item.transform.SetParent(visualRoot, false); // 重新挂在视觉根节点下
         
         // 【修复抖动】彻底禁用 Rigidbody，而不是仅设置 isKinematic
         if (item.rb != null)
