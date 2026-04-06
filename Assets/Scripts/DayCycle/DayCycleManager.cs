@@ -240,6 +240,14 @@ public class DayCycleManager : MonoBehaviour
 
     void OnMidBlackNextDay()
     {
+        // 先处理所有桌子的天数切换：保留脏盘子状态，清理残留的顾客引用
+        if (cachedTables == null || cachedTables.Length == 0)
+            cachedTables = FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
+        foreach (var t in cachedTables)
+        {
+            if (t != null) t.HandleDayTransition();
+        }
+
         currentDayIndex = (currentDayIndex + 1) % 7;
         TeleportPlayerToSpawn();
         StartPrepInternal(resetStats: true);

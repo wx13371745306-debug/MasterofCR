@@ -8,6 +8,9 @@ public class PlayerItemInteractor : MonoBehaviour
     public Transform holdPoint;
     public bool debugLog = true;
 
+    [Tooltip("持锅对台装盘：在 Sensor 原点周围搜索空盘")]
+    [SerializeField] float plateServeOverlapRadius = 2.2f;
+
     private CarryableItem heldItem;
     private IInteractiveStation activeStation;
 
@@ -54,13 +57,16 @@ public class PlayerItemInteractor : MonoBehaviour
         if (Keyboard.current.jKey.wasReleasedThisFrame)
         {
             isJKeyHeld = false;
-            if (!hasHandledJKeyThisPress) // 说明没满足长按时间就松手了
+            if (!hasHandledJKeyThisPress)
             {
                 hasHandledJKeyThisPress = true;
                 if (heldItem == null && activeStation == null)
-                    TryBeginHold(isLongPress: false); // 点击：只拿一个
+                    TryBeginHold(isLongPress: false);
                 else if (heldItem != null)
-                    TryEndHold(); // 手里有东西时点一下放下
+                {
+                    if (!TrySpecialInteraction())
+                        TryEndHold();
+                }
             }
         }
 
@@ -70,15 +76,8 @@ public class PlayerItemInteractor : MonoBehaviour
             {
                 if (activeStation != null) TryEndStationInteract();
 
-                IInteractiveStation nearStation = sensor != null ? sensor.GetCurrentStation() : null;
-                if (nearStation is BinStation bin && bin.TryDumpHeldItem(this, heldItem))
-                {
-                    // BinStation 已处理（清空锅 / 菜品转盘子）
-                }
-                else
-                {
+                if (!TrySpecialInteraction())
                     heldItem.TryUse(this, sensor);
-                }
             }
             else if (activeStation == null)
             {
@@ -136,12 +135,26 @@ public class PlayerItemInteractor : MonoBehaviour
                 highlightedItem.SetSensorHighlight(true);
             }
 
-            // 持物状态下高亮 BinStation（提示玩家可以按 K 清空/丢弃）
+            // 持物状态下高亮 BinStation（J/K 均可清空/丢弃）
             IInteractiveStation station = sensor.GetCurrentStation();
             if (station is BinStation)
             {
                 highlightedStation = station;
                 highlightedStation.SetSensorHighlight(true);
+            }
+
+            if (highlightedItem == null)
+            {
+                FryPot heldPot = heldItem.GetComponent<FryPot>();
+                if (heldPot != null && heldPot.CanServe())
+                {
+                    CarryableItem plateTarget = FindServablePlateTarget();
+                    if (plateTarget != null)
+                    {
+                        highlightedItem = plateTarget;
+                        highlightedItem.SetSensorHighlight(true);
+                    }
+                }
             }
         }
     }
@@ -264,16 +277,22 @@ public class PlayerItemInteractor : MonoBehaviour
 
         // 【优先级2】正常放置到 PlacePoint
         ItemPlacePoint targetPoint = sensor != null ? sensor.GetCurrentPlacePoint() : null;
-        if (targetPoint != null && targetPoint.CanPlace(item))
+        if (targetPoint != null)
         {
-            if (targetPoint.TryAcceptItem(item))
+            if (targetPoint.CanPlace(item) && targetPoint.TryAcceptItem(item))
             {
                 heldItem = null;
+                if (debugLog) Debug.Log($"<color=#00FF00>[大脑 放下]</color> 成功放置 {item.name} → {targetPoint.name}");
                 return;
             }
+
+            // 场景B：PlacePoint 存在但已被占用 → 拒绝放置，物品留在手中
+            if (debugLog) Debug.Log($"<color=#FF0000>[大脑 放下]</color> 拒绝放置: {targetPoint.name} 已占用 (占用者: {targetPoint.CurrentItem?.name ?? "N/A"})，物品留在手中");
+            return;
         }
 
-        // 不合法或没对准，掉地上
+        // 场景C：前方无任何 PlacePoint → 丢弃到地面
+        if (debugLog) Debug.Log($"<color=#FFFF00>[大脑 放下]</color> 前方无放置点，{item.name} 丢弃到地面");
         item.DropToGround();
         heldItem = null;
     }
@@ -294,6 +313,108 @@ public class PlayerItemInteractor : MonoBehaviour
         if (activeStation == null) return;
         activeStation.EndInteract(this);
         activeStation = null;
+    }
+
+    bool TrySpecialInteraction()
+    {
+        if (heldItem == null || sensor == null) return false;
+
+        IInteractiveStation station = sensor.GetCurrentStation();
+        if (station is BinStation bin)
+        {
+            if (bin.TryDumpHeldItem(this, heldItem))
+                return true;
+        }
+
+        PlateTool plateTool = heldItem.GetComponent<PlateTool>();
+        if (plateTool != null)
+        {
+            if (plateTool.TryUse(this, sensor, heldItem))
+                return true;
+        }
+
+        FryPot heldPot = heldItem.GetComponent<FryPot>();
+        if (heldPot != null && heldPot.CanServe())
+        {
+            CarryableItem targetPlate = FindServablePlateTarget();
+            if (targetPlate != null)
+            {
+                ExecutePotToPlateServe(heldPot, targetPlate);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    CarryableItem FindServablePlateTarget()
+    {
+        if (sensor == null) return null;
+
+        Vector3 origin = sensor.sensorOrigin != null ? sensor.sensorOrigin.position : sensor.playerRoot.position;
+        Collider[] cols = Physics.OverlapSphere(
+            origin,
+            plateServeOverlapRadius,
+            sensor.itemMask,
+            QueryTriggerInteraction.Collide);
+
+        CarryableItem best = null;
+        float bestSqr = float.MaxValue;
+
+        foreach (var col in cols)
+        {
+            if (col == null) continue;
+            CarryableItem ci = col.GetComponentInParent<CarryableItem>();
+            if (ci == null || ci == heldItem) continue;
+            if (ci.State == CarryableItem.ItemState.Held) continue;
+            if (!IsValidEmptyPlate(ci)) continue;
+
+            float sqr = (origin - ci.transform.position).sqrMagnitude;
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                best = ci;
+            }
+        }
+
+        return best;
+    }
+
+    bool IsValidEmptyPlate(CarryableItem item)
+    {
+        if (item.GetComponent<PlateItem>() == null) return false;
+        if (item.GetComponent<DishRecipeTag>() != null) return false;
+        if (item is DynamicItemStack) return false;
+        if (item.GetComponentInParent<DirtyPlateStack>() != null) return false;
+        if (item.GetComponentInParent<SupplyBox>() != null) return false;
+        return true;
+    }
+
+    void ExecutePotToPlateServe(FryPot pot, CarryableItem plate)
+    {
+        GameObject dishPrefab = pot.Serve();
+        if (dishPrefab == null) return;
+
+        ItemPlacePoint platePoint = plate.CurrentPlacePoint;
+        Vector3 fallbackPos = plate.transform.position;
+        Quaternion fallbackRot = plate.transform.rotation;
+
+        if (platePoint != null)
+            platePoint.ClearOccupant();
+        Destroy(plate.gameObject);
+
+        GameObject dishObj = Instantiate(dishPrefab);
+        CarryableItem dishItem = dishObj.GetComponent<CarryableItem>();
+
+        if (platePoint != null && dishItem != null)
+        {
+            platePoint.TryAcceptItem(dishItem);
+        }
+        else
+        {
+            dishObj.transform.position = fallbackPos;
+            dishObj.transform.rotation = fallbackRot;
+        }
     }
 
     public void ReplaceHeldItem(CarryableItem newItem) { heldItem = newItem; }

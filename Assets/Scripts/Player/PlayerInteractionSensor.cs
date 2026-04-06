@@ -86,8 +86,8 @@ public class PlayerInteractionSensor : MonoBehaviour
 
             if (debugLog && !debugItems.Contains(item)) debugItems.Add(item);
 
-            float dist = Vector3.Distance(originPos, item.transform.position);
-            if (dist < bestDist - 0.001f) { bestDist = dist; best = item; }
+            float sqrDist = (originPos - item.transform.position).sqrMagnitude;
+            if (sqrDist < bestDist) { bestDist = sqrDist; best = item; }
         }
         currentItem = best;
     }
@@ -113,16 +113,15 @@ public class PlayerInteractionSensor : MonoBehaviour
 
             if (debugLog && !debugPlacePoints.Contains(point)) debugPlacePoints.Add(point);
 
-            float dist = Vector3.Distance(originPos, point.transform.position);
-            float effectiveDist = dist;
+            float sqrDist = (originPos - point.transform.position).sqrMagnitude;
             if (heldItem != null && point.CurrentItem == null)
             {
-                effectiveDist -= 0.1f;
+                sqrDist *= 0.95f;
             }
 
-            if (effectiveDist < bestDist - 0.001f)
+            if (sqrDist < bestDist)
             {
-                bestDist = effectiveDist;
+                bestDist = sqrDist;
                 best = point;
             }
         }
@@ -145,8 +144,8 @@ public class PlayerInteractionSensor : MonoBehaviour
 
             if (debugLog && !debugStations.Contains(station)) debugStations.Add(station);
 
-            float dist = Vector3.Distance(originPos, mb.transform.position);
-            if (dist < bestDist - 0.001f) { bestDist = dist; best = station; }
+            float sqrDist = (originPos - mb.transform.position).sqrMagnitude;
+            if (sqrDist < bestDist) { bestDist = sqrDist; best = station; }
         }
         currentStation = best;
     }
@@ -177,8 +176,8 @@ public class PlayerInteractionSensor : MonoBehaviour
             {
                 if (existingStack.CanAccept(heldItem))
                 {
-                    float dist = Vector3.Distance(originPos, candidate.transform.position);
-                    if (dist < bestDist - 0.001f) { bestDist = dist; best = candidate; }
+                    float sqrDist = (originPos - candidate.transform.position).sqrMagnitude;
+                    if (sqrDist < bestDist) { bestDist = sqrDist; best = candidate; }
                 }
                 continue;
             }
@@ -188,8 +187,8 @@ public class PlayerInteractionSensor : MonoBehaviour
             {
                 if (candidate.State == CarryableItem.ItemState.Held) continue;
 
-                float dist = Vector3.Distance(originPos, candidate.transform.position);
-                if (dist < bestDist - 0.001f) { bestDist = dist; best = candidate; }
+                float sqrDist = (originPos - candidate.transform.position).sqrMagnitude;
+                if (sqrDist < bestDist) { bestDist = sqrDist; best = candidate; }
             }
         }
 

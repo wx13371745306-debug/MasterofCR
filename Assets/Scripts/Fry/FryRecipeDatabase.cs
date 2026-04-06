@@ -16,8 +16,17 @@ public class FryRecipeDatabase : ScriptableObject, IRecipeSource
     [System.Serializable]
     public class FryRecipe
     {
+        [Tooltip("内部标识，需与 DishRecipeTag、订单逻辑中的 recipeName 一致")]
         public string recipeName;
+        [Tooltip("菜单卡等 UI 显示用中文名；留空则使用 recipeName")]
+        public string displayNameZh = "";
         public bool unlocked = true;
+
+        /// <summary>菜单与订单 UI 展示用名称（优先中文）。</summary>
+        public string GetDisplayName()
+        {
+            return string.IsNullOrWhiteSpace(displayNameZh) ? recipeName : displayNameZh.Trim();
+        }
         public List<IngredientEntry> ingredients = new List<IngredientEntry>();
         public GameObject resultPrefab; 
         [Tooltip("烹饪完成后，留在锅里的模型预制体")]

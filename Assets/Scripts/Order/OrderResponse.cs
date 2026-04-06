@@ -614,6 +614,80 @@ public class OrderResponse : BaseStation
         }
     }
 
+    /// <summary>
+    /// 天数切换时由 DayCycleManager 调用：保留脏盘子等物理物品，清理残留的顾客相关状态。
+    /// </summary>
+    public void HandleDayTransition()
+    {
+        // WaitingForCleanup：保留脏盘子、残羹模型，只清理顾客相关引用
+        if (currentState == TableState.WaitingForCleanup)
+        {
+            boundGroup = null;
+            isReserved = false;
+            isAbandoningPatience = false;
+            currentOrder.Clear();
+            dishesOnTable.Clear();
+            currentOrderProgress = 0f;
+            currentPatienceOrder = maxPatienceOrder;
+            currentPatienceFood = maxPatienceFood;
+            Debug.Log($"[OrderResponse] 桌号 {tableId} 天数切换：保留 WaitingForCleanup 状态（脏盘子留存）");
+            return;
+        }
+
+        if (currentState == TableState.Empty)
+        {
+            boundGroup = null;
+            isReserved = false;
+            isAbandoningPatience = false;
+            return;
+        }
+
+        // 其他状态（安全兜底）：正常流程中不应出现在打烊后，但以防万一做防御性重置
+        if (eatRoutine != null)
+        {
+            StopCoroutine(eatRoutine);
+            eatRoutine = null;
+        }
+        if (readingMenuCoroutine != null)
+        {
+            StopCoroutine(readingMenuCoroutine);
+            readingMenuCoroutine = null;
+        }
+
+        if (GlobalOrderManager.Instance != null)
+            GlobalOrderManager.Instance.RemoveAllOrdersForTable(tableId);
+
+        if (dishPlaceSystem != null)
+            dishPlaceSystem.ClearAllDishes();
+
+        foreach (var model in activeEatenModels)
+        {
+            if (model != null) Destroy(model);
+        }
+        activeEatenModels.Clear();
+        dishesOnTable.Clear();
+        currentOrder.Clear();
+
+        if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
+        {
+            var occ = itemPlacePoint.CurrentItem;
+            itemPlacePoint.ClearOccupant();
+            if (occ != null) Destroy(occ.gameObject);
+        }
+
+        isInteracting = false;
+        currentOrderProgress = 0f;
+        currentEatTime = 0f;
+        currentPatienceOrder = maxPatienceOrder;
+        currentPatienceFood = maxPatienceFood;
+        currentState = TableState.Empty;
+        boundGroup = null;
+        isReserved = false;
+        isAbandoningPatience = false;
+
+        Debug.Log($"[OrderResponse] 桌号 {tableId} 天数切换：非预期状态 → 强制重置为 Empty");
+    }
+
     public float GetOrderProgressNormalized() => requiredOrderTime > 0f ? Mathf.Clamp01(currentOrderProgress / requiredOrderTime) : 0f;
 
     /// <summary>等待点菜阶段：始终显示「呼叫点餐」Icon（颜色由 UI 根据耐心值渐变）。</summary>

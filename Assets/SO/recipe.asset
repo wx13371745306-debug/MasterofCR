@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FryRecipeDatabase
   recipes:
   - recipeName: TomatoFireEgg
+    displayNameZh: "\u897F\u7EA2\u67FF\u7092\u9E21\u86CB"
     unlocked: 1
     ingredients:
     - ingredientId: TomatoChunk
@@ -28,6 +29,7 @@ MonoBehaviour:
     price: 50
     eatTime: 15
   - recipeName: GreenPepperMeat
+    displayNameZh: "\u8FA3\u6912\u7092\u8089"
     unlocked: 1
     ingredients:
     - ingredientId: GreenPepperStrip
@@ -38,11 +40,44 @@ MonoBehaviour:
     finishedVisualPrefab: {fileID: 8602442576936938373, guid: b9a94fd816dd0af499599d9c3509b0db, type: 3}
     eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
     size: 1
-    dishIcon: {fileID: 21300000, guid: 0896c728de89e1848baa182f9054fc41, type: 3}
+    dishIcon: {fileID: 21300000, guid: 981df2b0d56402c4da52cc58d7bb0527, type: 3}
     price: 50
+    eatTime: 15
+  - recipeName: MaPoDoufu
+    displayNameZh: "\u9EBB\u5A46\u8C46\u8150"
+    unlocked: 1
+    ingredients:
+    - ingredientId: PixianBeanPaste
+      count: 1
+    - ingredientId: DoufuChunk
+      count: 1
+    - ingredientId: PepperChunk
+      count: 1
+    resultPrefab: {fileID: 5258138650443871965, guid: 94c2d7e808ad2e44c9ba855e648315d9, type: 3}
+    finishedVisualPrefab: {fileID: 1154329586283223756, guid: 10177d8657ba4ad4d8eebb16f6006744, type: 3}
+    eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    size: 1
+    dishIcon: {fileID: 21300000, guid: d58a0d28f7caf9344845ff6fd24bc0aa, type: 3}
+    price: 50
+    eatTime: 15
+  - recipeName: GreenPepperEgg
+    displayNameZh: "\u5241\u6912\u7092\u86CB"
+    unlocked: 1
+    ingredients:
+    - ingredientId: GreenPepperStrip
+      count: 1
+    - ingredientId: Egg
+      count: 1
+    resultPrefab: {fileID: 5258138650443871965, guid: 9365d1556e4c3f24d9ef9ab97a067c61, type: 3}
+    finishedVisualPrefab: {fileID: 8602442576936938373, guid: a47750f6988216f4cb6affd206740f1f, type: 3}
+    eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    size: 1
+    dishIcon: {fileID: 21300000, guid: d58a0d28f7caf9344845ff6fd24bc0aa, type: 3}
+    price: 60
     eatTime: 15
   failedDishRecipe:
     recipeName: Faileddish
+    displayNameZh: 
     unlocked: 1
     ingredients: []
     resultPrefab: {fileID: 5202189278729499199, guid: 8d8f9fb0e3ee07945be2be1b36e6dd4f, type: 3}

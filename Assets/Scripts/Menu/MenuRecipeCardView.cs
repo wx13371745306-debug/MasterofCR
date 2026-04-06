@@ -23,7 +23,7 @@ public class MenuRecipeCardView : MonoBehaviour
         this.controller = controller;
 
         if (nameText != null)
-            nameText.text = recipe.recipeName;
+            nameText.text = recipe.GetDisplayName();
         if (iconImage != null)
         {
             iconImage.sprite = recipe.dishIcon;
@@ -33,7 +33,7 @@ public class MenuRecipeCardView : MonoBehaviour
             priceText.text = $"${recipe.price}";
 
         bool isSelected = controller != null && controller.IsSelected(recipe);
-        Debug.Log($"[MenuCard] Setup: '{recipe.recipeName}' | 价格={recipe.price} | 图标={(recipe.dishIcon != null ? "有" : "无")} | 已选={isSelected}");
+        Debug.Log($"[MenuCard] Setup: '{recipe.GetDisplayName()}' | 价格={recipe.price} | 图标={(recipe.dishIcon != null ? "有" : "无")} | 已选={isSelected}");
 
         RefreshSelectedVisual();
     }

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 7389759607953061280}
   - component: {fileID: 6325734174253782038}
   - component: {fileID: 6083537117193322654}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Fill
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -87,7 +87,7 @@ GameObject:
   - component: {fileID: 1630909375661780226}
   - component: {fileID: 7252328574028492861}
   - component: {fileID: 7421063714233651009}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -193,7 +193,7 @@ GameObject:
   - component: {fileID: 7742867226209124168}
   - component: {fileID: 5813262417244564740}
   - component: {fileID: 1975719576771897282}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Tomato
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -235,11 +235,12 @@ MonoBehaviour:
   - {fileID: 0}
   poseConfig: {fileID: 8634012162784508832}
   sensorHighlight: {fileID: 6519487431562491035}
-  categories: 4
+  categories: 256
   initialPlacePoint: {fileID: 0}
   isUsable: 0
   isPickable: 1
   useHighlightObject: {fileID: 0}
+  disableCollidersOnAttach: 1
   debugLog: 1
 --- !u!114 &306090520139179737
 MonoBehaviour:
@@ -346,7 +347,7 @@ GameObject:
   - component: {fileID: 3803012413654880079}
   - component: {fileID: 2996632592850577144}
   - component: {fileID: 8025857748969787149}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Background
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -474,13 +475,25 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -5568371526223589888, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: -1990968323811559735, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: de763e33858c8d54792e3984ba23acef, type: 2}
+    - target: {fileID: -391268320553695201, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_Name
       value: CarryableHighlight
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_IsActive

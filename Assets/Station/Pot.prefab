@@ -122,7 +122,7 @@ MonoBehaviour:
   isPickable: 1
   useHighlightObject: {fileID: 0}
   disableCollidersOnAttach: 1
-  debugLog: 1
+  debugLog: 0
 --- !u!114 &8504948133652732340
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -142,7 +142,7 @@ MonoBehaviour:
   currentProgress: 0
   requiredProgress: 0
   cookingFinished: 0
-  debugLog: 1
+  debugLog: 0
 --- !u!114 &3097156959792590957
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -160,6 +160,8 @@ MonoBehaviour:
   allowAnyCategory: 0
   allowedCategories: 1
   linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!114 &7091722167943443847
 MonoBehaviour:
   m_ObjectHideFlags: 0

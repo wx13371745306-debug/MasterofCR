@@ -18,7 +18,7 @@ public class MenuSelectedItemView : MonoBehaviour
         this.controller = controller;
 
         if (nameText != null)
-            nameText.text = recipe.recipeName;
+            nameText.text = recipe.GetDisplayName();
         if (iconImage != null)
         {
             iconImage.sprite = recipe.dishIcon;
