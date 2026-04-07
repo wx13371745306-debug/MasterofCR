@@ -2,20 +2,14 @@ using UnityEngine;
 
 public class AnimatorBridge : MonoBehaviour
 {
-    [Header("Animator Params (match your controller)")]
-    [SerializeField] private string horID = "Hor";
-    [SerializeField] private string vertID = "Vert";
-    [SerializeField] private string stateID = "State";
-    [SerializeField] private string jumpID = "IsJump";
+    [Header("Animator 参数名（需与 Controller 中一致）")]
+    [SerializeField] private string isWalkingID = "IsWalking";
 
-    [Header("Tuning")]
-    [SerializeField] private float runSpeed = 6f;
-    [SerializeField] private float moveEpsilon = 0.05f;
+    [Header("移动判定阈值")]
+    [SerializeField] private float moveEpsilon = 0.1f;
 
-    [Header("Ground Check (optional)")]
-    [SerializeField] private Transform groundCheck;
-    [SerializeField] private float groundCheckDist = 0.2f;
-    [SerializeField] private LayerMask groundMask = ~0;
+    [Header("调试")]
+    [SerializeField] private bool debugLog = true;
 
     private Rigidbody rb;
     private Animator animator;
@@ -23,42 +17,25 @@ public class AnimatorBridge : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        if (rb == null)
+            rb = GetComponentInParent<Rigidbody>();
+
         animator = GetComponentInChildren<Animator>();
 
         if (rb == null)
-            Debug.LogError("[AnimatorBridge] No Rigidbody found on Player root.");
-
+            Debug.LogError("[AnimatorBridge] 未找到 Rigidbody!");
         if (animator == null)
-            Debug.LogError("[AnimatorBridge] No Animator found in children. Make sure Character is a child of Player.");
+            Debug.LogError("[AnimatorBridge] 未找到 Animator!");
     }
 
     private void Update()
     {
         if (rb == null || animator == null) return;
 
-        Vector3 v = rb.linearVelocity; // 如果这里报错，改成 rb.velocity
-        Vector3 vXZ = new Vector3(v.x, 0f, v.z);
+        Vector3 v = rb.linearVelocity;
+        float horizontalSqr = v.x * v.x + v.z * v.z;
+        bool isWalking = horizontalSqr > moveEpsilon * moveEpsilon;
 
-        Vector3 local = transform.InverseTransformDirection(vXZ);
-
-        float norm = Mathf.Max(runSpeed, 0.01f);
-        float hor = Mathf.Clamp(local.x / norm, -1f, 1f);
-        float vert = Mathf.Clamp(local.z / norm, -1f, 1f);
-
-        animator.SetFloat(horID, hor, 0.1f, Time.deltaTime);
-        animator.SetFloat(vertID, vert, 0.1f, Time.deltaTime);
-
-        bool isMoving = vXZ.magnitude > moveEpsilon;
-        bool isRun = isMoving && vXZ.magnitude > (runSpeed * 0.6f);
-        animator.SetFloat(stateID, isRun ? 1f : 0f);
-
-        bool grounded = CheckGrounded();
-        animator.SetBool(jumpID, !grounded);
-    }
-
-    private bool CheckGrounded()
-    {
-        Vector3 origin = groundCheck != null ? groundCheck.position : (transform.position + Vector3.up * 0.1f);
-        return Physics.Raycast(origin, Vector3.down, groundCheckDist, groundMask, QueryTriggerInteraction.Ignore);
+        animator.SetBool(isWalkingID, isWalking);
     }
 }

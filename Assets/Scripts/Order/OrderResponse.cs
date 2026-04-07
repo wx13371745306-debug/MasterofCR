@@ -39,7 +39,7 @@ public class OrderResponse : BaseStation
     [Tooltip("桌子旁边的空地，AI先走到这里再入座")]
     public Transform approachPoint;
 
-    [Tooltip("这桌拥有的椅子位置（把椅子子物体拖进来）")]
+    [Tooltip("这桌的座位点（在椅子上创建空子物体作为坐姿位置，拖入此处）")]
     public List<Transform> chairs = new List<Transform>();
 
     [Header("Patience")]
@@ -161,7 +161,15 @@ public class OrderResponse : BaseStation
             }
             else if (currentState == TableState.WaitingForFood)
             {
-                currentPatienceFood -= lossPerSecondFood * Time.deltaTime;
+                float foodLoss = lossPerSecondFood;
+                // 家常羁绊：等菜阶段耐心衰减速度降低 20%
+                if (BondRuntimeBridge.Instance != null
+                    && BondRuntimeBridge.Instance.State != null
+                    && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.HomeCooking))
+                {
+                    foodLoss *= 0.8f;
+                }
+                currentPatienceFood -= foodLoss * Time.deltaTime;
                 if (currentPatienceFood <= 0f)
                 {
                     currentPatienceFood = 0f;
@@ -253,6 +261,11 @@ public class OrderResponse : BaseStation
         isInteracting = false;
         currentOrderProgress = requiredOrderTime;
         currentPatienceFood = maxPatienceFood;
+
+        bool homeBond = BondRuntimeBridge.Instance != null
+                        && BondRuntimeBridge.Instance.State != null
+                        && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.HomeCooking);
+        Debug.Log($"[OrderResponse] 桌{tableId} 点菜完成进入等菜 | 家常羁绊={homeBond} | lossPerSecondFood={lossPerSecondFood}{(homeBond ? " (将 ×0.8)" : "")}");
 
         currentOrder.Clear();
         dishesOnTable.Clear();

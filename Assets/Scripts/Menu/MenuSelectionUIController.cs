@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -26,7 +27,16 @@ public class MenuSelectionUIController : MonoBehaviour
     [Header("UI - Tutorial Panel")]
     public RecipeTutorialPanel tutorialPanel;
 
+    [Header("羁绊")]
+    [Tooltip("羁绊状态 SO，选菜变化时实时刷新")]
+    public BondActivationStateSO bondState;
+    [Tooltip("羁绊列表 UI，选菜变化时实时刷新（可选）")]
+    public BondListUIController bondListUI;
+
     private readonly HashSet<FryRecipeDatabase.FryRecipe> selected = new HashSet<FryRecipeDatabase.FryRecipe>();
+
+    /// <summary>选菜面板关闭（确认或取消）时触发，供主界面刷新羁绊等。</summary>
+    public event Action OnPanelClosed;
 
     public bool IsOpen => selectionPanelRoot != null && selectionPanelRoot.activeSelf;
 
@@ -51,6 +61,7 @@ public class MenuSelectionUIController : MonoBehaviour
         Debug.Log("[MenuSelection] Close() 被调用");
         if (selectionPanelRoot == null) return;
         selectionPanelRoot.SetActive(false);
+        OnPanelClosed?.Invoke();
     }
 
     public void ToggleRecipe(FryRecipeDatabase.FryRecipe recipe)
@@ -69,6 +80,7 @@ public class MenuSelectionUIController : MonoBehaviour
 
         RebuildRecipeGrid();
         RebuildSelectedList();
+        RefreshBonds();
     }
 
     public bool IsSelected(FryRecipeDatabase.FryRecipe recipe)
@@ -93,6 +105,7 @@ public class MenuSelectionUIController : MonoBehaviour
         }
         Debug.Log($"[MenuSelection] 已将 {menuSO.selectedRecipes.Count} 道菜谱写入 MenuSO");
 
+        RefreshBonds();
         Close();
     }
 
@@ -208,5 +221,27 @@ public class MenuSelectionUIController : MonoBehaviour
                 Debug.LogWarning($"[MenuSelection] selectedItemPrefab 上没有找到 MenuSelectedItemView 脚本！");
         }
         Debug.Log($"[MenuSelection] 已选列表刷新完成，共 {selected.Count} 项");
+    }
+
+    void RefreshBonds()
+    {
+        Debug.Log($"[MenuSelection] RefreshBonds | bondState={(bondState != null ? bondState.name : "NULL")} | bondListUI={(bondListUI != null ? "已赋值" : "NULL")} | 当前已选: {selected.Count}");
+        if (bondState != null)
+        {
+            bondState.RefreshFromRecipes(selected);
+            var active = bondState.GetActiveBonds();
+            Debug.Log($"[MenuSelection] 羁绊刷新完成，激活数量: {active.Count}");
+            foreach (var b in active)
+                Debug.Log($"[MenuSelection]   已激活: '{b.displayName}' (tag={b.tag})");
+        }
+        else
+        {
+            Debug.LogWarning("[MenuSelection] bondState 未赋值，无法刷新羁绊！请在 Inspector 中拖入 BondActivationStateSO。");
+        }
+
+        if (bondListUI != null)
+            bondListUI.Refresh();
+        else
+            Debug.LogWarning("[MenuSelection] bondListUI 未赋值，羁绊 UI 不会刷新。");
     }
 }

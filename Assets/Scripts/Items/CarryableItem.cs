@@ -30,6 +30,12 @@ public class CarryableItem : MonoBehaviour
     [Tooltip("附着时是否将 Collider 切换为 Trigger（关闭则保留原始 Collider 状态）")]
     public bool disableCollidersOnAttach = true;
 
+    [Header("IK 手部抓取点（可选）")]
+    [Tooltip("左手抓取位置，留空则使用默认偏移")]
+    public Transform leftHandGrip;
+    [Tooltip("右手抓取位置，留空则使用默认偏移")]
+    public Transform rightHandGrip;
+
     [Header("Debug")]
     public bool debugLog = false;
 

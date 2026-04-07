@@ -78,7 +78,18 @@ public class OrderGenerator : MonoBehaviour
         // 5. 每位顾客独立掷骰：是否追加饮料
         if (drinkRecipeDatabase != null && gameConfig != null)
         {
-            float probability = gameConfig.drinkOrderProbability;
+            float baseProbability = gameConfig.drinkOrderProbability;
+            float probability = baseProbability;
+
+            bool bridgeOk = BondRuntimeBridge.Instance != null && BondRuntimeBridge.Instance.State != null;
+            bool sichuanActive = bridgeOk && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.Sichuan);
+            Debug.Log($"[OrderGenerator] 饮料判定 | Bridge={bridgeOk} SichuanActive={sichuanActive} baseProbability={baseProbability:P0}");
+
+            if (sichuanActive)
+            {
+                probability = Mathf.Clamp01(probability + 0.4f);
+                Debug.Log($"[OrderGenerator] 川湘羁绊生效，饮料概率 {baseProbability:P0} → {probability:P0}");
+            }
             List<FryRecipeDatabase.FryRecipe> drinkCandidates;
             if (menuSO != null && menuSO.selectedRecipes.Count > 0)
                 drinkCandidates = menuSO.GetDrinkRecipes();

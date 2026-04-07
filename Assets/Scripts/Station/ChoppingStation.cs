@@ -28,7 +28,19 @@ public class ChoppingStation : BaseStation
             initialRotation = rotatingPart.localRotation;
             
         if (usableHighlight != null)
-            usableHighlight.SetActive(false); // 初始关闭
+            usableHighlight.SetActive(false);
+    }
+
+    /// <summary>获取实际切菜速度（含羁绊加成）。不修改 processingSpeed 字段本身。</summary>
+    float GetEffectiveProcessingSpeed()
+    {
+        if (BondRuntimeBridge.Instance != null
+            && BondRuntimeBridge.Instance.State != null
+            && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.Vegetable))
+        {
+            return processingSpeed * 1.2f;
+        }
+        return processingSpeed;
     }
 
     void Update()
@@ -53,7 +65,7 @@ public class ChoppingStation : BaseStation
             return;
         }
 
-        processable.ApplyProgress(stationProcessType, processingSpeed * Time.deltaTime, this);
+        processable.ApplyProgress(stationProcessType, GetEffectiveProcessingSpeed() * Time.deltaTime, this);
         UpdateSwingVisual();
 
         if (processable.IsComplete)

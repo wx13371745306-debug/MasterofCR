@@ -107,7 +107,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8d9e0f1a2b3c4d5e6f708192a3b4c5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FryIngredientTag
-  ingredientId: GreenPepperStrip
+  ingredientId: GreenPepperChunk
 --- !u!54 &8067401005603049707
 Rigidbody:
   m_ObjectHideFlags: 0

@@ -8,7 +8,7 @@ public class PlayerMoveRB : MonoBehaviour
     public float acceleration = 25f;  // 加速强度，越大越“跟手”
 
     private Rigidbody rb;
-    private Vector2 moveInput; // WASD 输入 (-1..1)
+    private Vector2 moveInput;
 
     private bool horizontalPositionLocked;
     private Vector2 lockedXZ;
@@ -28,8 +28,20 @@ public class PlayerMoveRB : MonoBehaviour
 
     private void Start()
     {
-        rb.linearVelocity = Vector3.zero;   // 如果报错就用 rb.velocity
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
+    }
+
+    /// <summary>获取实际移动速度（含羁绊加成）。不修改 moveSpeed 字段本身。</summary>
+    float GetEffectiveMoveSpeed()
+    {
+        if (BondRuntimeBridge.Instance != null
+            && BondRuntimeBridge.Instance.State != null
+            && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.Meat))
+        {
+            return moveSpeed * 1.2f;
+        }
+        return moveSpeed;
     }
 
     private void Awake()
@@ -72,9 +84,9 @@ public class PlayerMoveRB : MonoBehaviour
             return;
         }
 
-        // 目标水平速度（不动 y，保留重力和被撞飞的竖直速度）
+        float effectiveSpeed = GetEffectiveMoveSpeed();
         Vector3 currentVel = rb.linearVelocity;
-        Vector3 targetVel = new Vector3(moveInput.x * moveSpeed, currentVel.y, moveInput.y * moveSpeed);
+        Vector3 targetVel = new Vector3(moveInput.x * effectiveSpeed, currentVel.y, moveInput.y * effectiveSpeed);
 
         // 用“加速度限制”的方式靠近目标速度：不会直接覆盖外力结果，更适合以后撞飞
         Vector3 newVel = Vector3.MoveTowards(currentVel, targetVel, acceleration * Time.fixedDeltaTime);

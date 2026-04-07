@@ -7,6 +7,8 @@ public class MenuSceneController : MonoBehaviour
 {
     [Header("Data")]
     public MenuSO menuSO;
+    [Tooltip("羁绊状态 SO，进入主菜单时重置")]
+    public BondActivationStateSO bondState;
 
     [Header("UI")]
     public Button selectMenuButton;
@@ -15,6 +17,8 @@ public class MenuSceneController : MonoBehaviour
 
     [Header("References")]
     public MenuSelectionUIController menuSelectionUI;
+    [Tooltip("主界面上的羁绊列表 UI（可选），选菜后刷新")]
+    public BondListUIController mainBondListUI;
 
     [Header("Settings")]
     [Tooltip("进入游戏前要求的最低菜谱数量")]
@@ -23,6 +27,36 @@ public class MenuSceneController : MonoBehaviour
 
     [Tooltip("游戏场景名称")]
     public string gameSceneName = "SampleScene";
+
+    void Start()
+    {
+        if (menuSO != null)
+        {
+            menuSO.Clear();
+            Debug.Log("[MenuScene] MenuSO 已重置为空");
+        }
+        if (bondState != null)
+        {
+            bondState.ResetAll();
+            Debug.Log("[MenuScene] BondActivationStateSO 已重置为全部未激活");
+        }
+        RefreshMainBondUI();
+
+        if (menuSelectionUI != null)
+            menuSelectionUI.OnPanelClosed += OnSelectionPanelClosed;
+    }
+
+    void OnDestroy()
+    {
+        if (menuSelectionUI != null)
+            menuSelectionUI.OnPanelClosed -= OnSelectionPanelClosed;
+    }
+
+    void OnSelectionPanelClosed()
+    {
+        Debug.Log("[MenuScene] 选菜面板关闭，刷新主界面羁绊显示");
+        RefreshMainBondUI();
+    }
 
     public void OnSelectMenuClicked()
     {
@@ -53,6 +87,12 @@ public class MenuSceneController : MonoBehaviour
 
         Debug.Log($"[MenuScene] 验证通过，正在加载场景: {gameSceneName}");
         SceneManager.LoadScene(gameSceneName);
+    }
+
+    void RefreshMainBondUI()
+    {
+        if (mainBondListUI != null)
+            mainBondListUI.Refresh();
     }
 
     void ShowError(string msg)

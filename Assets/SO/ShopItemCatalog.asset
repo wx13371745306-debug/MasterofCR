@@ -63,8 +63,8 @@ MonoBehaviour:
     unlocked: 1
     legacyIngredientId: 0
   - itemId: PixianBeanPaste
-    displayName: "\u8C46\u74E3\u9171"
-    icon: {fileID: 21300000, guid: a486f550ac245ab4491588659fe4e0cd, type: 3}
+    displayName: "\u795E\u79D8\u8FA3\u9171"
+    icon: {fileID: 21300000, guid: 2ff0bb520249fb5439ebbcd0c6d11187, type: 3}
     unitPrice: 120
     worldPrefab: {fileID: 2485102227895740666, guid: 0f52a440215d10a46996230fc6d344a0, type: 3}
     unlocked: 1

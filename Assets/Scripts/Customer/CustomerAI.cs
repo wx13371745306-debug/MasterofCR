@@ -10,9 +10,16 @@ public class CustomerAI : MonoBehaviour
     public NavMeshAgent agent;
     public Collider aiCollider;
 
+    [Header("Random Model")]
+    [Tooltip("可用的人物模型预制体，生成时随机选一个")]
+    public GameObject[] modelPrefabs;
+
+    [Tooltip("顾客专用 Animator Controller（脚本会自动分配给模型）")]
+    public RuntimeAnimatorController customerAnimController;
+
     [Header("Movement Settings")]
     [Tooltip("距离集结点多远就算到达（调大可以防止小人挤在一起）")]
-    public float arrivalRadius = 1.0f; // 1米范围内都算到达
+    public float arrivalRadius = 1.0f;
 
     [Header("Debug")]
     public bool debugLog = true;
@@ -21,20 +28,42 @@ public class CustomerAI : MonoBehaviour
     private Action onSeatedCallback; 
     private bool isSittingDown = false;
     private bool isLeaving;
+    private Animator modelAnimator;
 
     void Awake()
     {
         if (agent == null) agent = GetComponent<NavMeshAgent>();
         if (aiCollider == null) aiCollider = GetComponent<Collider>();
+
+        SpawnRandomModel();
     }
 
-    // 【修改】：接收集结点和椅子两个位置
+    private void SpawnRandomModel()
+    {
+        if (modelPrefabs == null || modelPrefabs.Length == 0) return;
+
+        int idx = UnityEngine.Random.Range(0, modelPrefabs.Length);
+        GameObject model = Instantiate(modelPrefabs[idx], transform);
+        model.transform.localPosition = Vector3.zero;
+        model.transform.localRotation = Quaternion.identity;
+
+        modelAnimator = model.GetComponentInChildren<Animator>();
+        if (modelAnimator != null)
+        {
+            if (customerAnimController != null)
+                modelAnimator.runtimeAnimatorController = customerAnimController;
+            modelAnimator.applyRootMotion = false;
+        }
+
+        MeshRenderer placeholder = GetComponent<MeshRenderer>();
+        if (placeholder != null) placeholder.enabled = false;
+    }
+
     public void MoveToChair(Transform approachPoint, Transform chair, Action onSeated)
     {
         targetChair = chair;
         onSeatedCallback = onSeated;
         
-        // 1. 开启导航，目标设为那片开阔的空地（集结点）！
         agent.enabled = true;
         agent.SetDestination(approachPoint.position); 
         
@@ -45,27 +74,46 @@ public class CustomerAI : MonoBehaviour
     {
         if (isLeaving) return;
 
-        // 【修改点】：将 agent.stoppingDistance 替换成我们自定义的 arrivalRadius
+        UpdateAnimation();
+
         if (!isSittingDown && !agent.pathPending && agent.remainingDistance <= arrivalRadius)
         {
             if (!agent.hasPath || agent.velocity.sqrMagnitude == 0f || agent.remainingDistance <= arrivalRadius)
             {
-                // 到达集结点的宽泛区域了，立刻开始入座流程！
                 StartCoroutine(SitDownRoutine());
             }
         }
+    }
+
+    private void UpdateAnimation()
+    {
+        if (modelAnimator == null) return;
+
+        bool isWalking = agent != null && agent.enabled && agent.velocity.sqrMagnitude > 0.01f;
+        modelAnimator.SetBool("IsWalking", isWalking);
+    }
+
+    private void SetWalking(bool walking)
+    {
+        if (modelAnimator != null)
+            modelAnimator.SetBool("IsWalking", walking);
+    }
+
+    private void SetSitting(bool sitting)
+    {
+        if (modelAnimator != null)
+            modelAnimator.SetBool("IsSitting", sitting);
     }
 
     private IEnumerator SitDownRoutine()
     {
         isSittingDown = true;
 
-        // 3. 核心精髓：一到集结点，立刻关闭物理碰撞和导航！
-        // 这样接下来走向椅子的过程，就算是穿墙、穿桌子，也不会卡住了！
         agent.enabled = false;
         if (aiCollider != null) aiCollider.enabled = false;
 
-        // 【新增】：走向椅子的过渡动画（你可以调整 duration 控制走过去的速度）
+        SetWalking(false);
+
         Vector3 currentPos = transform.position;
         float walkToChairDuration = 1.0f; 
         float tWalk = 0;
@@ -73,10 +121,8 @@ public class CustomerAI : MonoBehaviour
         while (tWalk < 1f)
         {
             tWalk += Time.deltaTime / walkToChairDuration;
-            // 平滑地从集结点飘（走）向椅子的真实位置
             transform.position = Vector3.Lerp(currentPos, targetChair.position, tWalk);
             
-            // 顺便把身体转过去面朝椅子
             Vector3 direction = (targetChair.position - currentPos).normalized;
             if (direction != Vector3.zero)
             {
@@ -85,7 +131,6 @@ public class CustomerAI : MonoBehaviour
             yield return null;
         }
 
-        // 4. 原来的落座对齐代码保持不变
         transform.SetParent(targetChair);
         
         Vector3 startPos = transform.localPosition;
@@ -103,6 +148,8 @@ public class CustomerAI : MonoBehaviour
 
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
+
+        SetSitting(true);
 
         if (debugLog) Debug.Log($"<color=#00FF00>[CustomerAI]</color> {gameObject.name} 完美落座完毕！");
 
@@ -122,6 +169,7 @@ public class CustomerAI : MonoBehaviour
 
     private IEnumerator LeaveRoutine(Transform exit, Action onDestroyed)
     {
+        SetSitting(false);
         transform.SetParent(null);
 
         if (exit == null)
@@ -162,6 +210,8 @@ public class CustomerAI : MonoBehaviour
             timeout -= Time.deltaTime;
             yield return null;
         }
+
+        SetWalking(false);
 
         if (debugLog && timeout <= 0f && agent != null)
             Debug.LogWarning($"[PatienceLeave][{name}] 离场超时(45s)，仍销毁。remainingDist={agent.remainingDistance:F2} pathPending={agent.pathPending}");

@@ -34,8 +34,11 @@ public class FryRecipeDatabase : ScriptableObject, IRecipeSource
         [Tooltip("吃完后的空盘子预制体")]
         public GameObject eatenPrefab;
 
+        [Header("羁绊")]
+        [Tooltip("该菜品所属的羁绊类型")]
+        public RecipeBondTag bondTag = RecipeBondTag.None;
+
         [Header("订单与结算")]
-        // 菜品占用的桌面槽位类型：S/M/L 为餐食，D 为饮品
         public DishSize size;
         // 订单 UI 显示用图标（Sprite）
         public Sprite dishIcon;

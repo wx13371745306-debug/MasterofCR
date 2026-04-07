@@ -24,6 +24,7 @@ MonoBehaviour:
     resultPrefab: {fileID: 5258138650443871965, guid: f6e1839888e9e42439ed417b2d619671, type: 3}
     finishedVisualPrefab: {fileID: 1154329586283223756, guid: 53c444075b9da73499cd79d1a67721c2, type: 3}
     eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    bondTag: 6
     size: 1
     dishIcon: {fileID: 21300000, guid: 13b47a888426a2643bdd5b8920a2908e, type: 3}
     price: 50
@@ -32,13 +33,14 @@ MonoBehaviour:
     displayNameZh: "\u8FA3\u6912\u7092\u8089"
     unlocked: 1
     ingredients:
-    - ingredientId: GreenPepperStrip
+    - ingredientId: GreenPepperChunk
       count: 1
-    - ingredientId: PorkLoinMeatStrip
+    - ingredientId: PorkLoinMeatChunk
       count: 1
     resultPrefab: {fileID: 5258138650443871965, guid: 4e0830c245143fd4994b490ae3277f2e, type: 3}
     finishedVisualPrefab: {fileID: 8602442576936938373, guid: b9a94fd816dd0af499599d9c3509b0db, type: 3}
     eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    bondTag: 9
     size: 1
     dishIcon: {fileID: 21300000, guid: 981df2b0d56402c4da52cc58d7bb0527, type: 3}
     price: 50
@@ -56,6 +58,7 @@ MonoBehaviour:
     resultPrefab: {fileID: 5258138650443871965, guid: 94c2d7e808ad2e44c9ba855e648315d9, type: 3}
     finishedVisualPrefab: {fileID: 1154329586283223756, guid: 10177d8657ba4ad4d8eebb16f6006744, type: 3}
     eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    bondTag: 9
     size: 1
     dishIcon: {fileID: 21300000, guid: d58a0d28f7caf9344845ff6fd24bc0aa, type: 3}
     price: 50
@@ -64,15 +67,32 @@ MonoBehaviour:
     displayNameZh: "\u5241\u6912\u7092\u86CB"
     unlocked: 1
     ingredients:
-    - ingredientId: GreenPepperStrip
+    - ingredientId: GreenPepperChunk
       count: 1
     - ingredientId: Egg
       count: 1
     resultPrefab: {fileID: 5258138650443871965, guid: 9365d1556e4c3f24d9ef9ab97a067c61, type: 3}
     finishedVisualPrefab: {fileID: 8602442576936938373, guid: a47750f6988216f4cb6affd206740f1f, type: 3}
     eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    bondTag: 5
     size: 1
-    dishIcon: {fileID: 21300000, guid: d58a0d28f7caf9344845ff6fd24bc0aa, type: 3}
+    dishIcon: {fileID: 21300000, guid: 0745e2209a3ed0e43ae3856c78823421, type: 3}
+    price: 60
+    eatTime: 15
+  - recipeName: TWPork
+    displayNameZh: "\u56DE\u9505\u8089"
+    unlocked: 1
+    ingredients:
+    - ingredientId: PorkLoinMeatChunk
+      count: 1
+    - ingredientId: PixianBeanPaste
+      count: 1
+    resultPrefab: {fileID: 5258138650443871965, guid: f03c63732a5e1df4e9546af06373a991, type: 3}
+    finishedVisualPrefab: {fileID: 1154329586283223756, guid: 38179045e45f8f245a922275c3016328, type: 3}
+    eatenPrefab: {fileID: 826299552825601382, guid: efa521c0e45424f4688dcc3bf348b3c0, type: 3}
+    bondTag: 11
+    size: 1
+    dishIcon: {fileID: 21300000, guid: 269ca09012f19af469cacf5d80186ff6, type: 3}
     price: 60
     eatTime: 15
   failedDishRecipe:
@@ -83,6 +103,7 @@ MonoBehaviour:
     resultPrefab: {fileID: 5202189278729499199, guid: 8d8f9fb0e3ee07945be2be1b36e6dd4f, type: 3}
     finishedVisualPrefab: {fileID: 5009015618275011947, guid: a644a631703b08c419692f7a10460924, type: 3}
     eatenPrefab: {fileID: 0}
+    bondTag: 0
     size: 0
     dishIcon: {fileID: 0}
     price: 50
