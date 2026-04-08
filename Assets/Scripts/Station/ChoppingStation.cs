@@ -10,7 +10,8 @@ public class ChoppingStation : BaseStation
 
     [Header("Processing")]
     public ProcessType stationProcessType = ProcessType.Chop;
-    [Min(0.01f)] public float processingSpeed = 20f;
+    [Tooltip("切菜板的基础速度，暂设为1")]
+    [Min(0.01f)] public float baseProcessingSpeed = 1f;
 
     [Header("Visual")]
     public Transform rotatingPart;
@@ -31,16 +32,35 @@ public class ChoppingStation : BaseStation
             usableHighlight.SetActive(false);
     }
 
-    /// <summary>获取实际切菜速度（含羁绊加成）。不修改 processingSpeed 字段本身。</summary>
+    /// <summary>获取实际切菜速度（含羁绊加成和属性修正）。不修改 baseProcessingSpeed 字段本身。</summary>
     float GetEffectiveProcessingSpeed()
     {
+        // 1. 获取基础速度
+        float speed = baseProcessingSpeed;
+
+        // 2. 累乘玩家属性
+        float playerMulti = 1.0f;
+        if (CurrentPlayerAttributes != null)
+            playerMulti = CurrentPlayerAttributes.chopSpeedMultiplier;
+
+        // 3. 累加全局加成
+        float globalAddon = 0f;
+        if (GlobalOrderManager.Instance != null)
+            globalAddon = GlobalOrderManager.Instance.globalChopSpeedAddon;
+
+        // 4. 计算公式：最终速度 = (基础速度 * 玩家乘数) + 全局加成
+        float finalSpeed = (speed * playerMulti) + globalAddon;
+
+        // 保留原有的羁绊效果（作为额外的系数叠加，影响最终速度）
         if (BondRuntimeBridge.Instance != null
             && BondRuntimeBridge.Instance.State != null
             && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.Vegetable))
         {
-            return processingSpeed * 1.2f;
+            finalSpeed *= 1.2f;
         }
-        return processingSpeed;
+
+        // 安全界限限制（保证最小有0.01速度运转防止卡死）
+        return Mathf.Max(0.01f, finalSpeed);
     }
 
     void Update()

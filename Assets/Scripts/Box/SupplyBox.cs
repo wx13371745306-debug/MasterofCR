@@ -172,6 +172,14 @@ public class SupplyBox : BaseStation
         interactor.ReplaceHeldItem(item);
         currentCount--;
 
+        // 尝试继承箱子自身的腐烂进度
+        DecayableProp boxDecay = GetComponent<DecayableProp>();
+        if (boxDecay != null)
+        {
+            DecayableProp itemDecay = item.GetComponent<DecayableProp>();
+            if (itemDecay != null) boxDecay.CopyStateTo(itemDecay);
+        }
+
         UpdateItemVisuals();
         UpdateUIVisual();
 
@@ -208,6 +216,20 @@ public class SupplyBox : BaseStation
         stack.BeginHold(interactor.GetHoldPoint());
         interactor.ReplaceHeldItem(stack);
         currentCount -= dispenseCount;
+
+        // 为 Stack 内部所有生成的物品复制箱子的腐烂状态
+        DecayableProp boxDecay = GetComponent<DecayableProp>();
+        if (boxDecay != null)
+        {
+            foreach (var stackedItem in stack.GetItems())
+            {
+                if (stackedItem != null)
+                {
+                    DecayableProp itemDecay = stackedItem.GetComponent<DecayableProp>();
+                    if (itemDecay != null) boxDecay.CopyStateTo(itemDecay);
+                }
+            }
+        }
 
         UpdateItemVisuals();
         UpdateUIVisual();

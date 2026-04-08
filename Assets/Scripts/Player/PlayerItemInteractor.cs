@@ -135,9 +135,14 @@ public class PlayerItemInteractor : MonoBehaviour
                 highlightedItem.SetSensorHighlight(true);
             }
 
-            // 持物状态下高亮 BinStation（J/K 均可清空/丢弃）
+            // 持物状态下高亮特定 Station（ BinStation / FridgeStation）也能放置/交互
             IInteractiveStation station = sensor.GetCurrentStation();
             if (station is BinStation)
+            {
+                highlightedStation = station;
+                highlightedStation.SetSensorHighlight(true);
+            }
+            else if (station is FridgeStation fridge && fridge.CanAcceptItem())
             {
                 highlightedStation = station;
                 highlightedStation.SetSensorHighlight(true);
@@ -181,6 +186,14 @@ public class PlayerItemInteractor : MonoBehaviour
             if (dispensed)
             {
                 if (debugLog) Debug.Log($"<color=#FFA500>[大脑 拿取]</color> 从箱子 {supplyBox.name} 中{(isLongPress ? "长按取出Stack" : "点按取出单个")}");
+                return true;
+            }
+        }
+        else if (currentStation is FridgeStation fridge)
+        {
+            if (fridge.TryTakeItem(this))
+            {
+                if (debugLog) Debug.Log($"<color=#00FFFF>[大脑 拿取]</color> 从冰箱 {fridge.name} 中空手拿出了存货");
                 return true;
             }
         }
@@ -281,6 +294,19 @@ public class PlayerItemInteractor : MonoBehaviour
                         return;
                     }
                 }
+            }
+        }
+
+        // 【优先级1.5】尝试放入冰箱
+        IInteractiveStation station = sensor != null ? sensor.GetCurrentStation() : null;
+        if (station is FridgeStation fridge)
+        {
+            if (fridge.TryPutHeldItem(this, item))
+            {
+                // 如果成功放入冰箱，手中物品即已转移，直接返回
+                heldItem = null;
+                if (debugLog) Debug.Log($"<color=#00FFFF>[大脑 放下]</color> 成功将 {item.name} 放入进 {fridge.name}");
+                return;
             }
         }
 

@@ -22,6 +22,9 @@ public class DishWashingStation : BaseStation
     public int initialCleanPlates = 5;
 
     [Header("Washing Process")]
+    [Tooltip("洗碗的基础速度，暂设为1")]
+    public float baseProcessingSpeed = 1f;
+    [Tooltip("每洗净一个盘子需要的进度量，原为需要的总时间")]
     public float requiredWashTimePerPlate = 2f;
     public int dirtyPlatesInSink = 0;
     
@@ -61,6 +64,29 @@ public class DishWashingStation : BaseStation
             inputDropPoint.OnItemPlacedEvent -= OnDirtyPlateDropped;
     }
 
+    /// <summary>获取实际洗碗速度（含羁绊加成和属性修正）。</summary>
+    public float GetEffectiveWashingSpeed()
+    {
+        // 1. 获取基础速度
+        float speed = baseProcessingSpeed;
+
+        // 2. 累乘玩家属性
+        float playerMulti = 1.0f;
+        if (CurrentPlayerAttributes != null)
+            playerMulti = CurrentPlayerAttributes.washSpeedMultiplier;
+
+        // 3. 累加全局加成
+        float globalAddon = 0f;
+        if (GlobalOrderManager.Instance != null)
+            globalAddon = GlobalOrderManager.Instance.globalWashSpeedAddon;
+
+        // 4. 计算公式：最终速度 = (基础速度 * 玩家乘数) + 全局加成
+        float finalSpeed = (speed * playerMulti) + globalAddon;
+
+        // 安全界限限制（保证最小有0.01速度运转防止卡死）
+        return Mathf.Max(0.01f, finalSpeed);
+    }
+
     private void Update()
     {
         bool isOutputFull = IsOutputFull();
@@ -75,7 +101,7 @@ public class DishWashingStation : BaseStation
 
         if (isWashing && dirtyPlatesInSink > 0 && !isOutputFull)
         {
-            currentWashProgress += Time.deltaTime;
+            currentWashProgress += GetEffectiveWashingSpeed() * Time.deltaTime;
             
             if (currentWashProgress >= requiredWashTimePerPlate)
             {
@@ -250,6 +276,7 @@ public class DishWashingStation : BaseStation
     {
         if (CanInteract(interactor))
         {
+            cachedInteractor = interactor; // 记录当前互动玩家
             isWashing = true;
             if (debugLog) Debug.Log("<color=#00FFFF>[DishWashingStation]</color> 玩家开始洗碗！长按 K...");
         }

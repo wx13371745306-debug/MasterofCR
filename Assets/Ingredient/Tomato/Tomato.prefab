@@ -241,6 +241,8 @@ MonoBehaviour:
   isPickable: 1
   useHighlightObject: {fileID: 0}
   disableCollidersOnAttach: 1
+  leftHandGrip: {fileID: 0}
+  rightHandGrip: {fileID: 0}
   debugLog: 1
 --- !u!114 &306090520139179737
 MonoBehaviour:
@@ -254,7 +256,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 18d1ae15fc6177a47a8dcbb01404d403, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChopProcessable
-  requiredProgress: 60
+  requiredProgress: 3
   currentProgress: 0
   resultPrefab: {fileID: 8385399957628962730, guid: c9ea390c22e553d4eb1553b247acaca8, type: 3}
   debugLog: 0

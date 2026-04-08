@@ -9,6 +9,17 @@ public abstract class BaseStation : MonoBehaviour, IInteractiveStation
     protected bool isSensorTargeted = false;
     protected PlayerItemInteractor cachedInteractor;
 
+    // 获取当前互动的玩家属性
+    public PlayerAttributes CurrentPlayerAttributes
+    {
+        get
+        {
+            if (cachedInteractor != null)
+                return cachedInteractor.GetComponent<PlayerAttributes>();
+            return null;
+        }
+    }
+
     protected virtual void Awake()
     {
         if (cachedInteractor == null)

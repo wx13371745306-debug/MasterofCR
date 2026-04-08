@@ -576,6 +576,7 @@ GameObject:
   - component: {fileID: 5416572797830121970}
   - component: {fileID: 1696173215733838411}
   - component: {fileID: 1008561482671382456}
+  - component: {fileID: 3329108684176324335}
   m_Layer: 10
   m_Name: Player
   m_TagString: Untagged
@@ -708,6 +709,21 @@ MonoBehaviour:
   isWalkingID: IsWalking
   moveEpsilon: 0.01
   debugLog: 0
+--- !u!114 &3329108684176324335
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8203872156075153258}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0ec88d6e72947754db8fd056b778cfd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAttributes
+  chopSpeedMultiplier: 1
+  washSpeedMultiplier: 1
+  debugLog: 1
 --- !u!1001 &8697700615462324504
 PrefabInstance:
   m_ObjectHideFlags: 0

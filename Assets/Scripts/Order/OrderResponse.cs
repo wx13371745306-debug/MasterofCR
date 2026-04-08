@@ -270,11 +270,23 @@ public class OrderResponse : BaseStation
                 }
                 else if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount > 1)
                 {
-                    GameObject stackObj = Instantiate(dirtyPlateStackPrefab.stackPrefab, Vector3.one * -9999f, Quaternion.identity);
+                    GameObject stackPrefabToUse = dirtyPlateStackPrefab.stackPrefab;
+                    StackableProp sp = dirtyPlateStackPrefab.singlePlatePrefab != null ? dirtyPlateStackPrefab.singlePlatePrefab.GetComponent<StackableProp>() : null;
+                    if (stackPrefabToUse == null && sp != null)
+                    {
+                        stackPrefabToUse = sp.dynamicStackPrefab;
+                    }
+
+                    if (stackPrefabToUse == null)
+                    {
+                        Debug.LogError($"[OrderResponse] 无法生成多盘堆叠，因为没有找到有效的 stackPrefab 参数！请检查 {dirtyPlateStackPrefab.name}");
+                        return;
+                    }
+
+                    GameObject stackObj = Instantiate(stackPrefabToUse, Vector3.one * -9999f, Quaternion.identity);
                     DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
                     if (stack != null)
                     {
-                        StackableProp sp = dirtyPlateStackPrefab.singlePlatePrefab.GetComponent<StackableProp>();
                         int maxStack = sp != null && sp.layoutType == StackLayout.Grid && sp.gridColumns * sp.gridRows > 0 ? sp.gridColumns * sp.gridRows : (sp != null ? sp.maxStackCount : pendingDirtyPlatesCount);
                         StackLayout layout = sp != null ? sp.layoutType : StackLayout.Vertical;
                         float offset = dirtyPlateStackPrefab.stackYOffset;
@@ -371,7 +383,17 @@ public class OrderResponse : BaseStation
             {
                 GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
             }
-            if (MoneyManager.Instance != null) MoneyManager.Instance.AddMoney(recipe.price);
+            if (MoneyManager.Instance != null)
+            {
+                MoneyManager.Instance.AddMoney(recipe.price);
+                // 触发桌子的金钱弹窗
+                TableOrderProgressUI uiComponent = GetComponentInChildren<TableOrderProgressUI>(true);
+                if (uiComponent == null && transform.parent != null)
+                {
+                    uiComponent = transform.parent.GetComponentInChildren<TableOrderProgressUI>(true);
+                }
+                if (uiComponent != null) uiComponent.ShowMoneyEarned(recipe.price);
+            }
             if (DayStatsTracker.Instance != null)
             {
                 DayStatsTracker.Instance.RegisterPlacedItem(true, recipe.size == DishSize.D);

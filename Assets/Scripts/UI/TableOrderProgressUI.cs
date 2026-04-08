@@ -15,16 +15,21 @@ public class TableOrderProgressUI : MonoBehaviour
     [Tooltip("点菜读条（Ordering 阶段）")]
     public GameObject progressBarObj;
     public Image fillImage;
-    [Tooltip("等上菜且耐心低于 OrderResponse.impatientThreshold 时显示")]
     public GameObject waitingFoodImpatientIconObj;
     [Tooltip("为空则从 waitingFoodImpatientIconObj 上取 Image")]
     public Image waitingFoodImpatientImage;
 
-    [Header("Patience Color")]
-    [Tooltip("耐心高于此值：保持原色；从此值开始向红色过渡")]
-    public float patienceColorStressStart = 50f;
-    [Tooltip("耐心低于等于此值：完全变为 stress 色")]
-    public float patienceColorStressEnd = 10f;
+    [Header("Money Popup")]
+    [Tooltip("显示获得金钱的整个物体")]
+    public GameObject moneyPopupObj;
+    [Tooltip("用来显示 +$ 00.00 的文本（TextMeshPro 组件）")]
+    public TMPro.TMP_Text moneyPopupText;
+
+    [Header("Patience Color (Normalized)")]
+    [Tooltip("耐心百分比低于此值时开始向红色过渡 (0.0 - 1.0)")]
+    public float stressStartRatio = 0.5f;
+    [Tooltip("耐心百分比低于等于此值时完全变为 stress 色 (0.0 - 1.0)")]
+    public float stressEndRatio = 0.1f;
     public Color patienceStressColor = new Color(1f, 0.15f, 0.15f, 1f);
 
     [Header("Target")]
@@ -41,6 +46,11 @@ public class TableOrderProgressUI : MonoBehaviour
     private Color foodImpatientBaseColor = Color.white;
     private bool cachedBaseColors;
 
+    // 金钱弹窗控制变量
+    private float popupTimer = 0f;
+    private float currentPopupMoney = 0f;
+    private Color originalPopupColor = Color.white;
+
     void Start()
     {
         if (tableResponse == null)
@@ -49,6 +59,17 @@ public class TableOrderProgressUI : MonoBehaviour
         mainCamera = Camera.main;
 
         if (canvas != null) canvas.enabled = false;
+        
+        if (moneyPopupText != null)
+        {
+            originalPopupColor = moneyPopupText.color;
+            if (moneyPopupObj == null)
+            {
+                moneyPopupText.gameObject.SetActive(false); // 没绑 Obj 就直接关 Text 的游戏对象
+            }
+        }
+        
+        if (moneyPopupObj != null) moneyPopupObj.SetActive(false);
 
         CacheBaseColorsIfNeeded();
     }
@@ -78,19 +99,61 @@ public class TableOrderProgressUI : MonoBehaviour
         cachedBaseColors = true;
     }
 
-    /// <summary>耐心从高到低：t=0 原色，t=1 全红（在 stressStart 与 stressEnd 之间插值）。</summary>
-    static float PatienceStress01(float patience, float stressStart, float stressEnd)
+    /// <summary>耐心比例从高到低：t=0 原色，t=1 全红（在 stressStartRatio 与 stressEndRatio 之间插值）。</summary>
+    static float PatienceStress01(float patienceRatio, float startRatio, float endRatio)
     {
-        return Mathf.Clamp01(Mathf.InverseLerp(stressStart, stressEnd, patience));
+        // InverseLerp: 当 patienceRatio 从 startRatio 下降到 endRatio 时，返回 0 到 1
+        return Mathf.Clamp01(Mathf.InverseLerp(startRatio, endRatio, patienceRatio));
     }
 
-    void ApplyPatienceTint(Image img, Color baseCol, float patience)
+    /// <summary>
+    /// 【外部接口】允许其他系统主动施加基于耐心比例的变色效果
+    /// </summary>
+    public void ApplyPatienceTintRatio(Image img, Color baseCol, float patienceRatio)
     {
         if (img == null) return;
-        float t = PatienceStress01(patience, patienceColorStressStart, patienceColorStressEnd);
+        float t = PatienceStress01(patienceRatio, stressStartRatio, stressEndRatio);
         Color target = patienceStressColor;
         target.a = baseCol.a;
         img.color = Color.Lerp(baseCol, target, t);
+    }
+    /// <summary>
+    /// 当玩家上菜获得金钱时调用，显示弹窗并重置计时器。
+    /// </summary>
+    public void ShowMoneyEarned(int amount)
+    {
+        if (debugLog) Debug.Log($"[TableUI] ShowMoneyEarned 被调用! amount={amount}");
+
+        if (moneyPopupText == null && moneyPopupObj != null)
+             moneyPopupText = moneyPopupObj.GetComponent<TMPro.TMP_Text>();
+             
+        if (moneyPopupText == null)
+        {
+             if (debugLog) Debug.LogWarning("[TableUI] 尝试显示金钱，但 moneyPopupText 仍为空！");
+             return;
+        }
+        
+        // 如果当前没有弹窗，保存一个纯净的颜色，并重置累计金钱
+        if (popupTimer <= 0f) {
+             currentPopupMoney = 0f;
+        }
+
+        currentPopupMoney += amount;
+        popupTimer = 3f; // 重新设定3秒倒计时
+
+        // 显示文本
+        moneyPopupText.text = $"+$ {currentPopupMoney:0.00}";
+        if (debugLog) Debug.Log($"[TableUI] 金钱文本已更新为: {moneyPopupText.text}");
+        
+        // 重置透明度为完全不透明
+        Color c = originalPopupColor;
+        c.a = 1f;
+        moneyPopupText.color = c;
+        
+        if (moneyPopupObj != null) 
+            moneyPopupObj.SetActive(true);
+        else 
+            moneyPopupText.gameObject.SetActive(true); // 如果没有专门绑 obj，就把纯文字节点激活
     }
 
     void LateUpdate()
@@ -103,11 +166,13 @@ public class TableOrderProgressUI : MonoBehaviour
         var state = tableResponse.currentState;
         bool showCall = tableResponse.ShouldShowWaitingToOrderCallIcon;
         bool showFoodImpatient = tableResponse.ShouldShowWaitingFoodImpatientIcon;
+        bool isShowingPopup = popupTimer > 0f;
 
         bool shouldShowCanvas =
             state == OrderResponse.TableState.WaitingToOrder ||
             state == OrderResponse.TableState.Ordering ||
-            (state == OrderResponse.TableState.WaitingForFood && showFoodImpatient);
+            (state == OrderResponse.TableState.WaitingForFood && showFoodImpatient) ||
+            isShowingPopup; // 即使在别的阶段，只要弹窗时间还在，就显示Canvas
 
         if (canvas.enabled != shouldShowCanvas)
         {
@@ -122,7 +187,10 @@ public class TableOrderProgressUI : MonoBehaviour
             case OrderResponse.TableState.WaitingToOrder:
                 if (progressBarObj != null && progressBarObj.activeSelf) progressBarObj.SetActive(false);
                 if (callIconObj != null && callIconObj.activeSelf != showCall) callIconObj.SetActive(showCall);
-                ApplyPatienceTint(callIconImage, callIconBaseColor, tableResponse.currentPatienceOrder);
+                
+                float orderRatio = tableResponse.effectiveMaxPatienceOrder > 0f ? (tableResponse.currentPatienceOrder / tableResponse.effectiveMaxPatienceOrder) : 0f;
+                ApplyPatienceTintRatio(callIconImage, callIconBaseColor, orderRatio);
+                
                 if (waitingFoodImpatientIconObj != null && waitingFoodImpatientIconObj.activeSelf)
                     waitingFoodImpatientIconObj.SetActive(false);
                 if (waitingFoodImpatientImage != null)
@@ -147,10 +215,32 @@ public class TableOrderProgressUI : MonoBehaviour
                 if (waitingFoodImpatientIconObj != null && waitingFoodImpatientIconObj.activeSelf != showFoodImpatient)
                     waitingFoodImpatientIconObj.SetActive(showFoodImpatient);
                 if (showFoodImpatient)
-                    ApplyPatienceTint(waitingFoodImpatientImage, foodImpatientBaseColor, tableResponse.currentPatienceFood);
+                {
+                    float foodRatio = tableResponse.effectiveMaxPatienceFood > 0f ? (tableResponse.currentPatienceFood / tableResponse.effectiveMaxPatienceFood) : 0f;
+                    ApplyPatienceTintRatio(waitingFoodImpatientImage, foodImpatientBaseColor, foodRatio);
+                }
                 else if (waitingFoodImpatientImage != null)
                     waitingFoodImpatientImage.color = foodImpatientBaseColor;
                 break;
+        }
+
+        // 弹窗消失逻辑
+        if (popupTimer > 0f)
+        {
+            popupTimer -= Time.deltaTime;
+            
+            if (moneyPopupText != null)
+            {
+                Color c = originalPopupColor;
+                c.a = Mathf.Clamp01(popupTimer / 3f); // 从 1 慢慢降到 0
+                moneyPopupText.color = c;
+            }
+
+            if (popupTimer <= 0f)
+            {
+                if (moneyPopupObj != null) moneyPopupObj.SetActive(false);
+                else if (moneyPopupText != null) moneyPopupText.gameObject.SetActive(false);
+            }
         }
 
         if (alwaysFaceCamera && mainCamera != null)

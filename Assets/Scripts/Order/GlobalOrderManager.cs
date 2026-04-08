@@ -28,6 +28,12 @@ public class GlobalOrderManager : MonoBehaviour
     [Tooltip("所有顾客的耐心衰减速度附加值（正数 = 更快衰减）")]
     public float globalPatienceLossAddon = 0f;
 
+    [Header("全局设施速度修饰 (加减数)")]
+    [Tooltip("所有切菜台处理速度的全局附加值 (正=加速，负=减速)")]
+    public float globalChopSpeedAddon = 0f;
+    [Tooltip("所有洗碗池处理速度的全局附加值 (正=加速，负=减速)")]
+    public float globalWashSpeedAddon = 0f;
+
     [Header("Debug")]
     public bool debugLog = false;
 

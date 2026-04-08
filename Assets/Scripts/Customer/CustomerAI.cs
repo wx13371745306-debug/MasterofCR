@@ -72,9 +72,9 @@ public class CustomerAI : MonoBehaviour
 
     void Update()
     {
-        if (isLeaving) return;
-
         UpdateAnimation();
+
+        if (isLeaving) return;
 
         if (!isSittingDown && !agent.pathPending && agent.remainingDistance <= arrivalRadius)
         {

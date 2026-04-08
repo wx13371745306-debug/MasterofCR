@@ -13,6 +13,7 @@ public class AnimatorBridge : MonoBehaviour
 
     private Rigidbody rb;
     private Animator animator;
+    private bool lastIsWalking;
 
     private void Awake()
     {
@@ -35,6 +36,12 @@ public class AnimatorBridge : MonoBehaviour
         Vector3 v = rb.linearVelocity;
         float horizontalSqr = v.x * v.x + v.z * v.z;
         bool isWalking = horizontalSqr > moveEpsilon * moveEpsilon;
+
+        if (isWalking != lastIsWalking)
+        {
+            if (debugLog) Debug.Log($"[AnimatorBridge] {gameObject.name} 的动画状态切换为: {(isWalking ? "走路" : "静止")} (速度大小: {Mathf.Sqrt(horizontalSqr):F2})");
+            lastIsWalking = isWalking;
+        }
 
         animator.SetBool(isWalkingID, isWalking);
     }

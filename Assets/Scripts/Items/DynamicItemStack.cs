@@ -38,6 +38,7 @@ public class DynamicItemStack : CarryableItem
 
     public int Count => stackedItems.Count;
     public bool IsFull => stackedItems.Count >= maxCapacity;
+    public System.Collections.Generic.IEnumerable<CarryableItem> GetItems() => stackedItems;
 
     protected override void Awake()
     {
