@@ -42,33 +42,27 @@ public class OrderResponse : BaseStation
     [Tooltip("这桌的座位点（在椅子上创建空子物体作为坐姿位置，拖入此处）")]
     public List<Transform> chairs = new List<Transform>();
 
-    [Header("Patience")]
-    [Tooltip("等待点菜阶段初始耐心")]
-    public float maxPatienceOrder = 100f;
-    [Tooltip("等待点菜阶段每秒损失")]
-    public float lossPerSecondOrder = 10f;
-    [Tooltip("等上菜阶段初始耐心")]
-    public float maxPatienceFood = 100f;
-    [Tooltip("等上菜阶段每秒损失")]
-    public float lossPerSecondFood = 5f;
-    [Tooltip("任意菜品上桌后增加的耐心（封顶见 maxPatienceCap）")]
-    public float servePatienceBonus = 60f;
-    public float maxPatienceCap = 100f;
-    [Tooltip("低于此值时显示「不耐烦」图标（等上菜阶段）")]
-    public float impatientThreshold = 40f;
+    [Header("Patience (运行时，由 CustomerGroup + GlobalOrderManager 注入)")]
+    [HideInInspector] public float effectiveMaxPatienceOrder = 100f;
+    [HideInInspector] public float effectiveLossPerSecondOrder = 10f;
+    [HideInInspector] public float effectiveMaxPatienceFood = 100f;
+    [HideInInspector] public float effectiveLossPerSecondFood = 5f;
+    [HideInInspector] public float effectiveServePatienceBonus = 60f;
+    [HideInInspector] public float effectivePatienceCap = 100f;
+    [HideInInspector] public float effectiveImpatientThreshold = 40f;
 
     public float currentPatienceOrder;
     public float currentPatienceFood;
 
     [Header("Debug")]
-    [Tooltip("勾选后在 Console 输出耐心归零、顾客离场相关日志（排查不走向消失点等问题）")]
-    public bool debugPatienceLeave;
+    public bool debugLog = true;
 
     [Header("Order Settings")]
-    public int minDishes = 1;
-    public int maxDishes = 2;
+    [Tooltip("桌子物理上限（兜底），实际点菜数以顾客组配置为准")]
+    public int maxDishes = 6;
     public float requiredOrderTime = 2f;
     [HideInInspector] public int currentCustomerCount = 1;
+    [HideInInspector] public int currentMinDishes = 1;
 
     private readonly List<FryRecipeDatabase.FryRecipe> currentOrder = new List<FryRecipeDatabase.FryRecipe>();
     private Coroutine eatRoutine;
@@ -85,6 +79,7 @@ public class OrderResponse : BaseStation
 
     // 【新增】：用来存储纯净无害的“吃完后”独立视觉模型，防止跟物理逻辑产生任何藕断丝连
     private readonly List<GameObject> activeEatenModels = new List<GameObject>();
+    private int pendingDirtyPlatesCount = 0;
 
     private bool isInteracting = false;
     private CustomerGroup boundGroup;
@@ -136,6 +131,44 @@ public class OrderResponse : BaseStation
         currentState = TableState.Empty;
     }
 
+    // ================== 【耐心数据注入接口】 ==================
+
+    /// <summary>
+    /// 由 CustomerGroup 初始化时调用，注入该组顾客的耐心与点菜配置。
+    /// 结合 GlobalOrderManager 的全局修正，计算出最终生效值。
+    /// </summary>
+    public void ApplyGroupConfig(CustomerGroup group)
+    {
+        if (group == null) return;
+
+        var mods = GlobalOrderManager.Instance != null
+            ? GlobalOrderManager.Instance.GetCurrentModifiers()
+            : GlobalOrderManager.PatienceModifiers.Default;
+
+        // 最终值 = 基础值 × 乘数 + 加算
+        effectiveMaxPatienceOrder  = group.basePatienceOrder * mods.patienceMultiplier + mods.patienceAddon;
+        effectiveLossPerSecondOrder = group.baseLossPerSecondOrder * mods.patienceLossMultiplier + mods.patienceLossAddon;
+        effectiveMaxPatienceFood   = group.basePatienceFood * mods.patienceMultiplier + mods.patienceAddon;
+        effectiveLossPerSecondFood  = group.baseLossPerSecondFood * mods.patienceLossMultiplier + mods.patienceLossAddon;
+        effectiveServePatienceBonus = group.baseServePatienceBonus * mods.serveBonusMultiplier;
+        effectivePatienceCap       = group.basePatienceCap * mods.patienceMultiplier + mods.patienceAddon;
+        effectiveImpatientThreshold = group.baseImpatientThreshold;
+
+        currentMinDishes = group.minDishes;
+        maxDishes = Mathf.Max(group.maxDishes, maxDishes); // 取较大值作为上限兜底
+        currentCustomerCount = group.groupSize;
+
+        // 预设初始耐心
+        currentPatienceOrder = effectiveMaxPatienceOrder;
+        currentPatienceFood  = effectiveMaxPatienceFood;
+
+        if (debugLog) Debug.Log($"[OrderResponse] 桌号 {tableId} 接收顾客组配置 | " +
+            $"耐心Order={effectiveMaxPatienceOrder:F0} Loss={effectiveLossPerSecondOrder:F1}/s | " +
+            $"耐心Food={effectiveMaxPatienceFood:F0} Loss={effectiveLossPerSecondFood:F1}/s | " +
+            $"上菜回复={effectiveServePatienceBonus:F0} Cap={effectivePatienceCap:F0} | " +
+            $"人数={currentCustomerCount} 点菜={currentMinDishes}-{maxDishes}");
+    }
+
     void Update()
     {
         if (isInteracting && currentState == TableState.Ordering)
@@ -151,7 +184,7 @@ public class OrderResponse : BaseStation
         {
             if (currentState == TableState.WaitingToOrder)
             {
-                currentPatienceOrder -= lossPerSecondOrder * Time.deltaTime;
+                currentPatienceOrder -= effectiveLossPerSecondOrder * Time.deltaTime;
                 if (currentPatienceOrder <= 0f)
                 {
                     currentPatienceOrder = 0f;
@@ -161,15 +194,8 @@ public class OrderResponse : BaseStation
             }
             else if (currentState == TableState.WaitingForFood)
             {
-                float foodLoss = lossPerSecondFood;
-                // 家常羁绊：等菜阶段耐心衰减速度降低 20%
-                if (BondRuntimeBridge.Instance != null
-                    && BondRuntimeBridge.Instance.State != null
-                    && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.HomeCooking))
-                {
-                    foodLoss *= 0.8f;
-                }
-                currentPatienceFood -= foodLoss * Time.deltaTime;
+                // 衰减速度已在 ApplyGroupConfig 中整合了全局修正（含羁绊），直接使用
+                currentPatienceFood -= effectiveLossPerSecondFood * Time.deltaTime;
                 if (currentPatienceFood <= 0f)
                 {
                     currentPatienceFood = 0f;
@@ -179,25 +205,8 @@ public class OrderResponse : BaseStation
             }
         }
 
-        // 玩家端走脏盘子堆后，桌子彻底空出
-        if (currentState == TableState.WaitingForCleanup)
-        {
-            if (itemPlacePoint != null && itemPlacePoint.CurrentItem == null)
-            {
-                Debug.Log($"[Debug-Update] ⚠️ 触发清空桌面条件！状态为 WaitingForCleanup 且中心放置点为空！准备销毁 {activeEatenModels.Count} 个独立残羹视觉模型...");
-
-                // 此时巡回清除散落在桌上的，那些毫无物理属性的纯“残羹”视觉模型
-                foreach (var model in activeEatenModels)
-                {
-                    if (model != null) Destroy(model);
-                }
-                activeEatenModels.Clear();
-
-                currentState = TableState.Empty;
-                isReserved = false;
-                Debug.Log($"[OrderResponse] 桌号 {tableId} 脏盘堆被收走，独立残羹销毁，桌子重置为 Empty 空闲状态！");
-            }
-        }
+        // 玩家将在 WaitingForCleanup 阶段中通过交互 (BeginInteract) 拿取脏盘并清空桌面，
+        // 不再在 Update 中轮询清理阶段状态。
     }
 
     // ================== 【供 AI 调用的接口】 ==================
@@ -223,13 +232,14 @@ public class OrderResponse : BaseStation
 
         currentState = TableState.WaitingToOrder;
         currentOrderProgress = 0f;
-        currentPatienceOrder = maxPatienceOrder;
+        currentPatienceOrder = effectiveMaxPatienceOrder;
         Debug.Log($"[OrderResponse] 桌号 {tableId} 顾客看完了，头顶亮起图标请求点单！");
     }
 
     // ================== 【BaseStation 交互接口实现】 ==================
     public override bool CanInteract(PlayerItemInteractor interactor)
     {
+        if (currentState == TableState.WaitingForCleanup && pendingDirtyPlatesCount > 0 && !interactor.IsHoldingItem()) return true;
         return currentState == TableState.WaitingToOrder || currentState == TableState.Ordering;
     }
 
@@ -238,7 +248,50 @@ public class OrderResponse : BaseStation
         isInteracting = true;
         if (currentState == TableState.WaitingToOrder)
         {
+            if (debugLog) Debug.Log($"[OrderResponse] 玩家开始对桌号 {tableId} 点单交互");
             currentState = TableState.Ordering; // 开始读条
+        }
+        else if (currentState == TableState.WaitingForCleanup)
+        {
+            if (pendingDirtyPlatesCount > 0 && !interactor.IsHoldingItem())
+            {
+                if (debugLog) Debug.Log($"[OrderResponse] 玩家端起桌号 {tableId} 的所有脏盘子 (数量: {pendingDirtyPlatesCount})");
+                
+                // 复用 dirtyPlateStackPrefab 中的信息发放脏盘并送到玩家手上
+                if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount == 1)
+                {
+                    GameObject obj = Instantiate(dirtyPlateStackPrefab.singlePlatePrefab, Vector3.one * -9999f, Quaternion.identity);
+                    CarryableItem item = obj.GetComponent<CarryableItem>();
+                    if (item != null)
+                    {
+                        item.BeginHold(interactor.GetHoldPoint());
+                        interactor.ReplaceHeldItem(item);
+                    }
+                }
+                else if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount > 1)
+                {
+                    GameObject stackObj = Instantiate(dirtyPlateStackPrefab.stackPrefab, Vector3.one * -9999f, Quaternion.identity);
+                    DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
+                    if (stack != null)
+                    {
+                        StackableProp sp = dirtyPlateStackPrefab.singlePlatePrefab.GetComponent<StackableProp>();
+                        int maxStack = sp != null && sp.layoutType == StackLayout.Grid && sp.gridColumns * sp.gridRows > 0 ? sp.gridColumns * sp.gridRows : (sp != null ? sp.maxStackCount : pendingDirtyPlatesCount);
+                        StackLayout layout = sp != null ? sp.layoutType : StackLayout.Vertical;
+                        float offset = dirtyPlateStackPrefab.stackYOffset;
+                        int cols = sp != null ? sp.gridColumns : 1;
+                        int rows = sp != null ? sp.gridRows : 1;
+                        float spacing = sp != null ? sp.gridSpacing : 0.15f;
+                        
+                        stack.InitializeFromPrefab(dirtyPlateStackPrefab.singlePlatePrefab, pendingDirtyPlatesCount, maxStack, layout, offset, cols, rows, spacing);
+                        stack.BeginHold(interactor.GetHoldPoint());
+                        interactor.ReplaceHeldItem(stack);
+                    }
+                }
+                
+                pendingDirtyPlatesCount = 0;
+                CleanUpTable();  // 自动销毁残羹、重置桌面状态
+                isInteracting = false;
+            }
         }
     }
 
@@ -260,19 +313,16 @@ public class OrderResponse : BaseStation
         currentState = TableState.WaitingForFood;
         isInteracting = false;
         currentOrderProgress = requiredOrderTime;
-        currentPatienceFood = maxPatienceFood;
+        currentPatienceFood = effectiveMaxPatienceFood;
 
-        bool homeBond = BondRuntimeBridge.Instance != null
-                        && BondRuntimeBridge.Instance.State != null
-                        && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.HomeCooking);
-        Debug.Log($"[OrderResponse] 桌{tableId} 点菜完成进入等菜 | 家常羁绊={homeBond} | lossPerSecondFood={lossPerSecondFood}{(homeBond ? " (将 ×0.8)" : "")}");
+        if (debugLog) Debug.Log($"[OrderResponse] 桌{tableId} 点菜完成进入等菜 | lossPerSecondFood={effectiveLossPerSecondFood:F1}");
 
         currentOrder.Clear();
         dishesOnTable.Clear();
 
         if (orderGenerator != null)
         {
-            var next = orderGenerator.GenerateOrder(minDishes, maxDishes, dishPlaceSystem, currentCustomerCount);
+            var next = orderGenerator.GenerateOrder(currentMinDishes, maxDishes, dishPlaceSystem, currentCustomerCount);
             currentOrder.AddRange(next);
 
             if (GlobalOrderManager.Instance != null)
@@ -387,7 +437,7 @@ public class OrderResponse : BaseStation
         // 【新增】：将该 dish 设置为不可拿取
         item.isPickable = false;
 
-        currentPatienceFood = Mathf.Min(maxPatienceCap, currentPatienceFood + servePatienceBonus);
+        currentPatienceFood = Mathf.Min(effectivePatienceCap, currentPatienceFood + effectiveServePatienceBonus);
 
         // 6. 判断是否点菜全齐
         if (currentOrder.Count == 0)
@@ -479,22 +529,10 @@ public class OrderResponse : BaseStation
         if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
         dishesOnTable.Clear();
 
-        // 2. 生成包含数据总和的脏盘堆，并放入中心点位
-        Debug.Log($"[Debug-Eat] 准备生成脏盘堆，共计 {dirtyCount} 个盘子。dirtyPlateStackPrefab 是否为空: {dirtyPlateStackPrefab == null}");
-        if (dirtyCount > 0 && dirtyPlateStackPrefab != null)
-        {
-            DirtyPlateStack stack = Instantiate(dirtyPlateStackPrefab, transform.position, Quaternion.identity);
-            stack.SetPlateCount(dirtyCount);
-            stack.BindTable(this);
-            stack.ForceHideUntilPickedUp();
-
-            if (itemPlacePoint != null)
-            {
-                bool accepted = itemPlacePoint.TryAcceptItem(stack);
-                Debug.Log($"[Debug-Eat] 将新生成的 DirtyPlateStack 放入中心点位，是否成功放入(TryAcceptItem): {accepted}");
-            }
-        }
-
+        // 2. 将脏盘子计数并直接转为待清理状态
+        pendingDirtyPlatesCount = dirtyCount;
+        if (debugLog) Debug.Log($"[OrderResponse] 客人用餐完毕，桌号 {tableId} 剩余 {pendingDirtyPlatesCount} 个脏盘子待端走。");
+        
         currentState = TableState.WaitingForCleanup;
         if (DayStatsTracker.Instance != null)
             DayStatsTracker.Instance.RegisterGuestsServed(currentCustomerCount);
@@ -511,6 +549,12 @@ public class OrderResponse : BaseStation
             Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 用餐完毕但 boundGroup 为空，顾客无法离场");
 
         eatRoutine = null;
+
+        // 如果刚好没留下任何脏盘子，代表桌子可以直接用了（比如全员饮品吸收了）
+        if (pendingDirtyPlatesCount == 0)
+        {
+            CleanUpTable();
+        }
     }
 
     public void CleanUpTable()
@@ -529,13 +573,13 @@ public class OrderResponse : BaseStation
         // 【新增】：客人吃完走人，桌子解开预定锁
         isReserved = false;
 
-        currentPatienceOrder = maxPatienceOrder;
-        currentPatienceFood = maxPatienceFood;
+        currentPatienceOrder = effectiveMaxPatienceOrder;
+        currentPatienceFood = effectiveMaxPatienceFood;
     }
 
     void PatienceLeaveDbg(string msg)
     {
-        if (debugPatienceLeave) Debug.Log($"[PatienceLeave][桌{tableId}] {msg}");
+        if (debugLog) Debug.Log($"[PatienceLeave][桌{tableId}] {msg}");
     }
 
     void AbandonTableDueToPatience()
@@ -609,8 +653,8 @@ public class OrderResponse : BaseStation
         isInteracting = false;
         currentOrderProgress = 0f;
         currentEatTime = 0f;
-        currentPatienceOrder = maxPatienceOrder;
-        currentPatienceFood = maxPatienceFood;
+        currentPatienceOrder = effectiveMaxPatienceOrder;
+        currentPatienceFood = effectiveMaxPatienceFood;
 
         currentState = TableState.Empty;
 
@@ -641,8 +685,8 @@ public class OrderResponse : BaseStation
             currentOrder.Clear();
             dishesOnTable.Clear();
             currentOrderProgress = 0f;
-            currentPatienceOrder = maxPatienceOrder;
-            currentPatienceFood = maxPatienceFood;
+            currentPatienceOrder = effectiveMaxPatienceOrder;
+            currentPatienceFood = effectiveMaxPatienceFood;
             Debug.Log($"[OrderResponse] 桌号 {tableId} 天数切换：保留 WaitingForCleanup 状态（脏盘子留存）");
             return;
         }
@@ -691,8 +735,8 @@ public class OrderResponse : BaseStation
         isInteracting = false;
         currentOrderProgress = 0f;
         currentEatTime = 0f;
-        currentPatienceOrder = maxPatienceOrder;
-        currentPatienceFood = maxPatienceFood;
+        currentPatienceOrder = effectiveMaxPatienceOrder;
+        currentPatienceFood = effectiveMaxPatienceFood;
         currentState = TableState.Empty;
         boundGroup = null;
         isReserved = false;
@@ -708,7 +752,7 @@ public class OrderResponse : BaseStation
 
     /// <summary>等上菜阶段：耐心低于阈值时显示不耐烦 Icon（颜色由 UI 根据耐心值渐变）。</summary>
     public bool ShouldShowWaitingFoodImpatientIcon =>
-        currentState == TableState.WaitingForFood && currentPatienceFood < impatientThreshold;
+        currentState == TableState.WaitingForFood && currentPatienceFood < effectiveImpatientThreshold;
     public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder() => currentOrder;
 
     /// <summary>

@@ -733,7 +733,7 @@ MonoBehaviour:
   attachPoint: {fileID: 165193546466988380}
   sensorHighlight: {fileID: 1470700519073150386}
   allowAnyCategory: 1
-  allowedCategories: 0
+  allowedCategories: 4
   linkedCarryable: {fileID: 0}
   switchColliderLayerOnOccupy: 0
   targetCollider: {fileID: 0}
@@ -768,20 +768,20 @@ MonoBehaviour:
   - {fileID: 9209178088760980888}
   - {fileID: 3967406119785814008}
   - {fileID: 6784804405190949885}
-  maxPatienceOrder: 100
-  lossPerSecondOrder: 2
-  maxPatienceFood: 100
-  lossPerSecondFood: 2
-  servePatienceBonus: 60
-  maxPatienceCap: 100
-  impatientThreshold: 40
+  effectiveMaxPatienceOrder: 100
+  effectiveLossPerSecondOrder: 10
+  effectiveMaxPatienceFood: 100
+  effectiveLossPerSecondFood: 5
+  effectiveServePatienceBonus: 60
+  effectivePatienceCap: 100
+  effectiveImpatientThreshold: 40
   currentPatienceOrder: 0
   currentPatienceFood: 0
-  debugPatienceLeave: 0
-  minDishes: 3
+  debugLog: 0
   maxDishes: 6
   requiredOrderTime: 2
   currentCustomerCount: 1
+  currentMinDishes: 1
 --- !u!1 &4362147225365365236
 GameObject:
   m_ObjectHideFlags: 0

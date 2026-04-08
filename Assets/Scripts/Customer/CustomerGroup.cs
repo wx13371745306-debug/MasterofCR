@@ -8,7 +8,38 @@ public class CustomerGroup : MonoBehaviour
     [Header("Settings")]
     [Tooltip("单个顾客的预制体（必须挂有 CustomerAI 和 NavMeshAgent）")]
     public GameObject customerPrefab;
-    
+
+    [Header("Group Identity")]
+    [Tooltip("这队有多少人（1-4）")]
+    [Range(1, 4)]
+    public int groupSize = 2;
+
+    [Header("Order Settings")]
+    [Tooltip("这桌最少点几个菜")]
+    public int minDishes = 1;
+    [Tooltip("这桌最多点几个菜")]
+    public int maxDishes = 3;
+
+    [Header("Patience - 等待点菜阶段")]
+    [Tooltip("等待点菜阶段初始耐心")]
+    public float basePatienceOrder = 100f;
+    [Tooltip("等待点菜阶段每秒损失")]
+    public float baseLossPerSecondOrder = 10f;
+
+    [Header("Patience - 等待上菜阶段")]
+    [Tooltip("等上菜阶段初始耐心")]
+    public float basePatienceFood = 100f;
+    [Tooltip("等上菜阶段每秒损失")]
+    public float baseLossPerSecondFood = 5f;
+
+    [Header("Patience - 上菜后耐心回复")]
+    [Tooltip("任意菜品上桌后增加的耐心")]
+    public float baseServePatienceBonus = 60f;
+    [Tooltip("耐心值上限")]
+    public float basePatienceCap = 100f;
+    [Tooltip("低于此值时显示「不耐烦」图标（等上菜阶段）")]
+    public float baseImpatientThreshold = 40f;
+
     [Header("Debug")]
     public bool debugLog = true;
 
@@ -25,22 +56,21 @@ public class CustomerGroup : MonoBehaviour
     private readonly List<CustomerAI> memberAis = new List<CustomerAI>();
 
     /// <summary>
-    /// 初始化并生成队伍
+    /// 初始化并生成队伍。groupSize 直接从预制体自身字段读取。
     /// </summary>
-    /// <param name="size">这队有多少人</param>
     /// <param name="table">他们要去的桌子</param>
     /// <param name="spawnPoint">出生点</param>
     /// <param name="exitPoint">消失点（可为空，则离场时在原地销毁）</param>
-    public void InitGroup(int size, OrderResponse table, Transform spawnPoint, Transform exitPoint = null)
+    public void InitGroup(OrderResponse table, Transform spawnPoint, Transform exitPoint = null)
     {
-        totalMembers = size;
+        totalMembers = groupSize;
         assignedTable = table;
         customerExitPoint = exitPoint;
 
-        if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> 成功组建 {size} 人小队，目标桌号: {table.tableId}");
+        if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> 成功组建 {groupSize} 人小队，目标桌号: {table.tableId}");
 
         // 防止生成的数量超过桌子的椅子数量
-        int actualSpawnCount = Mathf.Min(size, table.chairs.Count);
+        int actualSpawnCount = Mathf.Min(groupSize, table.chairs.Count);
 
         for (int i = 0; i < actualSpawnCount; i++)
         {
@@ -61,6 +91,8 @@ public class CustomerGroup : MonoBehaviour
             }
         }
 
+        // 注入耐心与点菜配置给桌子
+        table.ApplyGroupConfig(this);
         table.RegisterCustomerGroup(this);
         ActiveGroupCount++;
 

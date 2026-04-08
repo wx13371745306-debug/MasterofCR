@@ -3,7 +3,7 @@ using UnityEngine;
 public class InteractableHighlight : MonoBehaviour
 {
     public GameObject highlightObject;
-    public bool debugLog = true;
+    public bool debugLog = false;
 
     void Awake()
     {

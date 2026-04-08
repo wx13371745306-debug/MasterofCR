@@ -61,6 +61,8 @@ MonoBehaviour:
   isPickable: 1
   useHighlightObject: {fileID: 0}
   disableCollidersOnAttach: 1
+  leftHandGrip: {fileID: 0}
+  rightHandGrip: {fileID: 0}
   debugLog: 1
 --- !u!114 &1708343872688826049
 MonoBehaviour:
@@ -145,15 +147,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.2
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.2
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.2
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.x
@@ -260,7 +262,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
   highlightObject: {fileID: 1099817145318214951}
-  debugLog: 1
+  debugLog: 0
 --- !u!1001 &6446894152795948988
 PrefabInstance:
   m_ObjectHideFlags: 0

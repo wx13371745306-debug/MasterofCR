@@ -198,6 +198,8 @@ MonoBehaviour:
   isPickable: 1
   useHighlightObject: {fileID: 0}
   disableCollidersOnAttach: 0
+  leftHandGrip: {fileID: 0}
+  rightHandGrip: {fileID: 0}
   debugLog: 1
 --- !u!114 &2943789578518126812
 MonoBehaviour:
@@ -244,7 +246,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.731
+      value: 0.218
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z
@@ -436,7 +438,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.693
+      value: 0.192
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z
@@ -566,7 +568,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.65300006
+      value: 0.258
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_LocalPosition.z

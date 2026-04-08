@@ -80,8 +80,17 @@ public class CustomerSpawner : MonoBehaviour
         WaveData nextWave = currentLevelConfig.waves[currentWaveIndex];
         if (levelTimer >= nextWave.spawnTime)
         {
+            if (nextWave.groupPrefab == null)
+            {
+                Debug.LogError("<color=#FF0000>[Spawner]</color> 这波的 groupPrefab 没有配置！");
+                currentWaveIndex++;
+                return;
+            }
+
+            int requiredSeats = nextWave.groupPrefab.groupSize;
+
             // 尝试找一张合适的空桌子
-            OrderResponse freeTable = FindAvailableTable(nextWave.groupSize);
+            OrderResponse freeTable = FindAvailableTable(requiredSeats);
 
             if (freeTable != null)
             {
@@ -91,7 +100,6 @@ public class CustomerSpawner : MonoBehaviour
             else
             {
                 // 如果没有空桌子，它会卡在这里等待，直到下一帧再找（相当于排队机制）
-                // 你也可以在这里做个提示，比如 "餐厅已满，顾客正在等待..."
             }
         }
     }
@@ -116,29 +124,19 @@ public class CustomerSpawner : MonoBehaviour
     /// </summary>
     private void SpawnGroup(WaveData wave, OrderResponse targetTable)
     {
-        if (wave.groupPrefab == null)
-        {
-            Debug.LogError("<color=#FF0000>[Spawner]</color> 这波的 groupPrefab 没有配置！");
-            return;
-        }
-
         // 【新增这一行】：经理一拍板，这桌立刻打上预定标记！别人抢不走了！
         targetTable.isReserved = true;
 
-        // 1. 动态覆写这桌的点餐范围（把 SO 里的数据传给桌子）
-        targetTable.minDishes = wave.minDishes;
-        targetTable.maxDishes = wave.maxDishes;
-        targetTable.currentCustomerCount = wave.groupSize;
-
-        // 2. 生成小队
+        // 生成小队（耐心与点菜参数由 CustomerGroup.InitGroup 内部注入桌子）
         CustomerGroup newGroup = Instantiate(wave.groupPrefab, spawnPoint.position, Quaternion.identity);
         
-        // 3. 初始化（寻路会自动开始）
-        newGroup.InitGroup(wave.groupSize, targetTable, spawnPoint, customerExitPoint);
+        // 初始化（寻路会自动开始）
+        newGroup.InitGroup(targetTable, spawnPoint, customerExitPoint);
 
         if (debugLog)
         {
-            Debug.Log($"<color=#00FFFF>[Spawner]</color> 游戏时间 {levelTimer:F1}s: 生成了 {wave.groupSize} 人小队，分配到桌号 {targetTable.tableId}。点餐范围: {wave.minDishes}-{wave.maxDishes}。");
+            Debug.Log($"<color=#00FFFF>[Spawner]</color> 游戏时间 {levelTimer:F1}s: 生成了 {wave.groupPrefab.groupSize} 人小队，分配到桌号 {targetTable.tableId}。" +
+                $"点餐范围: {wave.groupPrefab.minDishes}-{wave.groupPrefab.maxDishes}。");
             if (customerExitPoint == null)
                 Debug.LogWarning("[Spawner][PatienceLeave] customerExitPoint 未设置：耐心耗尽时顾客会原地销毁而不会走向消失点。");
         }

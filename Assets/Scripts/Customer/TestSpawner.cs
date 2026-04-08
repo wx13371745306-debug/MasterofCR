@@ -8,10 +8,11 @@ public class TestSpawner : MonoBehaviour
     [Tooltip("与 CustomerSpawner.customerExitPoint 一致，耐心离场目标；可空")]
     public Transform customerExitPoint;
 
-    [ContextMenu("测试：生成一波2人顾客")]
+    [ContextMenu("测试：生成一波顾客")]
     public void SpawnTest()
     {
+        targetTable.isReserved = true;
         CustomerGroup group = Instantiate(groupPrefab);
-        group.InitGroup(2, targetTable, spawnPoint, customerExitPoint); // 生成2个人
+        group.InitGroup(targetTable, spawnPoint, customerExitPoint); // groupSize 由预制体自身定义
     }
 }

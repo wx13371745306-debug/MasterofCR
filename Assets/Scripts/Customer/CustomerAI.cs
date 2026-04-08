@@ -22,7 +22,7 @@ public class CustomerAI : MonoBehaviour
     public float arrivalRadius = 1.0f;
 
     [Header("Debug")]
-    public bool debugLog = true;
+    public bool debugLog = false;
 
     private Transform targetChair;
     private Action onSeatedCallback; 

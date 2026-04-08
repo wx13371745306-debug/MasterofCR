@@ -14,6 +14,23 @@ public class GlobalOrderManager : MonoBehaviour
     [Header("饮料菜谱（供各桌自动获取）")]
     public DrinkRecipeDatabase drinkRecipeDatabase;
 
+    [Header("全局耐心修正 (乘数，1.0 = 不修改)")]
+    [Tooltip("所有顾客的初始耐心值乘数")]
+    public float globalPatienceMultiplier = 1.0f;
+    [Tooltip("所有顾客的耐心衰减速度乘数（>1 更快衰减，<1 更慢衰减）")]
+    public float globalPatienceLossMultiplier = 1.0f;
+    [Tooltip("上菜后回复耐心的乘数")]
+    public float globalServeBonusMultiplier = 1.0f;
+
+    [Header("全局耐心修正 (加算，在乘数结果基础上再加)")]
+    [Tooltip("所有顾客的初始耐心值附加值")]
+    public float globalPatienceAddon = 0f;
+    [Tooltip("所有顾客的耐心衰减速度附加值（正数 = 更快衰减）")]
+    public float globalPatienceLossAddon = 0f;
+
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("实时订单数据 (仅供观察)")]
     public List<OrderInstance> activeOrders = new List<OrderInstance>();
 
@@ -31,6 +48,65 @@ public class GlobalOrderManager : MonoBehaviour
             return;
         }
         Instance = this;
+    }
+
+    // ================== 【全局耐心修正系统】 ==================
+
+    /// <summary>
+    /// 耐心修正器数据结构。用于在 CustomerGroup 基础值上施加全局影响。
+    /// 最终计算公式：最终值 = 基础值 × multiplier + addon
+    /// </summary>
+    public struct PatienceModifiers
+    {
+        public float patienceMultiplier;      // 乘在耐心初始值上
+        public float patienceLossMultiplier;  // 乘在耐心衰减速度上
+        public float serveBonusMultiplier;    // 乘在上菜回复量上
+        public float patienceAddon;           // 在乘积结果上再加（耐心初始值）
+        public float patienceLossAddon;       // 在乘积结果上再加（衰减速度）
+
+        /// <summary>默认无修正（1.0倍 + 0加算）</summary>
+        public static PatienceModifiers Default => new PatienceModifiers
+        {
+            patienceMultiplier = 1f,
+            patienceLossMultiplier = 1f,
+            serveBonusMultiplier = 1f,
+            patienceAddon = 0f,
+            patienceLossAddon = 0f
+        };
+    }
+
+    /// <summary>
+    /// 获取当前生效的全局耐心修正值（整合羁绊、天赋等效果）。
+    /// OrderResponse 在接收顾客数据时调用此方法。
+    /// </summary>
+    public PatienceModifiers GetCurrentModifiers()
+    {
+        var mods = new PatienceModifiers
+        {
+            patienceMultiplier = globalPatienceMultiplier,
+            patienceLossMultiplier = globalPatienceLossMultiplier,
+            serveBonusMultiplier = globalServeBonusMultiplier,
+            patienceAddon = globalPatienceAddon,
+            patienceLossAddon = globalPatienceLossAddon
+        };
+
+        // 整合羁绊效果
+        bool bridgeOk = BondRuntimeBridge.Instance != null && BondRuntimeBridge.Instance.State != null;
+
+        // 家常羁绊：等菜阶段耐心衰减速度降低 20%（乘以 0.8）
+        if (bridgeOk && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.HomeCooking))
+        {
+            mods.patienceLossMultiplier *= 0.8f;
+            if (debugLog) Debug.Log($"[GlobalOrderManager] 家常羁绊生效：patienceLossMultiplier 修正为 {mods.patienceLossMultiplier:F2}");
+        }
+
+        // 未来可在此处添加更多羁绊/天赋/道具效果：
+        // if (bridgeOk && BondRuntimeBridge.Instance.State.IsActive(RecipeBondTag.XXX))
+        // {
+        //     mods.patienceMultiplier *= 1.2f;  // 示例
+        // }
+
+        return mods;
     }
 
     /// <summary>

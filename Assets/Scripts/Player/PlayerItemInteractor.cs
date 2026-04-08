@@ -184,6 +184,15 @@ public class PlayerItemInteractor : MonoBehaviour
                 return true;
             }
         }
+        else if (currentStation is OrderResponse orderResponse)
+        {
+            if (orderResponse.currentState == OrderResponse.TableState.WaitingForCleanup && orderResponse.CanInteract(this))
+            {
+                orderResponse.BeginInteract(this);
+                if (debugLog) Debug.Log($"<color=#FFA500>[大脑 拿取]</color> 按下J从餐桌 {orderResponse.name} 端起脏盘子");
+                return true;
+            }
+        }
 
         CarryableItem target = sensor.GetCurrentItem();
 

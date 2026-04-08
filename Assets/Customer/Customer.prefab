@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 621341453152694603}
   - component: {fileID: 6340687636778815559}
   - component: {fileID: 2806169311004827048}
-  m_Layer: 0
+  m_Layer: 13
   m_Name: Customer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -95,7 +95,7 @@ GameObject:
   - component: {fileID: 905466599380269261}
   - component: {fileID: 3219839867069564274}
   - component: {fileID: 4332655182205527415}
-  m_Layer: 0
+  m_Layer: 13
   m_Name: CustomerModel
   m_TagString: Untagged
   m_Icon: {fileID: 0}

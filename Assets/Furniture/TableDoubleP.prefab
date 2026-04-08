@@ -461,7 +461,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OrderResponse
   highlightObject: {fileID: 4371683078423672106}
-  debugLog: 0
+  debugLog: 1
   itemPlacePoint: {fileID: 3236824763287161460}
   dishPlaceSystem: {fileID: 7479316593837386389}
   orderGenerator: {fileID: 0}
@@ -486,6 +486,7 @@ MonoBehaviour:
   impatientThreshold: 40
   currentPatienceOrder: 0
   currentPatienceFood: 0
+  debugLog: 0
   debugPatienceLeave: 0
   minDishes: 1
   maxDishes: 2
