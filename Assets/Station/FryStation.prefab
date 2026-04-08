@@ -53,6 +53,9 @@ MonoBehaviour:
   sensorHighlight: {fileID: 6080675433213093044}
   allowAnyCategory: 1
   allowedCategories: -1
+  linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!114 &3159313210947883911
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -269,6 +272,9 @@ MonoBehaviour:
   sensorHighlight: {fileID: 5887164243761663021}
   allowAnyCategory: 1
   allowedCategories: -1
+  linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!114 &2722990609700297110
 MonoBehaviour:
   m_ObjectHideFlags: 0

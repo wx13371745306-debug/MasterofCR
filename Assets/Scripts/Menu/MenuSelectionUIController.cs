@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class MenuSelectionUIController : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("Data")]
     public MenuSO menuSO;
 
@@ -42,7 +45,7 @@ public class MenuSelectionUIController : MonoBehaviour
 
     public void Open()
     {
-        Debug.Log($"[MenuSelection] Open() 被调用 | selectionPanelRoot={(selectionPanelRoot != null ? selectionPanelRoot.name : "NULL")}");
+        if (debugLog) Debug.Log($"[MenuSelection] Open() 被调用 | selectionPanelRoot={(selectionPanelRoot != null ? selectionPanelRoot.name : "NULL")}");
         if (selectionPanelRoot == null)
         {
             Debug.LogWarning("[MenuSelection] selectionPanelRoot 未赋值，无法打开面板！");
@@ -51,14 +54,14 @@ public class MenuSelectionUIController : MonoBehaviour
 
         RestoreFromMenuSO();
         selectionPanelRoot.SetActive(true);
-        Debug.Log("[MenuSelection] 面板已激活，开始构建菜谱列表");
+        if (debugLog) Debug.Log("[MenuSelection] 面板已激活，开始构建菜谱列表");
         RebuildRecipeGrid();
         RebuildSelectedList();
     }
 
     public void Close()
     {
-        Debug.Log("[MenuSelection] Close() 被调用");
+        if (debugLog) Debug.Log("[MenuSelection] Close() 被调用");
         if (selectionPanelRoot == null) return;
         selectionPanelRoot.SetActive(false);
         OnPanelClosed?.Invoke();
@@ -71,11 +74,11 @@ public class MenuSelectionUIController : MonoBehaviour
         if (!selected.Remove(recipe))
         {
             selected.Add(recipe);
-            Debug.Log($"[MenuSelection] 选中菜谱: '{recipe.recipeName}' | 当前已选: {selected.Count}");
+            if (debugLog) Debug.Log($"[MenuSelection] 选中菜谱: '{recipe.recipeName}' | 当前已选: {selected.Count}");
         }
         else
         {
-            Debug.Log($"[MenuSelection] 取消选中: '{recipe.recipeName}' | 当前已选: {selected.Count}");
+            if (debugLog) Debug.Log($"[MenuSelection] 取消选中: '{recipe.recipeName}' | 当前已选: {selected.Count}");
         }
 
         RebuildRecipeGrid();
@@ -88,9 +91,11 @@ public class MenuSelectionUIController : MonoBehaviour
         return recipe != null && selected.Contains(recipe);
     }
 
+    public static event Action OnMenuConfirmed;
+
     public void OnConfirmClicked()
     {
-        Debug.Log($"[MenuSelection] 确定按钮被点击 | menuSO={(menuSO != null ? menuSO.name : "NULL")} | 已选数量: {selected.Count}");
+        if (debugLog) Debug.Log($"[MenuSelection] 确定按钮被点击 | menuSO={(menuSO != null ? menuSO.name : "NULL")} | 已选数量: {selected.Count}");
         if (menuSO == null)
         {
             Debug.LogWarning("[MenuSelection] menuSO 未赋值，无法保存选择！");
@@ -103,21 +108,31 @@ public class MenuSelectionUIController : MonoBehaviour
             if (recipe != null)
                 menuSO.selectedRecipes.Add(recipe);
         }
-        Debug.Log($"[MenuSelection] 已将 {menuSO.selectedRecipes.Count} 道菜谱写入 MenuSO");
+        if (debugLog) Debug.Log($"[MenuSelection] 已将 {menuSO.selectedRecipes.Count} 道菜谱写入 MenuSO");
 
         RefreshBonds();
+
+        // 【新增：如果运行中调用这】为了在游戏进行中也能读取，强制 RuntimeBridge 重计羁绊
+        if (BondRuntimeBridge.Instance != null)
+        {
+            BondRuntimeBridge.Instance.Refresh();
+        }
+
+        // 通知别的 UI （比如 HUD）
+        OnMenuConfirmed?.Invoke();
+
         Close();
     }
 
     public void OnCloseClicked()
     {
-        Debug.Log("[MenuSelection] 关闭按钮被点击");
+        if (debugLog) Debug.Log("[MenuSelection] 关闭按钮被点击");
         Close();
     }
 
     public void OpenTutorial(FryRecipeDatabase.FryRecipe recipe)
     {
-        Debug.Log($"[MenuSelection] 打开制作方法: '{recipe?.recipeName ?? "NULL"}' | tutorialPanel={(tutorialPanel != null ? "已赋值" : "NULL")}");
+        if (debugLog) Debug.Log($"[MenuSelection] 打开制作方法: '{recipe?.recipeName ?? "NULL"}' | tutorialPanel={(tutorialPanel != null ? "已赋值" : "NULL")}");
         if (tutorialPanel != null)
             tutorialPanel.Open(recipe);
     }
@@ -136,7 +151,7 @@ public class MenuSelectionUIController : MonoBehaviour
             if (r != null)
                 selected.Add(r);
         }
-        Debug.Log($"[MenuSelection] 从 MenuSO 恢复了 {selected.Count} 道已选菜谱");
+        if (debugLog) Debug.Log($"[MenuSelection] 从 MenuSO 恢复了 {selected.Count} 道已选菜谱");
     }
 
     void RebuildRecipeGrid()
@@ -155,7 +170,7 @@ public class MenuSelectionUIController : MonoBehaviour
         for (int i = recipeCardContainer.childCount - 1; i >= 0; i--)
             Destroy(recipeCardContainer.GetChild(i).gameObject);
 
-        Debug.Log($"[MenuSelection] recipeSources 槽位数量: {recipeSources.Count}");
+        if (debugLog) Debug.Log($"[MenuSelection] recipeSources 槽位数量: {recipeSources.Count}");
         int totalCards = 0;
 
         foreach (var source in recipeSources)
@@ -173,7 +188,7 @@ public class MenuSelectionUIController : MonoBehaviour
             }
 
             var unlocked = provider.GetUnlockedRecipes();
-            Debug.Log($"[MenuSelection] 数据源 '{source.name}' (分类: {provider.CategoryName}): 共 {unlocked.Count} 道已解锁菜谱");
+            if (debugLog) Debug.Log($"[MenuSelection] 数据源 '{source.name}' (分类: {provider.CategoryName}): 共 {unlocked.Count} 道已解锁菜谱");
 
             foreach (var recipe in unlocked)
             {
@@ -189,7 +204,7 @@ public class MenuSelectionUIController : MonoBehaviour
                 totalCards++;
             }
         }
-        Debug.Log($"[MenuSelection] 菜谱 Grid 构建完成，共生成 {totalCards} 张卡片");
+        if (debugLog) Debug.Log($"[MenuSelection] 菜谱 Grid 构建完成，共生成 {totalCards} 张卡片");
     }
 
     void RebuildSelectedList()
@@ -220,19 +235,19 @@ public class MenuSelectionUIController : MonoBehaviour
             else
                 Debug.LogWarning($"[MenuSelection] selectedItemPrefab 上没有找到 MenuSelectedItemView 脚本！");
         }
-        Debug.Log($"[MenuSelection] 已选列表刷新完成，共 {selected.Count} 项");
+        if (debugLog) Debug.Log($"[MenuSelection] 已选列表刷新完成，共 {selected.Count} 项");
     }
 
     void RefreshBonds()
     {
-        Debug.Log($"[MenuSelection] RefreshBonds | bondState={(bondState != null ? bondState.name : "NULL")} | bondListUI={(bondListUI != null ? "已赋值" : "NULL")} | 当前已选: {selected.Count}");
+        if (debugLog) Debug.Log($"[MenuSelection] RefreshBonds | bondState={(bondState != null ? bondState.name : "NULL")} | bondListUI={(bondListUI != null ? "已赋值" : "NULL")} | 当前已选: {selected.Count}");
         if (bondState != null)
         {
             bondState.RefreshFromRecipes(selected);
             var active = bondState.GetActiveBonds();
-            Debug.Log($"[MenuSelection] 羁绊刷新完成，激活数量: {active.Count}");
+            if (debugLog) Debug.Log($"[MenuSelection] 羁绊刷新完成，激活数量: {active.Count}");
             foreach (var b in active)
-                Debug.Log($"[MenuSelection]   已激活: '{b.displayName}' (tag={b.tag})");
+                if (debugLog) Debug.Log($"[MenuSelection]   已激活: '{b.displayName}' (tag={b.tag})");
         }
         else
         {

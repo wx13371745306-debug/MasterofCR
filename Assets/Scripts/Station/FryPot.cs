@@ -24,6 +24,9 @@ public class FryPot : MonoBehaviour
     [Header("Debug")]
     public bool debugLog = true;
 
+    [Header("UI")]
+    public TableOrderProgressUI progressUI;
+
     private readonly Dictionary<string, int> materials = new Dictionary<string, int>(System.StringComparer.Ordinal);
     private FryRecipeDatabase.FryRecipe finishedRecipe;
 

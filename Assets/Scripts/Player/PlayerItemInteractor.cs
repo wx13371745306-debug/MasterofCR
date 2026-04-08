@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Mirror;
 
 public class PlayerItemInteractor : MonoBehaviour
 {
@@ -246,7 +247,17 @@ public class PlayerItemInteractor : MonoBehaviour
             return false; // 如果堆空了就失败
         }
 
-        // 正常长按整锅端、或者不是堆的普通物体
+        // 网络隔离改造 (Step 4)：判断是否有主控干涉
+        PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
+        if (networkController != null && NetworkClient.active)
+        {
+            // 走权威服务器判决，本地先按兵不动，等待 Rpc 确认后赋值 heldItem
+            networkController.CmdRequestPickUp(target.gameObject, isLongPress);
+            if (debugLog) Debug.Log($"<color=#00FFFF>[大脑 拿取]</color> 发起网络拾取请求: {target.name}");
+            return true; 
+        }
+
+        // 正常单机长按整锅端、或者不是堆的普通物体
         target.BeginHold(holdPoint);
         heldItem = target;
 

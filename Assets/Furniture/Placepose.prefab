@@ -194,6 +194,9 @@ MonoBehaviour:
   sensorHighlight: {fileID: 6644095070132768057}
   allowAnyCategory: 1
   allowedCategories: 0
+  linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!1001 &6655344940494126287
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -43,6 +43,8 @@ GameObject:
   - component: {fileID: 4428252706592054150}
   - component: {fileID: 4430841268297836081}
   - component: {fileID: 8922402952605187616}
+  - component: {fileID: -6933164918407903787}
+  - component: {fileID: 8368168221770015108}
   m_Layer: 3
   m_Name: DirtyPlateStack
   m_TagString: Untagged
@@ -110,6 +112,9 @@ MonoBehaviour:
   isUsable: 0
   isPickable: 0
   useHighlightObject: {fileID: 0}
+  disableCollidersOnAttach: 1
+  leftHandGrip: {fileID: 0}
+  rightHandGrip: {fileID: 0}
   debugLog: 1
   plateCount: 1
   singlePlatePrefab: {fileID: 2333114217492066870, guid: 49cebbdedb4494b4cb6ed420cf96d610, type: 3}
@@ -144,6 +149,57 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &-6933164918407903787
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5513709124239720902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror::Mirror.NetworkIdentity
+  sceneId: 0
+  _assetId: 1860709837
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
+--- !u!114 &8368168221770015108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5513709124239720902}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ff3ba0becae47b8b9381191598957c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror.Components::Mirror.NetworkTransformReliable
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  target: {fileID: 4467037907924850336}
+  syncPosition: 1
+  syncRotation: 1
+  syncScale: 0
+  onlySyncOnChange: 1
+  compressRotation: 1
+  interpolatePosition: 1
+  interpolateRotation: 1
+  interpolateScale: 1
+  coordinateSpace: 0
+  timelineOffset: 1
+  showGizmos: 0
+  showOverlay: 0
+  overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
+  onlySyncOnChangeCorrectionMultiplier: 2
+  useFixedUpdate: 0
+  rotationSensitivity: 0.01
+  positionPrecision: 0.01
+  scalePrecision: 0.01
 --- !u!1001 &8278167413426477142
 PrefabInstance:
   m_ObjectHideFlags: 0

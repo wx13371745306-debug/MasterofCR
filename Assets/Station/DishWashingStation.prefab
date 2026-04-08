@@ -112,6 +112,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1087020844740678282}
+  - component: {fileID: 1471052445983113737}
   m_Layer: 0
   m_Name: DishWashingStation
   m_TagString: Untagged
@@ -138,6 +139,23 @@ Transform:
   - {fileID: 9072217381202005595}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1471052445983113737
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 714645503525379135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror::Mirror.NetworkIdentity
+  sceneId: 0
+  _assetId: 1723598906
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
 --- !u!1 &1576384315693075694
 GameObject:
   m_ObjectHideFlags: 0
@@ -299,6 +317,9 @@ MonoBehaviour:
   sensorHighlight: {fileID: 2589874351972949414}
   allowAnyCategory: 1
   allowedCategories: 0
+  linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!1 &3255108904803207307
 GameObject:
   m_ObjectHideFlags: 0
@@ -467,6 +488,7 @@ MonoBehaviour:
   outputPlacePoint: {fileID: 4901951297686218732}
   cleanPlatePrefab: {fileID: 8858006345147724, guid: 263f8c0af825b024b87bcf60534760e8, type: 3}
   initialCleanPlates: 10
+  baseProcessingSpeed: 1
   requiredWashTimePerPlate: 2
   dirtyPlatesInSink: 0
   currentWashProgress: 0
@@ -784,6 +806,9 @@ MonoBehaviour:
   sensorHighlight: {fileID: 3547311802078384470}
   allowAnyCategory: 1
   allowedCategories: 64
+  linkedCarryable: {fileID: 0}
+  switchColliderLayerOnOccupy: 0
+  targetCollider: {fileID: 0}
 --- !u!65 &7082302347786480457
 BoxCollider:
   m_ObjectHideFlags: 0

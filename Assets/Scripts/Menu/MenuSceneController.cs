@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class MenuSceneController : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("Data")]
     public MenuSO menuSO;
     [Tooltip("羁绊状态 SO，进入主菜单时重置")]
@@ -33,12 +36,12 @@ public class MenuSceneController : MonoBehaviour
         if (menuSO != null)
         {
             menuSO.Clear();
-            Debug.Log("[MenuScene] MenuSO 已重置为空");
+            if (debugLog) Debug.Log("[MenuScene] MenuSO 已重置为空");
         }
         if (bondState != null)
         {
             bondState.ResetAll();
-            Debug.Log("[MenuScene] BondActivationStateSO 已重置为全部未激活");
+            if (debugLog) Debug.Log("[MenuScene] BondActivationStateSO 已重置为全部未激活");
         }
         RefreshMainBondUI();
 
@@ -54,13 +57,13 @@ public class MenuSceneController : MonoBehaviour
 
     void OnSelectionPanelClosed()
     {
-        Debug.Log("[MenuScene] 选菜面板关闭，刷新主界面羁绊显示");
+        if (debugLog) Debug.Log("[MenuScene] 选菜面板关闭，刷新主界面羁绊显示");
         RefreshMainBondUI();
     }
 
     public void OnSelectMenuClicked()
     {
-        Debug.Log($"[MenuScene] 选菜按钮被点击 | menuSelectionUI={(menuSelectionUI != null ? menuSelectionUI.name : "NULL")}");
+        if (debugLog) Debug.Log($"[MenuScene] 选菜按钮被点击 | menuSelectionUI={(menuSelectionUI != null ? menuSelectionUI.name : "NULL")}");
         if (menuSelectionUI != null)
             menuSelectionUI.Open();
         else
@@ -70,7 +73,7 @@ public class MenuSceneController : MonoBehaviour
 
     public void OnStartGameClicked()
     {
-        Debug.Log($"[MenuScene] 开始游戏按钮被点击 | menuSO={(menuSO != null ? menuSO.name : "NULL")}");
+        if (debugLog) Debug.Log($"[MenuScene] 开始游戏按钮被点击 | menuSO={(menuSO != null ? menuSO.name : "NULL")}");
         if (menuSO == null)
         {
             ShowError("未配置 MenuSO");
@@ -78,14 +81,14 @@ public class MenuSceneController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[MenuScene] 当前已选菜谱数: {menuSO.selectedRecipes.Count}, 最低要求: {minRecipes}");
+        if (debugLog) Debug.Log($"[MenuScene] 当前已选菜谱数: {menuSO.selectedRecipes.Count}, 最低要求: {minRecipes}");
         if (menuSO.selectedRecipes.Count < minRecipes)
         {
             ShowError($"请至少选择 {minRecipes} 道菜谱后再开始游戏");
             return;
         }
 
-        Debug.Log($"[MenuScene] 验证通过，正在加载场景: {gameSceneName}");
+        if (debugLog) Debug.Log($"[MenuScene] 验证通过，正在加载场景: {gameSceneName}");
         SceneManager.LoadScene(gameSceneName);
     }
 

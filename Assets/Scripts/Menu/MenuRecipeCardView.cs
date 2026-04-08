@@ -4,6 +4,9 @@ using UnityEngine.UI;
 
 public class MenuRecipeCardView : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private Image iconImage;
@@ -33,14 +36,14 @@ public class MenuRecipeCardView : MonoBehaviour
             priceText.text = $"${recipe.price}";
 
         bool isSelected = controller != null && controller.IsSelected(recipe);
-        Debug.Log($"[MenuCard] Setup: '{recipe.GetDisplayName()}' | 价格={recipe.price} | 图标={(recipe.dishIcon != null ? "有" : "无")} | 已选={isSelected}");
+        if (debugLog) Debug.Log($"[MenuCard] Setup: '{recipe.GetDisplayName()}' | 价格={recipe.price} | 图标={(recipe.dishIcon != null ? "有" : "无")} | 已选={isSelected}");
 
         RefreshSelectedVisual();
     }
 
     public void OnCardClicked()
     {
-        Debug.Log($"[MenuCard] 卡片被点击: '{recipe?.recipeName ?? "NULL"}' | controller={(controller != null ? "有" : "NULL")}");
+        if (debugLog) Debug.Log($"[MenuCard] 卡片被点击: '{recipe?.recipeName ?? "NULL"}' | controller={(controller != null ? "有" : "NULL")}");
         if (controller != null && recipe != null)
             controller.ToggleRecipe(recipe);
         else
@@ -49,7 +52,7 @@ public class MenuRecipeCardView : MonoBehaviour
 
     public void OnTutorialClicked()
     {
-        Debug.Log($"[MenuCard] 制作方法按钮被点击: '{recipe?.recipeName ?? "NULL"}'");
+        if (debugLog) Debug.Log($"[MenuCard] 制作方法按钮被点击: '{recipe?.recipeName ?? "NULL"}'");
         if (controller != null && recipe != null)
             controller.OpenTutorial(recipe);
     }

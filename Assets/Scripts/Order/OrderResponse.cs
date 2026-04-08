@@ -594,6 +594,7 @@ public class OrderResponse : BaseStation
         
         // 【新增】：客人吃完走人，桌子解开预定锁
         isReserved = false;
+        isAbandoningPatience = false;
 
         currentPatienceOrder = effectiveMaxPatienceOrder;
         currentPatienceFood = effectiveMaxPatienceFood;
@@ -649,47 +650,93 @@ public class OrderResponse : BaseStation
             StopCoroutine(eatRoutine);
             eatRoutine = null;
         }
+        if (readingMenuCoroutine != null)
+        {
+            StopCoroutine(readingMenuCoroutine);
+            readingMenuCoroutine = null;
+        }
 
         if (GlobalOrderManager.Instance != null)
             GlobalOrderManager.Instance.RemoveAllOrdersForTable(tableId);
 
-        if (dishPlaceSystem != null)
-            dishPlaceSystem.ClearAllDishes();
-
-        foreach (var model in activeEatenModels)
+        if (dishesOnTable.Count > 0)
         {
-            if (model != null) Destroy(model);
-        }
-        activeEatenModels.Clear();
+            // 有已经上的菜，转为脏盘子并进入 WaitingForCleanup
+            int dirtyCount = 0;
+            foreach (var d in dishesOnTable)
+            {
+                if (d.physicalItem == null) continue;
+                if (d.recipe != null && d.recipe.size == DishSize.D) continue; // 饮料吸收不留脏杯
+                
+                dirtyCount++;
+                Vector3 pos = d.physicalItem.transform.position;
+                Quaternion rot = d.physicalItem.transform.rotation;
 
-        dishesOnTable.Clear();
-        currentOrder.Clear();
+                if (d.recipe != null && d.recipe.eatenPrefab != null)
+                {
+                    GameObject cleanEatenVisual = Instantiate(d.recipe.eatenPrefab, pos, rot, this.transform);
+                    activeEatenModels.Add(cleanEatenVisual);
+                }
+            }
 
-        if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
-        {
-            var occ = itemPlacePoint.CurrentItem;
-            itemPlacePoint.ClearOccupant();
-            if (occ != null) Destroy(occ.gameObject);
-        }
-
-        isInteracting = false;
-        currentOrderProgress = 0f;
-        currentEatTime = 0f;
-        currentPatienceOrder = effectiveMaxPatienceOrder;
-        currentPatienceFood = effectiveMaxPatienceFood;
-
-        currentState = TableState.Empty;
-
-        if (boundGroup != null)
-        {
-            PatienceLeaveDbg("调用 CustomerGroup.BeginLeaveGroup()");
-            boundGroup.BeginLeaveGroup();
+            if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
+            dishesOnTable.Clear();
+            currentOrder.Clear();
+            
+            pendingDirtyPlatesCount = dirtyCount;
+            currentState = TableState.WaitingForCleanup;
+            
+            if (boundGroup != null)
+            {
+                PatienceLeaveDbg("带着脏盘子离场，调用 CustomerGroup.BeginLeaveGroup()");
+                boundGroup.BeginLeaveGroup();
+            }
+            
+            if (pendingDirtyPlatesCount == 0)
+            {
+                CleanUpTable(); // 如果全是饮料，没有留下真正需要收的盘子，就直接重置
+            }
         }
         else
         {
-            PatienceLeaveDbg("无 boundGroup，已直接 isReserved=false");
-            isReserved = false;
-            isAbandoningPatience = false;
+            if (dishPlaceSystem != null)
+                dishPlaceSystem.ClearAllDishes();
+
+            foreach (var model in activeEatenModels)
+            {
+                if (model != null) Destroy(model);
+            }
+            activeEatenModels.Clear();
+
+            dishesOnTable.Clear();
+            currentOrder.Clear();
+
+            if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
+            {
+                var occ = itemPlacePoint.CurrentItem;
+                itemPlacePoint.ClearOccupant();
+                if (occ != null) Destroy(occ.gameObject);
+            }
+
+            isInteracting = false;
+            currentOrderProgress = 0f;
+            currentEatTime = 0f;
+            currentPatienceOrder = effectiveMaxPatienceOrder;
+            currentPatienceFood = effectiveMaxPatienceFood;
+
+            currentState = TableState.Empty;
+
+            if (boundGroup != null)
+            {
+                PatienceLeaveDbg("没有留下菜，干干净净离场，调用 CustomerGroup.BeginLeaveGroup()");
+                boundGroup.BeginLeaveGroup();
+            }
+            else
+            {
+                PatienceLeaveDbg("无 boundGroup，已直接 isReserved=false");
+                isReserved = false;
+                isAbandoningPatience = false;
+            }
         }
     }
 

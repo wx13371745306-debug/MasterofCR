@@ -4,6 +4,9 @@ using UnityEngine.UI;
 
 public class MenuSelectedItemView : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("UI")]
     [SerializeField] private TextMeshProUGUI nameText;
     [SerializeField] private Image iconImage;
@@ -28,7 +31,7 @@ public class MenuSelectedItemView : MonoBehaviour
 
     public void OnRemoveClicked()
     {
-        Debug.Log($"[MenuSelected] 移除按钮被点击: '{recipe?.recipeName ?? "NULL"}'");
+        if (debugLog) Debug.Log($"[MenuSelected] 移除按钮被点击: '{recipe?.recipeName ?? "NULL"}'");
         if (controller != null && recipe != null)
             controller.ToggleRecipe(recipe);
         else

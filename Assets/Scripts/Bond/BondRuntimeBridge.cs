@@ -6,6 +6,9 @@ using UnityEngine;
 /// </summary>
 public class BondRuntimeBridge : MonoBehaviour
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     public static BondRuntimeBridge Instance { get; private set; }
 
     [Header("数据引用")]
@@ -23,7 +26,7 @@ public class BondRuntimeBridge : MonoBehaviour
             return;
         }
         Instance = this;
-        Debug.Log($"[BondBridge] Awake 初始化 | bondState={(bondState != null ? bondState.name : "NULL")} | menuSO={(menuSO != null ? menuSO.name : "NULL")}");
+        if (debugLog) Debug.Log($"[BondBridge] Awake 初始化 | bondState={(bondState != null ? bondState.name : "NULL")} | menuSO={(menuSO != null ? menuSO.name : "NULL")}");
         Refresh();
     }
 
@@ -41,14 +44,14 @@ public class BondRuntimeBridge : MonoBehaviour
         }
         else
         {
-            Debug.Log($"[BondBridge] Refresh 开始 | MenuSO 已选菜谱数: {menuSO.selectedRecipes.Count}");
+            if (debugLog) Debug.Log($"[BondBridge] Refresh 开始 | MenuSO 已选菜谱数: {menuSO.selectedRecipes.Count}");
         }
 
         bondState.RefreshFromMenu(menuSO);
 
         var activeBonds = bondState.GetActiveBonds();
-        Debug.Log($"[BondBridge] Refresh 完成，激活羁绊数: {activeBonds.Count}");
+        if (debugLog) Debug.Log($"[BondBridge] Refresh 完成，激活羁绊数: {activeBonds.Count}");
         foreach (var b in activeBonds)
-            Debug.Log($"[BondBridge]   已激活: '{b.displayName}' (tag={b.tag})");
+            if (debugLog) Debug.Log($"[BondBridge]   已激活: '{b.displayName}' (tag={b.tag})");
     }
 }

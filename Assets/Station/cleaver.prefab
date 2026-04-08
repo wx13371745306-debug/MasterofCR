@@ -72,9 +72,14 @@ MonoBehaviour:
   - {fileID: 8910556632008888063}
   poseConfig: {fileID: 5825720492997220860}
   sensorHighlight: {fileID: 5812548546889821707}
+  categories: 0
   initialPlacePoint: {fileID: 0}
   isUsable: 1
+  isPickable: 1
   useHighlightObject: {fileID: 7102876218944839722}
+  disableCollidersOnAttach: 1
+  leftHandGrip: {fileID: 0}
+  rightHandGrip: {fileID: 0}
   debugLog: 1
 --- !u!114 &5812548546889821707
 MonoBehaviour:

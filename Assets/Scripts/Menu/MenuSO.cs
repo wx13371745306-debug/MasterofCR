@@ -4,6 +4,9 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Menu", menuName = "Cooking/Menu")]
 public class MenuSO : ScriptableObject
 {
+    [Header("Debug")]
+    public bool debugLog = false;
+
     [Header("玩家选择的菜单")]
     public List<FryRecipeDatabase.FryRecipe> selectedRecipes = new List<FryRecipeDatabase.FryRecipe>();
 
