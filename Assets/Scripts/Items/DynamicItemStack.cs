@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
 public enum StackLayout
 {
@@ -103,8 +104,10 @@ public class DynamicItemStack : CarryableItem
 
         for (int i = 0; i < count; i++)
         {
-            // 在一个远离场景的位置实例化，避免瞬间的物理碰撞
             GameObject obj = Instantiate(itemPrefab, Vector3.one * -9999f, Quaternion.identity);
+            if (NetworkServer.active && obj.GetComponent<NetworkIdentity>() != null)
+                NetworkServer.Spawn(obj);
+
             CarryableItem item = obj.GetComponent<CarryableItem>();
             if (item != null)
             {
@@ -172,14 +175,16 @@ public class DynamicItemStack : CarryableItem
 
         item.transform.SetParent(visualRoot, false);
         
-        // 【修复抖动】彻底禁用 Rigidbody，而不是仅设置 isKinematic
         if (item.rb != null)
         {
+            if (!item.rb.isKinematic)
+            {
+                item.rb.linearVelocity = Vector3.zero;
+                item.rb.angularVelocity = Vector3.zero;
+            }
             item.rb.isKinematic = true;
             item.rb.useGravity = false;
-            item.rb.linearVelocity = Vector3.zero;
-            item.rb.angularVelocity = Vector3.zero;
-            item.rb.detectCollisions = false; // 彻底禁用碰撞检测
+            item.rb.detectCollisions = false;
         }
 
         // 关掉它的碰撞体

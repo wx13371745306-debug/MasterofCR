@@ -36,8 +36,10 @@ public class ShopDeliveryQueue : MonoBehaviour
         dayZeroPending.Clear();
     }
 
-    /// <summary>Day0 阶段下单：仅记账，第一天进入准备阶段时并入 pendingBatch，按准备阶段 5 秒规则交货。</summary>
-    public void EnqueueDayZeroCart(Dictionary<string, int> cart)
+    /// <summary>
+    /// Day0 或营业/打烊阶段下单：仅记账，下一次进入准备阶段时并入 pendingBatch，按准备阶段规则交货。
+    /// </summary>
+    public void EnqueueForNextPrep(Dictionary<string, int> cart)
     {
         if (cart == null) return;
         foreach (var kv in cart)
@@ -47,6 +49,9 @@ public class ShopDeliveryQueue : MonoBehaviour
             dayZeroPending[kv.Key] = q + kv.Value;
         }
     }
+
+    /// <summary>向后兼容旧调用。</summary>
+    public void EnqueueDayZeroCart(Dictionary<string, int> cart) => EnqueueForNextPrep(cart);
 
     /// <summary>
     /// 由 DayCycleManager 在准备阶段调用：当经过 shopDeliveryDelay 秒时触发一次批次交货。

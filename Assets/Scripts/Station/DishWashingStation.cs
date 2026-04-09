@@ -129,6 +129,7 @@ public class DishWashingStation : BaseStation
         if (item == null) return;
 
         DirtyPlateStack dirtyStack = item as DirtyPlateStack;
+        DynamicItemStack dynamicStack = item as DynamicItemStack;
 
         if (dirtyStack != null)
         {
@@ -136,9 +137,21 @@ public class DishWashingStation : BaseStation
             inputDropPoint.ClearOccupant();
             Destroy(dirtyStack.gameObject);
         }
+        else if (dynamicStack != null && item.HasAnyCategory(ItemCategory.DirtyPlate))
+        {
+            int stackCount = dynamicStack.Count;
+            dirtyPlatesInSink += Mathf.Max(1, stackCount);
+            inputDropPoint.ClearOccupant();
+
+            foreach (var stackedItem in dynamicStack.GetItems())
+            {
+                if (stackedItem != null)
+                    Destroy(stackedItem.gameObject);
+            }
+            Destroy(dynamicStack.gameObject);
+        }
         else if (item.HasAnyCategory(ItemCategory.DirtyPlate)) 
         {
-            // 兼容单个脏盘子
             dirtyPlatesInSink += 1;
             inputDropPoint.ClearOccupant();
             Destroy(item.gameObject);
@@ -172,19 +185,27 @@ public class DishWashingStation : BaseStation
             if (count > 1)
             {
                 // [初始化调用] 需要直接捏一个完整的堆出来
-                int maxCap = (sp.layoutType == StackLayout.Grid) ? sp.gridColumns * sp.gridRows : sp.maxStackCount;
-                GameObject stackObj = Instantiate(sp.dynamicStackPrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
-                DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
+                if (Mirror.NetworkServer.active)
+                {
+                    int maxCap = (sp.layoutType == StackLayout.Grid) ? sp.gridColumns * sp.gridRows : sp.maxStackCount;
+                    GameObject stackObj = Instantiate(sp.dynamicStackPrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
+                    Mirror.NetworkServer.Spawn(stackObj);
+                    DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
 
-                stack.InitializeFromPrefab(cleanPlatePrefab, count, maxCap, sp.layoutType, sp.stackYOffset, sp.gridColumns, sp.gridRows, sp.gridSpacing);
-                stack.ForcePlaceAtStart(outputPlacePoint);
+                    stack.InitializeFromPrefab(cleanPlatePrefab, count, maxCap, sp.layoutType, sp.stackYOffset, sp.gridColumns, sp.gridRows, sp.gridSpacing);
+                    stack.ForcePlaceAtStart(outputPlacePoint);
+                }
             }
             else
             {
                 // 洗完第一个盘子，出来是一个普通单盘被放在台上
-                GameObject obj = Instantiate(cleanPlatePrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
-                CarryableItem singlePlate = obj.GetComponent<CarryableItem>();
-                singlePlate.ForcePlaceAtStart(outputPlacePoint);
+                if (Mirror.NetworkServer.active)
+                {
+                    GameObject obj = Instantiate(cleanPlatePrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
+                    Mirror.NetworkServer.Spawn(obj);
+                    CarryableItem singlePlate = obj.GetComponent<CarryableItem>();
+                    singlePlate.ForcePlaceAtStart(outputPlacePoint);
+                }
             }
         }
         else
@@ -198,9 +219,13 @@ public class DishWashingStation : BaseStation
                     if (stack.IsFull) break;
 
                     // 在远处产卵避免物理异常
-                    GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-                    CarryableItem newPlate = obj.GetComponent<CarryableItem>();
-                    stack.PushItem(newPlate);
+                    if (Mirror.NetworkServer.active)
+                    {
+                        GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
+                        Mirror.NetworkServer.Spawn(obj);
+                        CarryableItem newPlate = obj.GetComponent<CarryableItem>();
+                        stack.PushItem(newPlate);
+                    }
                 }
             }
             else
@@ -214,9 +239,13 @@ public class DishWashingStation : BaseStation
                     // 此处通过实例化一个假盘子传给它进行合并，合并后俩东西都被吸扯进一个新堆
                     if (existProp != null && existProp.CanStackWith(cleanPlatePrefab.GetComponent<CarryableItem>()))
                     {
-                        GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-                        CarryableItem newPlate = obj.GetComponent<CarryableItem>();
-                        existProp.MergeIntoStack(newPlate, null);
+                        if (Mirror.NetworkServer.active)
+                        {
+                            GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
+                            Mirror.NetworkServer.Spawn(obj);
+                            CarryableItem newPlate = obj.GetComponent<CarryableItem>();
+                            existProp.MergeIntoStack(newPlate, null);
+                        }
                     }
                 }
             }

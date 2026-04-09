@@ -101,7 +101,17 @@ public class OrderResponse : BaseStation
         if (eatRoutine != null) StopCoroutine(eatRoutine);
     }
 
-    protected override void Awake() { base.Awake(); }
+    private static int autoTableIdCounter = 0;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        if (tableId <= 0)
+        {
+            tableId = ++autoTableIdCounter;
+            Debug.LogWarning($"[OrderResponse] 桌号未手动分配，自动赋值为 {tableId}（请在编辑器中使用 GlobalOrderManager 的「自动分配桌号」功能）");
+        }
+    }
 
     void Start()
     {
@@ -125,7 +135,17 @@ public class OrderResponse : BaseStation
         if (drinkRecipeDatabase == null && GlobalOrderManager.Instance != null)
             drinkRecipeDatabase = GlobalOrderManager.Instance.drinkRecipeDatabase;
 
-        currentState = TableState.Empty;
+        SetState(TableState.Empty);
+    }
+
+    void SetState(TableState newState)
+    {
+        currentState = newState;
+        if (itemPlacePoint != null)
+        {
+            bool allowServe = (newState == TableState.WaitingForFood || newState == TableState.Eating);
+            itemPlacePoint.externalLock = !allowServe;
+        }
     }
 
     // ================== 【耐心数据注入接口】 ==================
@@ -213,7 +233,7 @@ public class OrderResponse : BaseStation
         if (currentState != TableState.Empty) return;
 
         // 【修改点】：不再直接等待点单，而是进入看菜单状态
-        currentState = TableState.ReadingMenu;
+        SetState(TableState.ReadingMenu);
         if (readingMenuCoroutine != null)
             StopCoroutine(readingMenuCoroutine);
         readingMenuCoroutine = StartCoroutine(ReadingMenuRoutine());
@@ -227,7 +247,7 @@ public class OrderResponse : BaseStation
         yield return new WaitForSeconds(waitTime);
         readingMenuCoroutine = null;
 
-        currentState = TableState.WaitingToOrder;
+        SetState(TableState.WaitingToOrder);
         currentOrderProgress = 0f;
         currentPatienceOrder = effectiveMaxPatienceOrder;
         Debug.Log($"[OrderResponse] 桌号 {tableId} 顾客看完了，头顶亮起图标请求点单！");
@@ -246,7 +266,7 @@ public class OrderResponse : BaseStation
         if (currentState == TableState.WaitingToOrder)
         {
             if (debugLog) Debug.Log($"[OrderResponse] 玩家开始对桌号 {tableId} 点单交互");
-            currentState = TableState.Ordering; // 开始读条
+            SetState(TableState.Ordering);
         }
         else if (currentState == TableState.WaitingForCleanup)
         {
@@ -254,10 +274,10 @@ public class OrderResponse : BaseStation
             {
                 if (debugLog) Debug.Log($"[OrderResponse] 玩家端起桌号 {tableId} 的所有脏盘子 (数量: {pendingDirtyPlatesCount})");
                 
-                // 复用 dirtyPlateStackPrefab 中的信息发放脏盘并送到玩家手上
                 if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount == 1)
                 {
                     GameObject obj = Instantiate(dirtyPlateStackPrefab.singlePlatePrefab, Vector3.one * -9999f, Quaternion.identity);
+                    if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(obj);
                     CarryableItem item = obj.GetComponent<CarryableItem>();
                     if (item != null)
                     {
@@ -281,6 +301,7 @@ public class OrderResponse : BaseStation
                     }
 
                     GameObject stackObj = Instantiate(stackPrefabToUse, Vector3.one * -9999f, Quaternion.identity);
+                    if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(stackObj);
                     DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
                     if (stack != null)
                     {
@@ -309,7 +330,7 @@ public class OrderResponse : BaseStation
         isInteracting = false;
         if (currentState == TableState.Ordering)
         {
-            currentState = TableState.WaitingToOrder; // 松手退回等待图标状态
+            SetState(TableState.WaitingToOrder);
         }
 
         if (DayCycleManager.Instance != null && DayCycleManager.Instance.Phase == DayCyclePhase.ExtendedBusiness)
@@ -319,7 +340,7 @@ public class OrderResponse : BaseStation
     // ================== 【核心业务逻辑】 ==================
     void CompleteOrdering()
     {
-        currentState = TableState.WaitingForFood;
+        SetState(TableState.WaitingForFood);
         isInteracting = false;
         currentOrderProgress = requiredOrderTime;
         currentPatienceFood = effectiveMaxPatienceFood;
@@ -351,10 +372,10 @@ public class OrderResponse : BaseStation
         // 且它不属于“上餐”行为，所以遇到脏盘堆直接放行，切勿执行拦截拒收和订单判定逻辑！
         if (item is DirtyPlateStack) return;
 
-        // 1. 拦截非 WaitingForFood 状态的放置
-        if (currentState != TableState.WaitingForFood)
+        // 1. 只有 WaitingForFood 和 Eating 阶段允许上菜
+        if (currentState != TableState.WaitingForFood && currentState != TableState.Eating)
         {
-            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 当前不在等菜状态，忽略放置！");
+            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 当前状态 {currentState} 不允许上菜，忽略放置！");
             itemPlacePoint.ClearOccupant();
             return;
         }
@@ -371,11 +392,10 @@ public class OrderResponse : BaseStation
 
         // 3. 判断是否在 currentOrder 中
         int idx = FindInOrder(recipe);
-        bool isCorrectOrder = false;
+        bool isCorrectOrder = (idx >= 0);
 
-        if (idx >= 0)
+        if (isCorrectOrder)
         {
-            isCorrectOrder = true;
             if (GlobalOrderManager.Instance != null)
             {
                 GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
@@ -383,7 +403,6 @@ public class OrderResponse : BaseStation
             if (MoneyManager.Instance != null)
             {
                 MoneyManager.Instance.AddMoney(recipe.price);
-                // 触发桌子的金钱弹窗
                 TableOrderProgressUI uiComponent = GetComponentInChildren<TableOrderProgressUI>(true);
                 if (uiComponent == null && transform.parent != null)
                 {
@@ -402,10 +421,9 @@ public class OrderResponse : BaseStation
         }
         else
         {
-            isCorrectOrder = false;
             if (DayStatsTracker.Instance != null)
                 DayStatsTracker.Instance.RegisterPlacedItem(false, recipe.size == DishSize.D);
-            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 上错菜惩罚: {recipe.recipeName} 不在订单中！当做白送！");
+            Debug.LogWarning($"[OrderResponse] 桌号 {tableId} 上错菜: {recipe.recipeName} 不在订单中！白送给客人，不给钱，订单不变。");
         }
 
         // 4. 尝试放入并防溢出
@@ -471,7 +489,7 @@ public class OrderResponse : BaseStation
             }
             
             Debug.Log($"[OrderResponse] 桌号 {tableId} 菜品全齐！进入 Eating 状态，总耗时估算: {totalEatTime}s");
-            currentState = TableState.Eating;
+            SetState(TableState.Eating);
             eatRoutine = StartCoroutine(EatCountdown(totalEatTime));
         }
     }
@@ -552,7 +570,7 @@ public class OrderResponse : BaseStation
         pendingDirtyPlatesCount = dirtyCount;
         if (debugLog) Debug.Log($"[OrderResponse] 客人用餐完毕，桌号 {tableId} 剩余 {pendingDirtyPlatesCount} 个脏盘子待端走。");
         
-        currentState = TableState.WaitingForCleanup;
+        SetState(TableState.WaitingForCleanup);
         if (DayStatsTracker.Instance != null)
             DayStatsTracker.Instance.RegisterGuestsServed(currentCustomerCount);
         Debug.Log($"[Debug-Eat] 切换状态为 WaitingForCleanup。流程结束。");
@@ -587,7 +605,7 @@ public class OrderResponse : BaseStation
         }
         activeEatenModels.Clear();
 
-        currentState = TableState.Empty; 
+        SetState(TableState.Empty);
         
         // 【新增】：客人吃完走人，桌子解开预定锁
         isReserved = false;
@@ -681,7 +699,7 @@ public class OrderResponse : BaseStation
             currentOrder.Clear();
             
             pendingDirtyPlatesCount = dirtyCount;
-            currentState = TableState.WaitingForCleanup;
+            SetState(TableState.WaitingForCleanup);
             
             if (boundGroup != null)
             {
@@ -721,7 +739,7 @@ public class OrderResponse : BaseStation
             currentPatienceOrder = effectiveMaxPatienceOrder;
             currentPatienceFood = effectiveMaxPatienceFood;
 
-            currentState = TableState.Empty;
+            SetState(TableState.Empty);
 
             if (boundGroup != null)
             {
@@ -803,7 +821,7 @@ public class OrderResponse : BaseStation
         currentEatTime = 0f;
         currentPatienceOrder = effectiveMaxPatienceOrder;
         currentPatienceFood = effectiveMaxPatienceFood;
-        currentState = TableState.Empty;
+        SetState(TableState.Empty);
         boundGroup = null;
         isReserved = false;
         isAbandoningPatience = false;

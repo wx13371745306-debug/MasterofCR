@@ -25,13 +25,19 @@ public class CustomerSpawner : MonoBehaviour
 
     void Start()
     {
-        // 游戏开始时，找到场景里所有的桌子
-        allTables = FindObjectsOfType<OrderResponse>();
+        RefreshTableCache();
 
         if (currentLevelConfig == null && weekLevelConfig == null)
         {
             Debug.LogError("<color=#FF0000>[Spawner]</color> 未配置关卡数据 (LevelConfigSO / WeekLevelConfigSO)！");
         }
+    }
+
+    private void RefreshTableCache()
+    {
+        allTables = FindObjectsByType<OrderResponse>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (debugLog)
+            Debug.Log($"[Spawner] 刷新桌子缓存，找到 {allTables.Length} 张桌子");
     }
 
     /// <summary>
@@ -71,9 +77,11 @@ public class CustomerSpawner : MonoBehaviour
     {
         if (spawningPaused) return;
         if (currentLevelConfig == null || currentWaveIndex >= currentLevelConfig.waves.Count)
-            return; // 关卡配置为空或所有波次已出完，停止运行
+            return;
 
-        // 计时器推进
+        if (allTables == null || allTables.Length == 0)
+            RefreshTableCache();
+
         levelTimer += Time.deltaTime;
 
         // 检查是否到了下一波的出兵时间
@@ -99,7 +107,8 @@ public class CustomerSpawner : MonoBehaviour
             }
             else
             {
-                // 如果没有空桌子，它会卡在这里等待，直到下一帧再找（相当于排队机制）
+                if (debugLog)
+                    Debug.LogWarning($"<color=#FFA500>[Spawner]</color> 时间已到但找不到空桌！wave={currentWaveIndex}, 需要座位={requiredSeats}, 桌子总数={allTables?.Length ?? 0}");
             }
         }
     }
@@ -109,12 +118,25 @@ public class CustomerSpawner : MonoBehaviour
     /// </summary>
     private OrderResponse FindAvailableTable(int requiredSeats)
     {
+        if (allTables == null || allTables.Length == 0)
+        {
+            if (debugLog) Debug.LogWarning("<color=#FF0000>[Spawner]</color> allTables 为空！场景中没找到任何 OrderResponse 桌子。");
+            return null;
+        }
+
         foreach (var table in allTables)
         {
-            // 【修改点】：不仅要是 Empty，而且不能被 Reserved（预定）
             if (table.currentState == OrderResponse.TableState.Empty && !table.isReserved && table.chairs.Count >= requiredSeats)
             {
                 return table;
+            }
+        }
+
+        if (debugLog)
+        {
+            foreach (var table in allTables)
+            {
+                Debug.Log($"<color=#FFA500>[Spawner 桌况]</color> 桌号={table.tableId} state={table.currentState} reserved={table.isReserved} chairs={table.chairs.Count} 需要={requiredSeats}");
             }
         }
         return null;

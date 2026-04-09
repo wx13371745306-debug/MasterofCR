@@ -113,6 +113,19 @@ public class DecayableProp : MonoBehaviour
         if (debugLog) Debug.Log($"[DecayableProp] 将 {gameObject.name} (阶段:{currentState}) 的腐烂进度复制给 {other.gameObject.name}");
     }
 
+    /// <summary>
+    /// 强制设定物品新鲜度，一般用于无腐烂概念的食材在加工后生成有腐烂概念的食材。
+    /// </summary>
+    public void ForceSetFreshness(int freshness = 1)
+    {
+        currentState = DecayState.Fresh;
+        currentFreshness = freshness;
+        currentRottenness = rottennessDuration;
+        UpdateVisuals();
+
+        if (debugLog) Debug.Log($"[DecayableProp] {gameObject.name} 被强制设置为初始新鲜度: {freshness}");
+    }
+
     private void UpdateVisuals()
     {
         if (freshObj != null) freshObj.SetActive(currentState == DecayState.Fresh);

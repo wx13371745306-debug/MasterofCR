@@ -15,11 +15,21 @@ public class FryPot : MonoBehaviour
     public float spawnRandomRange = 0.08f;
 
     [Header("State")]
-
     public float currentProgress;
     public float requiredProgress;
     public bool cookingFinished;
-    // 删除：public bool cookingFailed; (不再需要这个状态标记)
+
+    [Header("糊菜倒计时")]
+    [Tooltip("烹饪完成后多少秒菜会糊掉")]
+    [SerializeField] private float burnTime = 10f;
+    [Tooltip("前多少秒为安全期（进度条不闪烁）")]
+    [SerializeField] private float burnSafeTime = 4f;
+    private float burnElapsed;
+    private bool isBurnCountdown;
+
+    public bool IsBurnCountdown => isBurnCountdown;
+    public float BurnRatio => burnTime > 0f ? Mathf.Clamp01(burnElapsed / burnTime) : 0f;
+    public float BurnSafeRatio => burnTime > 0f ? Mathf.Clamp01(burnSafeTime / burnTime) : 0f;
 
     [Header("Debug")]
     public bool debugLog = true;
@@ -60,10 +70,23 @@ public class FryPot : MonoBehaviour
         }
     }
 
+    void Update()
+    {
+        if (!isBurnCountdown) return;
+        burnElapsed += Time.deltaTime;
+        if (burnElapsed >= burnTime)
+        {
+            if (debugLog) Debug.Log("[FryPot] 糊菜倒计时结束，菜糊了！", this);
+            isBurnCountdown = false;
+            cookingFinished = true;
+            SpoilFinishedDish();
+        }
+    }
+
     // 当有食材被放置进来时，由 ItemPlacePoint 的事件主动调用这个方法
     void OnIngredientPlaced(CarryableItem item)
     {
-        if (item == null || cookingFinished) return;
+        if (item == null || cookingFinished || isBurnCountdown) return;
 
         FryIngredientTag tag = item.GetComponent<FryIngredientTag>();
         if (tag == null)
@@ -115,7 +138,7 @@ public class FryPot : MonoBehaviour
     }
 
     public bool HasAnyIngredient() => materials.Count > 0;
-    public bool CanReceiveProgress() => !cookingFinished && requiredProgress > 0f;
+    public bool CanReceiveProgress() => !cookingFinished && !isBurnCountdown && requiredProgress > 0f;
 
     public void AddProgress(float amount)
     {
@@ -130,44 +153,50 @@ public class FryPot : MonoBehaviour
 
     void ResolveRecipe()
     {
-        if (cookingFinished) return;
-        cookingFinished = true;
+        if (cookingFinished || isBurnCountdown) return;
 
         ClearIngredientVisuals();
 
         if (recipeDatabase == null)
         {
+            cookingFinished = true;
             if (debugLog) Debug.LogWarning("[FryPot] Resolve failed: recipeDatabase is null.");
             return;
         }
 
         if (debugLog)
-        {
             Debug.Log($"[FryPot] === 开始匹配菜谱 ===  锅内材料({materials.Count}种): {DumpMaterials()}", this);
-        }
 
         finishedRecipe = recipeDatabase.FindMatch(materials);
 
         if (finishedRecipe == null)
         {
+            cookingFinished = true;
             Debug.LogWarning("[FryPot] 匹配失败: 无匹配菜谱，且未配置兜底 FailedDish!", this);
             return;
         }
 
+        bool isFailed = (finishedRecipe == recipeDatabase.failedDishRecipe);
+
         if (debugLog)
-        {
-            bool isFallback = (finishedRecipe == recipeDatabase.failedDishRecipe);
             Debug.Log($"[FryPot] 匹配结果: '{finishedRecipe.recipeName}' " +
-                      (isFallback ? "(兜底/失败菜)" : "(正常菜谱)"), this);
-        }
+                      (isFailed ? "(兜底/失败菜，直接完成)" : $"(正常菜谱，进入{burnTime}s糊菜倒计时)"), this);
 
         if (finishedRecipe.finishedVisualPrefab != null && visualContainer != null)
-        {
             spawnedFinishedVisual = Instantiate(finishedRecipe.finishedVisualPrefab, visualContainer);
+
+        if (isFailed)
+        {
+            cookingFinished = true;
+        }
+        else
+        {
+            isBurnCountdown = true;
+            burnElapsed = 0f;
         }
     }
 
-    public bool CanDump() => HasAnyIngredient() || cookingFinished;
+    public bool CanDump() => HasAnyIngredient() || cookingFinished || isBurnCountdown;
 
     public void ForceClear()
     {
@@ -175,13 +204,27 @@ public class FryPot : MonoBehaviour
         ResetPot();
     }
 
-    public bool CanServe() => cookingFinished;
+    /// <summary>将锅内成品强制替换为 FailedDish（糊菜 / 隔夜腐烂共用）。</summary>
+    public void SpoilFinishedDish()
+    {
+        if (recipeDatabase == null) return;
+        var failed = recipeDatabase.failedDishRecipe;
+        if (failed == null || finishedRecipe == failed) return;
+
+        if (debugLog) Debug.Log($"[FryPot] 菜品变质: '{finishedRecipe?.recipeName}' → '{failed.recipeName}'", this);
+        finishedRecipe = failed;
+
+        if (spawnedFinishedVisual != null) Destroy(spawnedFinishedVisual);
+        if (failed.finishedVisualPrefab != null && visualContainer != null)
+            spawnedFinishedVisual = Instantiate(failed.finishedVisualPrefab, visualContainer);
+    }
+
+    public bool CanServe() => cookingFinished || isBurnCountdown;
 
     public GameObject Serve()
     {
-        if (!cookingFinished) return null;
+        if (!cookingFinished && !isBurnCountdown) return null;
 
-        // --- 核心修改：不再需要 if (cookingFailed) 分支，一切以 finishedRecipe 为准 ---
         GameObject result = finishedRecipe != null ? finishedRecipe.resultPrefab : null;
 
         if (spawnedFinishedVisual != null) Destroy(spawnedFinishedVisual);
@@ -198,7 +241,8 @@ public class FryPot : MonoBehaviour
         currentProgress = 0f;
         requiredProgress = 0f;
         cookingFinished = false;
-        // cookingFailed = false; (已删除)
+        isBurnCountdown = false;
+        burnElapsed = 0f;
         finishedRecipe = null;
 
         ClearIngredientVisuals();

@@ -57,7 +57,11 @@ public class ShopDeliverySpawner : MonoBehaviour
             Vector3 worldPos = anchor.TransformPoint(localPos) + batch * batchOffset;
 
             GameObject prefab = prefabsInOrder[slotIndex];
-            Instantiate(prefab, worldPos, anchor.rotation);
+            GameObject obj = Instantiate(prefab, worldPos, anchor.rotation);
+            if (Mirror.NetworkServer.active)
+            {
+                Mirror.NetworkServer.Spawn(obj);
+            }
         }
     }
 }

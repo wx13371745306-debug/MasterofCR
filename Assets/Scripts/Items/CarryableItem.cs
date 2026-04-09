@@ -1,6 +1,7 @@
 using UnityEngine;
+using Mirror;
 
-public class CarryableItem : MonoBehaviour
+public class CarryableItem : NetworkBehaviour
 {
     public enum ItemState
     {
@@ -46,6 +47,7 @@ public class CarryableItem : MonoBehaviour
     private ItemPlacePoint lastPlacePointBeforeHold;
     private ItemState state = ItemState.Free;
     private int originalLayer;
+    private NetworkBehaviour cachedNetTransform;
 
     void Reset()
     {
@@ -59,6 +61,9 @@ public class CarryableItem : MonoBehaviour
     {
         originalLayer = gameObject.layer;
 
+        if (rb == null)
+            rb = GetComponent<Rigidbody>();
+
         if (itemColliders == null || itemColliders.Length == 0)
             itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
 
@@ -66,6 +71,15 @@ public class CarryableItem : MonoBehaviour
             useHighlightObject.SetActive(false);
 
         SetSensorHighlight(false);
+
+        foreach (var nb in GetComponents<NetworkBehaviour>())
+        {
+            if (nb != this && nb.GetType().Name.Contains("NetworkTransform"))
+            {
+                cachedNetTransform = nb;
+                break;
+            }
+        }
     }
 
     protected virtual void Start()
@@ -99,6 +113,7 @@ public class CarryableItem : MonoBehaviour
             currentPlacePoint = null;
         }
 
+        SetNetTransformEnabled(false);
         SetAttachedPhysics(true);
         SetHeldLayer(true);
 
@@ -144,6 +159,7 @@ public class CarryableItem : MonoBehaviour
             transform.localRotation = Quaternion.identity;
         }
         state = ItemState.Placed;
+        SetNetTransformEnabled(true);
         if (debugLog) Debug.Log($"[CarryableItem] Placed internally: {name} at {point.name}");
     }
 
@@ -181,6 +197,7 @@ public class CarryableItem : MonoBehaviour
         }
 
         state = ItemState.Free;
+        SetNetTransformEnabled(true);
         if (debugLog) Debug.Log($"[CarryableItem] Dropped to ground: {name}");
     }
 
@@ -273,5 +290,11 @@ public class CarryableItem : MonoBehaviour
         obj.layer = layer;
         foreach (Transform child in obj.transform)
             SetLayerRecursively(child.gameObject, layer);
+    }
+
+    private void SetNetTransformEnabled(bool enabled)
+    {
+        if (cachedNetTransform != null)
+            cachedNetTransform.enabled = enabled;
     }
 }

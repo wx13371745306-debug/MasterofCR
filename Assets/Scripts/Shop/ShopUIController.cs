@@ -243,15 +243,20 @@ public class ShopUIController : MonoBehaviour
         }
 
         var dcm = dayCycleManager != null ? dayCycleManager : DayCycleManager.Instance;
-        if (dcm != null && dcm.Phase == DayCyclePhase.DayZero && shopDeliveryQueue != null && catalog != null)
+        DayCyclePhase currentPhase = dcm != null ? dcm.Phase : DayCyclePhase.Prep;
+
+        if (shopDeliveryQueue != null && catalog != null)
         {
             var copy = new Dictionary<string, int>(cart, StringComparer.Ordinal);
-            shopDeliveryQueue.EnqueueDayZeroCart(copy);
-        }
-        else if (dcm != null && dcm.Phase == DayCyclePhase.Prep && shopDeliveryQueue != null && catalog != null)
-        {
-            var copy = new Dictionary<string, int>(cart, StringComparer.Ordinal);
-            shopDeliveryQueue.EnqueueOrSpawn(copy, catalog, dcm.PrepElapsed, dcm.ShopDeliveryDelayFromPrepStart);
+
+            if (currentPhase == DayCyclePhase.Prep)
+            {
+                shopDeliveryQueue.EnqueueOrSpawn(copy, catalog, dcm.PrepElapsed, dcm.ShopDeliveryDelayFromPrepStart);
+            }
+            else
+            {
+                shopDeliveryQueue.EnqueueForNextPrep(copy);
+            }
         }
         else
         {

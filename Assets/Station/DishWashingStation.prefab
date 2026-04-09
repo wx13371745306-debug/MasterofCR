@@ -482,6 +482,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4db10fc2a4d4b14781a5eba16ad12d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DishWashingStation
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 7811858952649070433}
   debugLog: 0
   inputDropPoint: {fileID: 8019887932254479337}

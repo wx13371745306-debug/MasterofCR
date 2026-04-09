@@ -140,6 +140,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ab932643735b284fb8cf1cb400d4f72, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 7528683388947699374}
   debugLog: 1
   placePoint: {fileID: 2943789578518126812}
@@ -162,7 +165,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
-  rb: {fileID: 0}
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  rb: {fileID: 5918590436662506651}
   itemColliders:
   - {fileID: 4411372568672821604}
   poseConfig: {fileID: 0}
@@ -175,7 +181,7 @@ MonoBehaviour:
   disableCollidersOnAttach: 0
   leftHandGrip: {fileID: 0}
   rightHandGrip: {fileID: 0}
-  debugLog: 1
+  debugLog: 0
 --- !u!114 &2943789578518126812
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -398,7 +404,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractableHighlight
   highlightObject: {fileID: 3080024036895167524}
-  debugLog: 1
+  debugLog: 0
 --- !u!1001 &5805286107781801066
 PrefabInstance:
   m_ObjectHideFlags: 0

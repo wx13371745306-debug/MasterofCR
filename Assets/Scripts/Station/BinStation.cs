@@ -1,4 +1,5 @@
 using UnityEngine;
+using Mirror;
 
 public class BinStation : BaseStation
 {
@@ -31,7 +32,10 @@ public class BinStation : BaseStation
         if (debugLog)
             Debug.Log($"<color=#FF4444>[BinStation]</color> 销毁放入的物品: {item.name}");
 
-        Destroy(item.gameObject);
+        if (NetworkServer.active)
+            NetworkServer.Destroy(item.gameObject);
+        else
+            Destroy(item.gameObject);
     }
 
     public override bool CanInteract(PlayerItemInteractor interactor)
@@ -97,13 +101,19 @@ public class BinStation : BaseStation
             return false;
         }
 
+        if (NetworkServer.active)
+            NetworkServer.Spawn(plateObj);
+
         plateItem.BeginHold(holdPoint);
         interactor.ReplaceHeldItem(plateItem);
 
         if (debugLog)
             Debug.Log($"<color=#FF4444>[BinStation]</color> 菜品 '{dish.name}' 已转回空盘子。");
 
-        Destroy(dish.gameObject);
+        if (NetworkServer.active)
+            NetworkServer.Destroy(dish.gameObject);
+        else
+            Destroy(dish.gameObject);
         return true;
     }
 }

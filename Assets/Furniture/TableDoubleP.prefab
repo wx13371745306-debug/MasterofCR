@@ -405,6 +405,7 @@ GameObject:
   - component: {fileID: 8777547707111277926}
   - component: {fileID: 3236824763287161460}
   - component: {fileID: 4671285765191671568}
+  - component: {fileID: 7104319957700669594}
   m_Layer: 3
   m_Name: PlacePoint
   m_TagString: Untagged
@@ -460,6 +461,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d4f3213097a094d47a8c62d0f52b2e40, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OrderResponse
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 4371683078423672106}
   debugLog: 1
   itemPlacePoint: {fileID: 3236824763287161460}
@@ -486,11 +490,27 @@ MonoBehaviour:
   effectiveImpatientThreshold: 40
   currentPatienceOrder: 0
   currentPatienceFood: 0
-  debugLog: 0
   maxDishes: 2
   requiredOrderTime: 2
   currentCustomerCount: 1
   currentMinDishes: 1
+--- !u!114 &7104319957700669594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4996329012064439678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror::Mirror.NetworkIdentity
+  sceneId: 0
+  _assetId: 2845865239
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
 --- !u!1 &6146046130822894362
 GameObject:
   m_ObjectHideFlags: 0

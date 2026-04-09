@@ -188,7 +188,7 @@ public class GlobalOrderManager : MonoBehaviour
     public void AutoAssignTableIDs()
     {
         // 找到场景中所有的桌子组件
-        OrderResponse[] allTables = FindObjectsOfType<OrderResponse>();
+        OrderResponse[] allTables = FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
         
         // 按照物体在 Hierarchy 里的名字进行排序（比如 Table1, Table2...）
         Array.Sort(allTables, (a, b) => a.name.CompareTo(b.name));

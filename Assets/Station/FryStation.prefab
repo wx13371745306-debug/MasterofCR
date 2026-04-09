@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9002565933269699716}
   - component: {fileID: 2710367023097425075}
   - component: {fileID: 3159313210947883911}
+  - component: {fileID: 6867619071021230951}
   m_Layer: 3
   m_Name: PlacePoint_1
   m_TagString: Untagged
@@ -68,11 +69,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45cc773c228c6ee4b8350761748e7aa3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FryStation
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 2847965789766758715}
   debugLog: 1
   potPlacePoint: {fileID: 2710367023097425075}
   frySpeed: 10
   fryEffect: {fileID: 2544061619272865998}
+--- !u!114 &6867619071021230951
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3364105825648388209}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror::Mirror.NetworkIdentity
+  sceneId: 0
+  _assetId: 1122695371
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
 --- !u!1 &3546353170004422618
 GameObject:
   m_ObjectHideFlags: 0
@@ -230,6 +251,7 @@ GameObject:
   - component: {fileID: 8110815622097567901}
   - component: {fileID: 5860164120704872380}
   - component: {fileID: 2722990609700297110}
+  - component: {fileID: -7889759391214302438}
   m_Layer: 3
   m_Name: PlacePoint_2
   m_TagString: Untagged
@@ -287,11 +309,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45cc773c228c6ee4b8350761748e7aa3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FryStation
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 7182562110278373440}
   debugLog: 1
   potPlacePoint: {fileID: 5860164120704872380}
   frySpeed: 10
   fryEffect: {fileID: 5205644292124411876}
+--- !u!114 &-7889759391214302438
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5008613815163792034}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror::Mirror.NetworkIdentity
+  sceneId: 0
+  _assetId: 1122695371
+  serverOnly: 0
+  visibility: 0
+  hasSpawned: 0
 --- !u!1 &8210597215511989994
 GameObject:
   m_ObjectHideFlags: 0

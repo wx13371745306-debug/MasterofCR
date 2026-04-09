@@ -1,6 +1,7 @@
 using UnityEngine;
+using Mirror;
 
-public abstract class BaseStation : MonoBehaviour, IInteractiveStation
+public abstract class BaseStation : NetworkBehaviour, IInteractiveStation
 {
     [Header("Common")]
     public GameObject highlightObject;
@@ -23,7 +24,7 @@ public abstract class BaseStation : MonoBehaviour, IInteractiveStation
     protected virtual void Awake()
     {
         if (cachedInteractor == null)
-            cachedInteractor = FindObjectOfType<PlayerItemInteractor>();
+            cachedInteractor = FindFirstObjectByType<PlayerItemInteractor>();
     }
 
     // Interactor 叫我亮我就亮

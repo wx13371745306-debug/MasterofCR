@@ -1,4 +1,5 @@
 using UnityEngine;
+using Mirror;
 
 /// <summary>
 /// 【纯数据+触发器组件】
@@ -84,11 +85,17 @@ public class StackableProp : MonoBehaviour
 
         // 2. 实例化通用的堆预制体
         GameObject stackObj = Instantiate(dynamicStackPrefab, transform.position, transform.rotation);
+        if (NetworkServer.active)
+            NetworkServer.Spawn(stackObj);
+
         DynamicItemStack newStack = stackObj.GetComponent<DynamicItemStack>();
         if (newStack == null)
         {
             Debug.LogError("[StackableProp] 实例化出来的物体上没有 DynamicItemStack 脚本！请检查预制体配置。");
-            Destroy(stackObj);
+            if (NetworkServer.active)
+                NetworkServer.Destroy(stackObj);
+            else
+                Destroy(stackObj);
             return null;
         }
 

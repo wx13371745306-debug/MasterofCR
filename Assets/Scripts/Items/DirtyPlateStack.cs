@@ -1,4 +1,5 @@
 using UnityEngine;
+using Mirror;
 
 /// <summary>
 /// 餐桌吃完饭后生成的脏盘子堆（纯视觉 + 数量追踪）。
@@ -11,6 +12,7 @@ using UnityEngine;
 public class DirtyPlateStack : CarryableItem
 {
     [Header("Dirty Plate Stack")]
+    [SyncVar(hook = nameof(OnPlateCountChanged))]
     public int plateCount = 1;
     [Tooltip("代表单个脏盘子的预制体（必须有 CarryableItem + StackableProp）")]
     public GameObject singlePlatePrefab;
@@ -29,6 +31,7 @@ public class DirtyPlateStack : CarryableItem
     private float baseColliderSizeY = 0.05f;
     private float baseColliderCenterY = 0.025f;
 
+    [SyncVar(hook = nameof(OnForcedHiddenChanged))]
     private bool forcedHidden = false;
 
     /// <summary>
@@ -79,6 +82,19 @@ public class DirtyPlateStack : CarryableItem
         }
     }
 
+    void OnPlateCountChanged(int oldVal, int newVal)
+    {
+        UpdateVisuals();
+    }
+
+    void OnForcedHiddenChanged(bool oldVal, bool newVal)
+    {
+        if (newVal && visualRoot != null)
+        {
+            visualRoot.gameObject.SetActive(false);
+        }
+    }
+
     /// <summary>
     /// 从单盘预制体上的 StackableProp 读取堆叠参数。
     /// </summary>
@@ -104,15 +120,19 @@ public class DirtyPlateStack : CarryableItem
 
     public void SetPlateCount(int count)
     {
-        plateCount = Mathf.Max(1, count);
-        UpdateVisuals();
+        if (NetworkServer.active)
+        {
+            plateCount = Mathf.Max(1, count);
+        }
     }
 
     // 由餐桌在吃完饭时调用，施加终极隐身锁
     public void ForceHideUntilPickedUp()
     {
-        forcedHidden = true;
-        if (visualRoot != null) visualRoot.gameObject.SetActive(false);
+        if (NetworkServer.active)
+        {
+            forcedHidden = true;
+        }
     }
 
     public void BindTable(OrderResponse table)
@@ -121,16 +141,15 @@ public class DirtyPlateStack : CarryableItem
     }
 
     /// <summary>
-    /// 玩家对着脏盘堆按 J 时由 PlayerItemInteractor 调用。
-    /// isLongPress = false: 拿一个脏盘子
-    /// isLongPress = true:  拿一堆脏盘子 (DynamicItemStack)
+    /// 仅由服务器端调用：生成物品并自动向全网进行Spawn注册
     /// </summary>
-    public bool TryDispenseToPlayer(PlayerItemInteractor interactor, bool isLongPress)
+    [Server]
+    public GameObject ServerDispenseItem(bool isLongPress)
     {
-        if (plateCount <= 0 || interactor.IsHoldingItem()) return false;
-        if (singlePlatePrefab == null) return false;
+        if (plateCount <= 0) return null;
+        if (singlePlatePrefab == null) return null;
 
-        // 解除隐身锁；若桌上仍用「特殊残羹」展示，则不要打开通用 visualRoot，避免叠出第二套盘子模型
+        // 解除隐身锁
         if (forcedHidden)
         {
             forcedHidden = false;
@@ -138,42 +157,44 @@ public class DirtyPlateStack : CarryableItem
 
         if (isLongPress && stackPrefab != null && plateCount >= 2)
         {
-            return DispenseStack(interactor);
+            return DispenseStackServer();
         }
         else
         {
-            return DispenseSingle(interactor);
+            return DispenseSingleServer();
         }
     }
 
-    bool DispenseSingle(PlayerItemInteractor interactor)
+    [Server]
+    GameObject DispenseSingleServer()
     {
-        // 在远离场景的地方实例化，避免物理碰撞
         GameObject obj = Instantiate(singlePlatePrefab, Vector3.one * -9999f, Quaternion.identity);
         CarryableItem item = obj.GetComponent<CarryableItem>();
         if (item == null)
         {
             Destroy(obj);
-            return false;
+            return null;
         }
 
-        item.BeginHold(interactor.GetHoldPoint());
-        interactor.ReplaceHeldItem(item);
         plateCount--;
-        boundTable?.OnDirtyPlatesDispensed(1);
+        if (boundTable != null)
+            boundTable.OnDirtyPlatesDispensed(1);
 
-        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack]</color> 拿取了一个脏盘子，剩余: {plateCount}");
+        NetworkServer.Spawn(obj);
+
+        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 吐出了一个脏盘子，剩余: {plateCount}");
 
         AfterDispense();
-        return true;
+        return obj;
     }
 
-    bool DispenseStack(PlayerItemInteractor interactor)
+    [Server]
+    GameObject DispenseStackServer()
     {
         int dispenseCount = Mathf.Min(maxDispensePerStack, plateCount);
 
         if (dispenseCount <= 1)
-            return DispenseSingle(interactor);
+            return DispenseSingleServer();
 
         GameObject stackObj = Instantiate(stackPrefab, Vector3.one * -9999f, Quaternion.identity);
         DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
@@ -181,27 +202,39 @@ public class DirtyPlateStack : CarryableItem
         {
             Debug.LogError("[DirtyPlateStack] Stack 预制体上没有 DynamicItemStack 组件!");
             Destroy(stackObj);
-            return false;
+            return null;
         }
 
         stack.InitializeFromPrefab(singlePlatePrefab, dispenseCount,
             maxDispensePerStack, dispenseLayout, stackYOffset,
             dispenseGridCols, dispenseGridRows, dispenseGridSpacing);
 
-        stack.BeginHold(interactor.GetHoldPoint());
-        interactor.ReplaceHeldItem(stack);
         plateCount -= dispenseCount;
-        boundTable?.OnDirtyPlatesDispensed(dispenseCount);
+        if (boundTable != null)
+            boundTable.OnDirtyPlatesDispensed(dispenseCount);
 
-        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack]</color> 拿取了一个脏盘Stack({dispenseCount}个)，剩余: {plateCount}");
+        NetworkServer.Spawn(stackObj);
+
+        // 如果内部物体也带 NetworkIdentity，需一并 Spawn
+        foreach (var stackedItem in stack.GetItems())
+        {
+            if (stackedItem != null && stackedItem.GetComponent<NetworkIdentity>() != null)
+            {
+                NetworkServer.Spawn(stackedItem.gameObject);
+            }
+        }
+
+        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 吐出了脏盘Stack({dispenseCount}个)，剩余: {plateCount}");
 
         AfterDispense();
-        return true;
+        return stackObj;
     }
 
     /// <summary>
-    /// 每次分发后调用：更新视觉。如果盘子全拿完了，销毁自身。
+    /// 每次分发后由 Server 调用：销毁自身。
+    /// （Visuals由于SyncVar hook，会在全网自动更新）
     /// </summary>
+    [Server]
     void AfterDispense()
     {
         if (plateCount <= 0)
@@ -213,11 +246,12 @@ public class DirtyPlateStack : CarryableItem
             }
             ClearPlaceState();
 
-            if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack]</color> 所有脏盘子都被拿走了，销毁脏盘堆。");
-            Destroy(gameObject);
+            if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 所有脏盘子都被拿走了，销毁脏盘堆。");
+            NetworkServer.Destroy(gameObject);
         }
         else
         {
+            // SyncVar hook 自动更视觉，无需显式 UpdateVisuals
             UpdateVisuals();
         }
     }
@@ -237,7 +271,7 @@ public class DirtyPlateStack : CarryableItem
             singlePlatePrefab != null &&
             (boundTable == null || boundTable.GetActiveEatenModelCount() == 0);
 
-        if (useGenericStackVisual)
+        if (useGenericStackVisual && !forcedHidden)
         {
             visualRoot.gameObject.SetActive(true);
             for (int i = 0; i < plateCount; i++)
@@ -246,7 +280,6 @@ public class DirtyPlateStack : CarryableItem
                 plate.transform.localPosition = new Vector3(0, i * stackYOffset, 0);
                 plate.transform.localRotation = Quaternion.identity;
 
-                // StackableProp 依赖 CarryableItem，必须先删依赖组件再删 CarryableItem，否则会报 Can't remove CarryableItem...
                 StackableProp sp = plate.GetComponent<StackableProp>();
                 if (sp != null) Destroy(sp);
                 CarryableItem ci = plate.GetComponent<CarryableItem>();

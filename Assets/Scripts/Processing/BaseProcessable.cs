@@ -74,6 +74,10 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
 
         // 1. 先生成新物体
         GameObject newObj = Instantiate(resultPrefab, spawnPos, spawnRot, spawnParent);
+        if (Mirror.NetworkServer.active)
+        {
+            Mirror.NetworkServer.Spawn(newObj);
+        }
         CarryableItem newItem = newObj.GetComponent<CarryableItem>();
 
         // 【核心修复】：让新生成的物体继承放置点记录
@@ -82,6 +86,28 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
             // 继承原来的初始放置点
             newItem.initialPlacePoint = oldPlacePoint; 
         }
+
+        // === 腐烂进度继承系统 ===
+        DecayableProp oldDecay = GetComponent<DecayableProp>();
+        DecayableProp newDecay = newObj.GetComponent<DecayableProp>();
+
+        if (newDecay != null)
+        {
+            if (oldDecay != null)
+            {
+                oldDecay.CopyStateTo(newDecay);
+            }
+            else
+            {
+                // 如果原食材没有腐烂值，生成食材有，则按默认值1初始化并弹Log
+                newDecay.ForceSetFreshness(1);
+                if (debugLog)
+                {
+                    Debug.Log($"[{GetType().Name}] 原食材 {gameObject.name} 无腐烂组件，加工成品 {newObj.name} 有腐烂组件，强制设置新鲜度为 1。");
+                }
+            }
+        }
+        // =======================
 
         // 2. 如果旧物体原本在 PlacePoint 上，就让新物体重新正式放上去
         if (oldPlacePoint != null)

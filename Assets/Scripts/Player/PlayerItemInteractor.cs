@@ -179,16 +179,24 @@ public class PlayerItemInteractor : MonoBehaviour
             return false;
         }
 
-        // 【优先级0】如果面对的是一个打开的 SupplyBox，直接由箱子出货
+        PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
+
+        // 【优先级0】如果面对的是一个打开的 SupplyBox，通过网络中枢请求提取
         IInteractiveStation currentStation = sensor.GetCurrentStation();
         if (currentStation is SupplyBox supplyBox)
         {
-            bool dispensed = supplyBox.TryDispenseToPlayer(this, isLongPress);
-            if (dispensed)
+            if (supplyBox.IsOpened && supplyBox.currentCount > 0)
             {
-                if (debugLog) Debug.Log($"<color=#FFA500>[大脑 拿取]</color> 从箱子 {supplyBox.name} 中{(isLongPress ? "长按取出Stack" : "点按取出单个")}");
-                return true;
+                if (networkController != null && NetworkClient.active)
+                {
+                    networkController.CmdRequestDispenseBox(supplyBox.gameObject, isLongPress);
+                    if (debugLog) Debug.Log($"<color=#FFA500>[大脑 拿取]</color> 发起箱子提货网络请求: {supplyBox.name}");
+                    return true;
+                }
             }
+            // 如果箱子关闭或为空，拿取动作应该失败
+            // 注意：我们直接返回 true 或 false，避免它去拿身后的其他东西而导致穿模误操作
+            if (supplyBox.IsOpened) return false;
         }
         else if (currentStation is FridgeStation fridge)
         {
@@ -215,13 +223,13 @@ public class PlayerItemInteractor : MonoBehaviour
         if (target == null)
             return false;
 
-        // 【优先级1】如果目标是 DirtyPlateStack，走分发逻辑而不是直接拿取
+        // 【优先级1】如果目标是 DirtyPlateStack，走联机分发逻辑
         if (target is DirtyPlateStack dirtyStack)
         {
-            bool dispensed = dirtyStack.TryDispenseToPlayer(this, isLongPress);
-            if (dispensed)
+            if (networkController != null && NetworkClient.active)
             {
-                if (debugLog) Debug.Log($"<color=#8B4513>[大脑 拿取]</color> 从脏盘堆中{(isLongPress ? "长按取出Stack" : "点按取出单个")}");
+                networkController.CmdRequestDispenseBox(dirtyStack.gameObject, isLongPress);
+                if (debugLog) Debug.Log($"<color=#8B4513>[大脑 拿取]</color> 发起脏盘堆拿取请求");
                 return true;
             }
             return false;
@@ -248,7 +256,6 @@ public class PlayerItemInteractor : MonoBehaviour
         }
 
         // 网络隔离改造 (Step 4)：判断是否有主控干涉
-        PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
         if (networkController != null && NetworkClient.active)
         {
             // 走权威服务器判决，本地先按兵不动，等待 Rpc 确认后赋值 heldItem
@@ -350,15 +357,54 @@ public class PlayerItemInteractor : MonoBehaviour
         if (station == null || !station.CanInteract(this)) return false;
 
         activeStation = station;
-        activeStation.BeginInteract(this);
+
+        PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
+        bool isNetworked = networkController != null && Mirror.NetworkClient.active;
+
+        if (isNetworked && activeStation is Component comp)
+        {
+            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), true);
+        }
+        else
+        {
+            activeStation.BeginInteract(this);
+        }
+
         return true;
     }
 
     void TryEndStationInteract()
     {
         if (activeStation == null) return;
-        activeStation.EndInteract(this);
+        PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
+        bool isNetworked = networkController != null && Mirror.NetworkClient.active;
+
+        if (isNetworked && activeStation is Component comp)
+        {
+            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), false);
+        }
+        else
+        {
+            activeStation.EndInteract(this);
+        }
+
         activeStation = null;
+    }
+
+    /// <summary>
+    /// 向上查找挂有 NetworkIdentity 的 GameObject，
+    /// 解决 Station 脚本挂在子物体上而 NetworkIdentity 挂在根物体上的序列化问题。
+    /// </summary>
+    private GameObject FindNetworkedGameObject(Component comp)
+    {
+        Transform t = comp.transform;
+        while (t != null)
+        {
+            if (t.GetComponent<Mirror.NetworkIdentity>() != null)
+                return t.gameObject;
+            t = t.parent;
+        }
+        return comp.gameObject;
     }
 
     bool TrySpecialInteraction()
@@ -447,9 +493,14 @@ public class PlayerItemInteractor : MonoBehaviour
 
         if (platePoint != null)
             platePoint.ClearOccupant();
-        Destroy(plate.gameObject);
+
+        if (Mirror.NetworkServer.active)
+            Mirror.NetworkServer.Destroy(plate.gameObject);
+        else
+            Destroy(plate.gameObject);
 
         GameObject dishObj = Instantiate(dishPrefab);
+        if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(dishObj);
         CarryableItem dishItem = dishObj.GetComponent<CarryableItem>();
 
         if (platePoint != null && dishItem != null)

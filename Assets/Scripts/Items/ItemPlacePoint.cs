@@ -23,6 +23,12 @@ public class ItemPlacePoint : MonoBehaviour
     // 【新增事件】：当有物体合法放上来时触发，取代 Update 轮询！
     public event System.Action<CarryableItem> OnItemPlacedEvent;
 
+    /// <summary>
+    /// 外部锁：为 true 时 CanPlace 对玩家手持物一律返回 false。
+    /// 由 OrderResponse 等上层逻辑在状态不对时设置。
+    /// </summary>
+    [HideInInspector] public bool externalLock = false;
+
     public CarryableItem CurrentItem => currentItem;
     private CarryableItem currentItem;
     private int targetColliderOriginalLayer;
@@ -37,6 +43,7 @@ public class ItemPlacePoint : MonoBehaviour
 
     public bool CanPlace(CarryableItem item)
     {
+        if (externalLock) return false;
         if (item == null || (currentItem != null && currentItem != item)) return false;
         if (allowAnyCategory) return true;
         return item.HasAnyCategory(allowedCategories);

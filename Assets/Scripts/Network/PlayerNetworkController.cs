@@ -91,7 +91,7 @@ public class PlayerNetworkController : NetworkBehaviour
         CarryableItem item = targetItemObj.GetComponent<CarryableItem>();
         if (item == null || !item.CanBePickedUp())
         {
-            if (debugLog) Debug.Log($"[Server] 拒绝玩家 {netId} 收取物体，目标已被他人取走。");
+            if (debugLog) Debug.Log($"[Server] 拒绝玩家 {netId} 收取物体，目标已被他人取走或锁定。");
             return;
         }
 
@@ -108,6 +108,40 @@ public class PlayerNetworkController : NetworkBehaviour
 
         // 下发同步，所有端执行视觉跟随或全套拾取动作
         RpcAcknowledgePickUp(targetItemObj, isLongPress);
+    }
+
+    [Command]
+    public void CmdRequestDispenseBox(GameObject stationObj, bool isLongPress)
+    {
+        if (stationObj == null) return;
+
+        GameObject generatedObj = null;
+
+        SupplyBox supplyBox = stationObj.GetComponent<SupplyBox>();
+        if (supplyBox != null)
+        {
+            generatedObj = supplyBox.ServerDispenseItem(isLongPress);
+        }
+        else
+        {
+            DirtyPlateStack dirtyStack = stationObj.GetComponent<DirtyPlateStack>();
+            if (dirtyStack != null)
+            {
+                generatedObj = dirtyStack.ServerDispenseItem(isLongPress);
+            }
+        }
+
+        if (generatedObj != null)
+        {
+            NetworkIdentity itemIdentity = generatedObj.GetComponent<NetworkIdentity>();
+            if (itemIdentity != null)
+            {
+                itemIdentity.AssignClientAuthority(connectionToClient);
+            }
+            
+            // 下发拾取动作指令给该玩家，如同他刚刚拾取了这个刚生成的物体
+            RpcAcknowledgePickUp(generatedObj, isLongPress);
+        }
     }
 
     [ClientRpc]
@@ -146,6 +180,22 @@ public class PlayerNetworkController : NetworkBehaviour
                 }
                 if (debugLog) Debug.Log($"<color=#FF00FF>[远端同播]</color> 幽灵避免：仅视觉上将 {item.name} 塞入了玩家 {netId} 掌中");
             }
+        }
+    }
+
+    [Command]
+    public void CmdSetStationInteractState(GameObject stationObj, bool isInteracting)
+    {
+        if (stationObj == null) return;
+        BaseStation station = stationObj.GetComponentInChildren<BaseStation>();
+        if (station != null)
+        {
+            // 在服务器模拟开启或关闭互动
+            // 注意：由于服务器没有本地的 PlayerItemInteractor 实例传入拿在手上的道具，暂传 null
+            if (isInteracting)
+                station.BeginInteract(null);
+            else
+                station.EndInteract(null);
         }
     }
 }

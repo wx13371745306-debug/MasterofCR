@@ -1,113 +1,133 @@
 using UnityEngine;
 using UnityEditor;
 using System.Text;
-using System.IO;
 
-public class PrefabFullDataExporter : EditorWindow
+public class PrefabExporter : Editor
 {
-    private GameObject targetPrefab;
-    private bool exportAllProperties = false; // 是否导出所有底层属性（勾选后内容会非常多）
-
-    [MenuItem("Tools/Prefab/导出预制体完整参数")]
-    public static void ShowWindow()
+    [MenuItem("Tools/游戏开发助手/一键导出选中预制体参数 (复制到剪贴板)")]
+    public static void ExportPrefabToClipboard()
     {
-        GetWindow<PrefabFullDataExporter>("参数导出器");
-    }
+        // 获取当前选中的 GameObject（支持在 Project 窗口选中 Prefab，或在 Hierarchy 中选中物体）
+        GameObject selectedGO = Selection.activeGameObject;
 
-    private void OnGUI()
-    {
-        GUILayout.Label("预制体属性深度导出", EditorStyles.boldLabel);
-        targetPrefab = (GameObject)EditorGUILayout.ObjectField("目标预制体", targetPrefab, typeof(GameObject), false);
-        
-        exportAllProperties = EditorGUILayout.Toggle("导出隐藏/原生属性", exportAllProperties);
-        EditorGUILayout.HelpBox("默认只导出可见的公共参数。开启后会包含更多底层数据。", MessageType.Info);
-
-        if (GUILayout.Button("导出详细报告") && targetPrefab != null)
+        if (selectedGO == null)
         {
-            ExportFullData();
+            Debug.LogWarning("<color=#FF9900>[PrefabExporter]</color> 导出失败：请先选中一个 GameObject 或 Prefab！");
+            return;
         }
-    }
 
-    private void ExportFullData()
-    {
         StringBuilder sb = new StringBuilder();
-        sb.AppendLine($"==========================================");
-        sb.AppendLine($"预制体详细数据报告: {targetPrefab.name}");
-        sb.AppendLine($"生成时间: {System.DateTime.Now}");
-        sb.AppendLine($"==========================================\n");
+        sb.AppendLine("=========================================");
+        sb.AppendLine($"# Prefab / GameObject: {selectedGO.name}");
+        sb.AppendLine($"# 导出时间: {System.DateTime.Now}");
+        sb.AppendLine("=========================================\n");
 
-        Traverse(targetPrefab.transform, sb, 0);
+        // 从根节点开始深度遍历
+        TraverseGameObject(selectedGO, sb, 0);
 
-        string path = EditorUtility.SaveFilePanel("保存详细报告", "", $"{targetPrefab.name}_FullReport.txt", "txt");
-        if (!string.IsNullOrEmpty(path))
+        // 写入剪贴板
+        EditorGUIUtility.systemCopyBuffer = sb.ToString();
+
+        Debug.Log($"<color=#00FF00>[PrefabExporter]</color> 成功！<b>{selectedGO.name}</b> 的结构与参数已复制到系统剪贴板！");
+    }
+
+    private static void TraverseGameObject(GameObject go, StringBuilder sb, int indentLevel)
+    {
+        string indent = new string(' ', indentLevel * 4);
+        sb.AppendLine($"{indent}▶ [{go.name}]");
+
+        // 1. 读取该物体上的所有组件
+        Component[] components = go.GetComponents<Component>();
+        foreach (Component comp in components)
         {
-            File.WriteAllText(path, sb.ToString());
-            AssetDatabase.Refresh();
-            Debug.Log($"<color=cyan>[Exporter]</color> 报告已生成: {path}");
+            if (comp == null)
+            {
+                sb.AppendLine($"{indent}    - (Missing Script)");
+                continue;
+            }
+
+            sb.AppendLine($"{indent}    - ({comp.GetType().Name})");
+            DumpComponentProperties(comp, sb, indentLevel + 1);
+        }
+
+        // 2. 递归遍历所有子物体
+        foreach (Transform child in go.transform)
+        {
+            TraverseGameObject(child.gameObject, sb, indentLevel + 1);
         }
     }
 
-    private void Traverse(Transform t, StringBuilder sb, int indent)
+    private static void DumpComponentProperties(Component comp, StringBuilder sb, int indentLevel)
     {
-        string space = new string(' ', indent * 4);
-        sb.AppendLine($"{space}● 物体: {t.name} (Layer: {LayerMask.LayerToName(t.gameObject.layer)})");
+        string indent = new string(' ', indentLevel * 4);
+        SerializedObject so = new SerializedObject(comp);
+        SerializedProperty prop = so.GetIterator();
 
-        // 获取该物体上所有的组件
-        Component[] components = t.GetComponents<Component>();
-        foreach (var comp in components)
+        bool enterChildren = true;
+
+        while (prop.NextVisible(enterChildren))
         {
-            if (comp == null) continue;
+            // 对于普通的属性，我们不需要深入其底层的 struct 细节，除非它是我们要展开的 Generic 类型
+            enterChildren = false; 
 
-            string compName = comp.GetType().Name;
-            sb.AppendLine($"{space}  |- [组件: {compName}]");
-
-            // 使用 SerializedObject 遍历属性
-            SerializedObject so = new SerializedObject(comp);
-            SerializedProperty prop = so.GetIterator();
-
-            // 进入属性树
-            bool enterChildren = true;
-            while (prop.NextVisible(enterChildren)) // 只遍历 Inspector 可见的属性
+            // 屏蔽掉一些毫无意义的 Unity 内部属性，让导出的代码更干净
+            if (prop.name == "m_ObjectHideFlags" || 
+                prop.name == "m_CorrespondingSourceObject" || 
+                prop.name == "m_PrefabInstance" || 
+                prop.name == "m_PrefabAsset" || 
+                prop.name == "m_Script")
             {
-                enterChildren = false; // 防止重复进入子节点
+                continue;
+            }
 
-                // 排除掉一些没用的基础属性
-                if (prop.name == "m_GameObject" || prop.name == "m_Script") continue;
+            // 安全获取属性值
+            string valueStr = GetPropertyValueSafe(prop);
+            sb.AppendLine($"{indent}  {prop.name}: {valueStr}");
+        }
+    }
 
-                string valueStr = GetPropertyValue(prop);
-                if (!string.IsNullOrEmpty(valueStr))
-                {
-                    sb.AppendLine($"{space}     |-- {prop.displayName} ({prop.name}): {valueStr}");
-                }
+    private static string GetPropertyValueSafe(SerializedProperty prop)
+    {
+        try
+        {
+            switch (prop.propertyType)
+            {
+                case SerializedPropertyType.Integer: return prop.intValue.ToString();
+                case SerializedPropertyType.Boolean: return prop.boolValue ? "True" : "False";
+                case SerializedPropertyType.Float: return prop.floatValue.ToString("F3");
+                case SerializedPropertyType.String: return string.IsNullOrEmpty(prop.stringValue) ? "\"\"" : $"\"{prop.stringValue}\"";
+                case SerializedPropertyType.Color: return prop.colorValue.ToString();
+                case SerializedPropertyType.ObjectReference: return prop.objectReferenceValue != null ? prop.objectReferenceValue.name : "null";
+                case SerializedPropertyType.LayerMask: return prop.intValue.ToString();
+                case SerializedPropertyType.Vector2: return prop.vector2Value.ToString();
+                case SerializedPropertyType.Vector3: return prop.vector3Value.ToString();
+                case SerializedPropertyType.Vector4: return prop.vector4Value.ToString();
+                case SerializedPropertyType.Rect: return prop.rectValue.ToString();
+                case SerializedPropertyType.ArraySize: return $"[Array Size: {prop.intValue}]";
+                case SerializedPropertyType.Character: return $"'{((char)prop.intValue)}'";
+                case SerializedPropertyType.AnimationCurve: return "[AnimationCurve]";
+                case SerializedPropertyType.Bounds: return prop.boundsValue.ToString();
+                
+                // 【核心修复点】：针对枚举类型的越界安全检查
+                case SerializedPropertyType.Enum:
+                    if (prop.enumValueIndex >= 0 && prop.enumValueIndex < prop.enumDisplayNames.Length)
+                    {
+                        return prop.enumDisplayNames[prop.enumValueIndex];
+                    }
+                    return $"[Invalid Enum Index: {prop.enumValueIndex}]";
+
+                // 其他通用类型（如 struct, array），直接返回其类型名
+                case SerializedPropertyType.Generic:
+                    return prop.isArray ? "[Array/List]" : "[Generic Struct]";
+
+                default:
+                    return $"[{prop.propertyType.ToString()}]";
             }
         }
-
-        sb.AppendLine("");
-
-        foreach (Transform child in t)
+        catch (System.Exception ex)
         {
-            Traverse(child, sb, indent + 1);
-        }
-    }
-
-    // 根据属性类型获取其字符串表现形式
-    private string GetPropertyValue(SerializedProperty prop)
-    {
-        switch (prop.propertyType)
-        {
-            case SerializedPropertyType.Integer: return prop.intValue.ToString();
-            case SerializedPropertyType.Boolean: return prop.boolValue.ToString();
-            case SerializedPropertyType.Float: return prop.floatValue.ToString("F2");
-            case SerializedPropertyType.String: return $"\"{prop.stringValue}\"";
-            case SerializedPropertyType.Color: return prop.colorValue.ToString();
-            case SerializedPropertyType.ObjectReference: 
-                return prop.objectReferenceValue != null ? $"[{prop.objectReferenceValue.name}]" : "None";
-            case SerializedPropertyType.Enum:
-                return prop.enumDisplayNames[prop.enumValueIndex];
-            case SerializedPropertyType.Vector3: return prop.vector3Value.ToString();
-            case SerializedPropertyType.Rect: return prop.rectValue.ToString();
-            default:
-                return exportAllProperties ? $"(Type: {prop.propertyType})" : ""; 
+            // 无论发生什么底层错误，直接截断捕获，绝不崩溃
+            return $"[读取错误: {ex.Message}]";
         }
     }
 }
