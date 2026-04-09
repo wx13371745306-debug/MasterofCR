@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Mirror;
@@ -121,8 +122,44 @@ public class LobbyUIManager : MonoBehaviour
     public void OnClickSinglePlayer()
     {
         SaveName();
-        // 直接用源生 API 读取场景，绝对不会涉及 NetworkManager 从而实现完美“黑盒旁路”隔离
-        SceneManager.LoadScene(singlePlayerSceneName); 
+
+        // 【假装单机模式】：启动一台只有自己的本地 Host 服务器。
+        // 这样所有 NetworkIdentity 物体都会被 Mirror 正确管理，场景中的厨具、桌子全部正常显示。
+        CustomNetworkRoomManager nrm = NetworkManager.singleton as CustomNetworkRoomManager;
+        if (nrm != null)
+        {
+            nrm.StartHost();
+            StartCoroutine(AutoStartSinglePlayerRoutine(nrm));
+        }
+        else
+        {
+            Debug.LogWarning("[LobbyUI] 未找到 CustomNetworkRoomManager，将直接加载场景");
+            SceneManager.LoadScene(singlePlayerSceneName);
+        }
+    }
+
+    /// <summary>
+    /// 协程：等待 Mirror 完成 Host 初始化，自动标记本地玩家为"已准备"，然后跳转到游戏场景。
+    /// </summary>
+    private IEnumerator AutoStartSinglePlayerRoutine(CustomNetworkRoomManager nrm)
+    {
+        // 等两帧，确保 Mirror 完成 Host 连接和 RoomPlayer 的创建
+        yield return null;
+        yield return null;
+
+        // 自动将本地 RoomPlayer 标记为"已准备"
+        // 否则 NetworkRoomManager.ServerChangeScene 会因 allPlayersReady==false 而静默拒绝跳转
+        NetworkRoomPlayer roomPlayer = NetworkClient.localPlayer != null 
+            ? NetworkClient.localPlayer.GetComponent<NetworkRoomPlayer>() 
+            : null;
+
+        if (roomPlayer != null)
+        {
+            roomPlayer.CmdChangeReadyState(true);
+            yield return null; // 再等一帧让 ready 状态在服务端生效
+        }
+
+        nrm.ServerChangeScene(nrm.GameplayScene);
     }
 
     public void OnClickMultiplayer()

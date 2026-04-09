@@ -14,6 +14,14 @@ public class DayZeroIntroUI : MonoBehaviour
     [Tooltip("第一天（周一）关卡配置中计划的顾客总数")]
     [SerializeField] private TextMeshProUGUI firstDayPlannedGuestsText;
 
+    [Header("开始第一天 校验")]
+    [Tooltip("菜单数据资产，用于检查玩家是否已选了至少一道菜")]
+    [SerializeField] private MenuSO menuSO;
+    [Tooltip("配送队列，用于检查玩家是否有已下单的待交付货物")]
+    [SerializeField] private ShopDeliveryQueue shopDeliveryQueue;
+    [Tooltip("弹窗 UI 控制器（与打烊面板共用同一个）")]
+    [SerializeField] private NextDayConfirmUI confirmUI;
+
     void Start()
     {
         var d = Resolve();
@@ -71,6 +79,34 @@ public class DayZeroIntroUI : MonoBehaviour
     }
 
     public void OnStartFirstDayClicked()
+    {
+        // ========== 校验 Step 1：菜单是否为空 ==========
+        if (menuSO == null || menuSO.selectedRecipes == null || menuSO.selectedRecipes.Count == 0)
+        {
+            if (confirmUI != null)
+                confirmUI.ShowWarning("请至少选择一道菜才能开始第一天！");
+            else
+                Debug.LogWarning("[DayZeroIntroUI] 菜单为空且 confirmUI 未赋值，无法弹窗！");
+            return;
+        }
+
+        // ========== 校验 Step 2：是否有已下单的待交付货物 ==========
+        bool hasOrders = shopDeliveryQueue != null && shopDeliveryQueue.HasPendingOrders;
+
+        if (!hasOrders)
+        {
+            if (confirmUI != null)
+                confirmUI.ShowConfirm("你还没有下单购买任何食材，确定要开始第一天吗？", DoStartFirstDay);
+            else
+                DoStartFirstDay();
+            return;
+        }
+
+        // ========== 两项都满足，直接开始 ==========
+        DoStartFirstDay();
+    }
+
+    void DoStartFirstDay()
     {
         var d = Resolve();
         if (d != null)

@@ -280,6 +280,20 @@ public class DayCycleManager : MonoBehaviour
         if (cc != null) cc.enabled = true;
     }
 
+    /// <summary>供 SinglePlayerSpawner 等外部脚本在运行时注入玩家引用。</summary>
+    public void SetPlayerObject(GameObject player)
+    {
+        playerObject = player;
+        if (debugLog) Debug.Log($"[DayCycle] 外部注入 playerObject: {(player != null ? player.name : "NULL")}");
+    }
+
+    /// <summary>供 SinglePlayerSpawner 等外部脚本在运行时注入出生点。</summary>
+    public void SetPlayerSpawnPoint(Transform point)
+    {
+        playerSpawnPoint = point;
+        if (debugLog) Debug.Log($"[DayCycle] 外部注入 playerSpawnPoint: {(point != null ? point.name : "NULL")}");
+    }
+
     /// <summary>订单收入等是否记入「今日营业额」（营业与延迟营业期间）。</summary>
     public bool ShouldRecordOrderRevenue()
     {

@@ -8,7 +8,7 @@ public class CustomNetworkRoomManager : NetworkRoomManager
 {
     [Header("Debug Settings")]
     public bool debugLog = false;
-    
+
     // 【屏蔽原生UI】防止屏幕上出现 Mirror 默认的灰色方块和连通信息
     public override void OnGUI() {}
 
@@ -66,5 +66,14 @@ public class CustomNetworkRoomManager : NetworkRoomManager
         base.OnRoomClientDisconnect();
         if (debugLog)
             Debug.Log("[CustomNetworkRoomManager] 本地客户端断开连接");
+    }
+
+    // 【新增修复】拦截 Mirror 在所有人准备后默认触发的「全自动跳场景」！
+    // 将切场景的主动权完全交给房主点击的 "开始游戏" 按钮，解决 Scene change is already in progress 报错。
+    public override void OnRoomServerPlayersReady()
+    {
+        // 留空，什么都不做！不调用 base.OnRoomServerPlayersReady()
+        if (debugLog)
+            Debug.Log("[CustomNetworkRoomManager] 所有人都准备好了，等待房主手动点击开始游戏...");
     }
 }

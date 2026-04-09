@@ -54,7 +54,6 @@ public class PlayerNetworkController : NetworkBehaviour
         if (camRig != null)
         {
             camRig.target = this.transform;
-            // 使其死死咬住目标（如果摄像机本身逻辑是按住Space跟随可以用 alwaysFollow 强行覆盖体验）
             camRig.alwaysFollow = true; 
             
             if (debugLog) Debug.Log("[PlayerNetworkController] 摄像机绑定成功！");
@@ -62,6 +61,19 @@ public class PlayerNetworkController : NetworkBehaviour
         else
         {
             Debug.LogWarning("[PlayerNetworkController] 出错：未能找到场景中的 CameraFollowRig！请确保存在。");
+        }
+
+        // 将本地玩家注入 DayCycleManager，使每日传送（TeleportPlayerToSpawn）在联机和假单机模式下都能正常工作
+        if (DayCycleManager.Instance != null)
+        {
+            DayCycleManager.Instance.SetPlayerObject(this.gameObject);
+
+            // 同时注入出生点：优先用场景中的 NetworkStartPosition
+            NetworkStartPosition nsp = UnityEngine.Object.FindAnyObjectByType<NetworkStartPosition>();
+            if (nsp != null)
+                DayCycleManager.Instance.SetPlayerSpawnPoint(nsp.transform);
+
+            if (debugLog) Debug.Log("[PlayerNetworkController] 已将玩家引用和出生点注入 DayCycleManager。");
         }
     }
 

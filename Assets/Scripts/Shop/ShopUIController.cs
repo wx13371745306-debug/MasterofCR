@@ -46,6 +46,9 @@ public class ShopUIController : MonoBehaviour
 
     public bool IsOpen => shopPanelRoot != null && shopPanelRoot.activeSelf;
 
+    /// <summary>购物车是否为空（供外部校验用，如打烊面板的"下一天"按钮）。</summary>
+    public bool IsCartEmpty => cart.Count == 0;
+
     void OnEnable()
     {
         MoneyManager.OnMoneyChanged += OnMoneyChanged;

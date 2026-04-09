@@ -19,6 +19,9 @@ public class ShopDeliveryQueue : MonoBehaviour
         set => deliverySpawner = value;
     }
 
+    /// <summary>是否有已下单但尚未交付的货物（Day0 存单 + 准备阶段批次）。</summary>
+    public bool HasPendingOrders => dayZeroPending.Count > 0 || pendingBatch.Count > 0;
+
     public void OnNewPrepStarted()
     {
         pendingBatch.Clear();

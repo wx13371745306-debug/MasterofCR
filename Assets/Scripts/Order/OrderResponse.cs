@@ -54,9 +54,6 @@ public class OrderResponse : BaseStation
     public float currentPatienceOrder;
     public float currentPatienceFood;
 
-    [Header("Debug")]
-    public bool debugLog = true;
-
     [Header("Order Settings")]
     [Tooltip("桌子物理上限（兜底），实际点菜数以顾客组配置为准")]
     public int maxDishes = 6;

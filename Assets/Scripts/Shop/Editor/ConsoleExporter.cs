@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 
 [InitializeOnLoad]
@@ -41,35 +40,36 @@ public class ConsoleExporter
         }
     }
 
-    [MenuItem("Tools/游戏开发助手/一键导出当前运行日志")]
-    public static void ExportLogs()
+    [MenuItem("Tools/游戏开发助手/一键复制当前运行日志")]
+    public static void CopyLogsToClipboard()
     {
-        // 弹出文件保存面板
-        string defaultName = $"GameLogs_{System.DateTime.Now:MMdd_HHmm}.txt";
-        string path = EditorUtility.SaveFilePanel("导出日志", "", defaultName, "txt");
-        
-        if (string.IsNullOrEmpty(path)) return; // 用户取消了保存
-
         StringBuilder sb = new StringBuilder();
         sb.AppendLine("=========================================");
-        sb.AppendLine("          Unity 游戏运行日志导出         ");
-        sb.AppendLine($"          导出时间: {System.DateTime.Now}");
+        sb.AppendLine("          Unity 游戏运行日志提取         ");
+        sb.AppendLine($"          提取时间: {System.DateTime.Now}");
         sb.AppendLine("=========================================\n");
 
         lock (lockObj)
         {
+            if (logHistory.Count == 0)
+            {
+                Debug.LogWarning("<color=#FF9900>[ConsoleExporter]</color> 当前没有任何日志缓存哦！");
+                return;
+            }
+
+
             foreach (var log in logHistory)
             {
                 sb.AppendLine(log);
             }
         }
 
-        // 写入文件
-        File.WriteAllText(path, sb.ToString());
-        Debug.Log($"<color=#00FF00>[ConsoleExporter]</color> 成功导出 {logHistory.Count} 条日志到: {path}");
+        // ==========================================
+        // 核心修改点：直接写入系统剪贴板
+        // ==========================================
+        EditorGUIUtility.systemCopyBuffer = sb.ToString();
         
-        // 自动在系统资源管理器中打开该文件所在文件夹并选中
-        EditorUtility.RevealInFinder(path);
+        Debug.Log($"<color=#00FF00>[ConsoleExporter]</color> 成功！已将 {logHistory.Count} 条完整日志复制到剪贴板，快去粘贴给 Cursor 吧！");
     }
 
     [MenuItem("Tools/游戏开发助手/清空后台日志缓存")]
