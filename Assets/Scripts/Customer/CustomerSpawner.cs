@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
 public class CustomerSpawner : MonoBehaviour
 {
@@ -75,6 +76,8 @@ public class CustomerSpawner : MonoBehaviour
 
     void Update()
     {
+        if (NetworkClient.active && !NetworkServer.active) return;
+
         if (spawningPaused) return;
         if (currentLevelConfig == null || currentWaveIndex >= currentLevelConfig.waves.Count)
             return;
@@ -146,13 +149,13 @@ public class CustomerSpawner : MonoBehaviour
     /// </summary>
     private void SpawnGroup(WaveData wave, OrderResponse targetTable)
     {
-        // 【新增这一行】：经理一拍板，这桌立刻打上预定标记！别人抢不走了！
         targetTable.isReserved = true;
 
-        // 生成小队（耐心与点菜参数由 CustomerGroup.InitGroup 内部注入桌子）
         CustomerGroup newGroup = Instantiate(wave.groupPrefab, spawnPoint.position, Quaternion.identity);
-        
-        // 初始化（寻路会自动开始）
+
+        if (NetworkServer.active)
+            NetworkServer.Spawn(newGroup.gameObject);
+
         newGroup.InitGroup(targetTable, spawnPoint, customerExitPoint);
 
         if (debugLog)

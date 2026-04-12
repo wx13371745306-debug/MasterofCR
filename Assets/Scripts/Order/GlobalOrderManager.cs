@@ -14,6 +14,9 @@ public class GlobalOrderManager : MonoBehaviour
     [Header("饮料菜谱（供各桌自动获取）")]
     public DrinkRecipeDatabase drinkRecipeDatabase;
 
+    [Tooltip("与 OrderGenerator 一致，用于联机客户端根据 recipeName 还原全局订单卡片")]
+    public FryRecipeDatabase fryRecipeDatabase;
+
     [Header("全局耐心修正 (乘数，1.0 = 不修改)")]
     [Tooltip("所有顾客的初始耐心值乘数")]
     public float globalPatienceMultiplier = 1.0f;
@@ -118,45 +121,111 @@ public class GlobalOrderManager : MonoBehaviour
     /// <summary>
     /// 桌子点完菜后，调用此方法把整桌的菜注册到全局中心
     /// </summary>
-    public void RegisterOrdersForTable(int tableId, List<FryRecipeDatabase.FryRecipe> recipes)
+    public List<OrderInstance> RegisterOrdersForTable(int tableId, List<FryRecipeDatabase.FryRecipe> recipes)
     {
+        var created = new List<OrderInstance>();
         foreach (var recipe in recipes)
         {
             if (recipe == null) continue;
 
-            // 1. 为每道菜生成带唯一 ID 的实例
             OrderInstance newOrder = new OrderInstance(tableId, recipe);
-            
-            // 2. 加入全局总列表
             activeOrders.Add(newOrder);
-
-            // 3. 广播给所有的 UI：“有新单子啦，快生成卡片！”
             OnOrderAdded?.Invoke(newOrder);
-            
+            created.Add(newOrder);
+
             Debug.Log($"[GlobalOrderManager] 接收新订单: 桌号 {tableId}, 菜品 {recipe.recipeName}, ID: {newOrder.orderId}");
         }
+        return created;
+    }
+
+    /// <summary>联机纯客户端：镜像服务端已注册的全局订单（不经过服务端 Register 路径）。</summary>
+    public void ClientMirrorRegisterOrders(int tableId, string[] orderIds, string[] recipeNames)
+    {
+        if (orderIds == null || recipeNames == null || orderIds.Length != recipeNames.Length) return;
+
+        for (int i = 0; i < orderIds.Length; i++)
+        {
+            string oid = orderIds[i];
+            string rname = recipeNames[i];
+            if (string.IsNullOrEmpty(oid) || string.IsNullOrEmpty(rname)) continue;
+
+            var recipe = ResolveRecipeByName(rname);
+            if (recipe == null)
+            {
+                Debug.LogWarning($"[GlobalOrderManager] ClientMirror 无法解析菜谱: {rname}");
+                continue;
+            }
+
+            var newOrder = new OrderInstance(tableId, recipe, oid);
+            activeOrders.Add(newOrder);
+            OnOrderAdded?.Invoke(newOrder);
+        }
+    }
+
+    /// <summary>联机纯客户端：核销与 Host 一致的订单实例。</summary>
+    public void ClientMirrorFulfillOrder(string orderId)
+    {
+        if (string.IsNullOrEmpty(orderId)) return;
+        for (int i = 0; i < activeOrders.Count; i++)
+        {
+            var order = activeOrders[i];
+            if (order != null && order.orderId == orderId)
+            {
+                activeOrders.RemoveAt(i);
+                OnOrderRemoved?.Invoke(order);
+                return;
+            }
+        }
+    }
+
+    /// <summary>联机纯客户端：撤掉某桌全部全局订单。</summary>
+    public void ClientMirrorRemoveAllOrdersForTable(int tableId)
+    {
+        for (int i = activeOrders.Count - 1; i >= 0; i--)
+        {
+            var order = activeOrders[i];
+            if (order == null || order.tableId != tableId) continue;
+            activeOrders.RemoveAt(i);
+            OnOrderRemoved?.Invoke(order);
+        }
+    }
+
+    FryRecipeDatabase.FryRecipe ResolveRecipeByName(string recipeName)
+    {
+        if (string.IsNullOrEmpty(recipeName)) return null;
+        if (fryRecipeDatabase != null)
+        {
+            var r = fryRecipeDatabase.FindByName(recipeName);
+            if (r != null) return r;
+        }
+        if (drinkRecipeDatabase != null)
+        {
+            var r = drinkRecipeDatabase.FindByName(recipeName);
+            if (r != null) return r;
+        }
+        var gen = UnityEngine.Object.FindAnyObjectByType<OrderGenerator>();
+        if (gen != null && gen.recipeDatabase != null)
+            return gen.recipeDatabase.FindByName(recipeName);
+        return null;
     }
 
     /// <summary>
     /// 玩家把菜放到桌子上时，桌子调用此方法尝试核销订单
     /// </summary>
     /// <returns>如果是这桌需要的菜，返回 true 并将其从全局列表中划掉；否则返回 false</returns>
-    public bool TryFulfillOrder(int tableId, string recipeName)
+    public bool TryFulfillOrder(int tableId, string recipeName, out string removedOrderId)
     {
-        // 从头到尾遍历（保证优先消除最左边/最早点的那一份）
+        removedOrderId = null;
         for (int i = 0; i < activeOrders.Count; i++)
         {
             var order = activeOrders[i];
-            
-            // 匹配条件：是这张桌子点的，且菜名完全一致
-            if (order.tableId == tableId && order.recipe.recipeName == recipeName)
+
+            if (order.tableId == tableId && order.recipe != null && order.recipe.recipeName == recipeName)
             {
-                // 1. 从列表中移除
+                removedOrderId = order.orderId;
                 activeOrders.RemoveAt(i);
-                
-                // 2. 广播给 UI：“这道菜做完啦，快把对应的卡片删掉！”
                 OnOrderRemoved?.Invoke(order);
-                
+
                 Debug.Log($"[GlobalOrderManager] 订单核销成功: 桌号 {tableId}, 菜品 {recipeName}");
                 return true;
             }

@@ -76,13 +76,9 @@ public class LobbyUIManager : MonoBehaviour
             if (hostControls != null) hostControls.SetActive(isHost);
             if (clientControls != null) clientControls.SetActive(!isHost);
 
-            // 2. 房主逻辑：检查所有人是否都准备了
+            // 2. 房主逻辑：检查房间内每一名玩家是否都已准备（不依赖 Mirror 的 minPlayers / allPlayersReady 启发式）
             if (isHost && startGameBtn != null)
-            {
-                // 如果不仅自己一个人，且全部准备好了
-                bool allReady = nrm.allPlayersReady && nrm.roomSlots.Count > 0;
-                startGameBtn.interactable = allReady;
-            }
+                startGameBtn.interactable = AreAllRoomPlayersReady(nrm);
 
             // 3. 客机逻辑：判断自己的准备状态来切换按钮
             if (!isHost && readyBtn != null && cancelReadyBtn != null)
@@ -251,11 +247,32 @@ public class LobbyUIManager : MonoBehaviour
     public void OnClickStartGame()
     {
         CustomNetworkRoomManager nrm = NetworkManager.singleton as CustomNetworkRoomManager;
-        if (nrm != null && NetworkServer.active)
+        if (nrm == null || !NetworkServer.active) return;
+
+        if (!AreAllRoomPlayersReady(nrm))
         {
-            // 这是 Mirror 的启动游戏跳转指令
-            nrm.ServerChangeScene(nrm.GameplayScene);
+            Debug.LogWarning("[LobbyUI] 无法开始游戏：房间内仍有玩家未准备。");
+            return;
         }
+
+        nrm.ServerChangeScene(nrm.GameplayScene);
+    }
+
+    /// <summary>
+    /// Mirror 的 allPlayersReady 在 minPlayers 较小时可能只需部分玩家就绪；联机房间要求「全员准备」才能开局。
+    /// </summary>
+    static bool AreAllRoomPlayersReady(NetworkRoomManager nrm)
+    {
+        if (nrm == null || nrm.roomSlots == null || nrm.roomSlots.Count == 0)
+            return false;
+
+        foreach (NetworkRoomPlayer rp in nrm.roomSlots)
+        {
+            if (rp == null || !rp.readyToBegin)
+                return false;
+        }
+
+        return true;
     }
 
     public void OnClickLeaveRoom()

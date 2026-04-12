@@ -2,11 +2,7 @@ using UnityEngine;
 using Mirror;
 
 /// <summary>
-/// 餐桌吃完饭后生成的脏盘子堆（纯视觉 + 数量追踪）。
-/// 玩家对着它：
-///   - 点按 J：拿走一个脏盘子
-///   - 长按 J：拿走一堆脏盘子（DynamicItemStack）
-/// 当所有盘子被拿完后，自动销毁自身。
+/// 脏盘子堆：桌上或地上为数量追踪 + 视觉；联机分发时仅生成带 NetworkIdentity 的整堆 <see cref="DirtyPlateStack"/>，不再生成单盘或 DynamicItemStack。
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class DirtyPlateStack : CarryableItem
@@ -16,8 +12,10 @@ public class DirtyPlateStack : CarryableItem
     public int plateCount = 1;
     [Tooltip("代表单个脏盘子的预制体（必须有 CarryableItem + StackableProp）")]
     public GameObject singlePlatePrefab;
-    [Tooltip("通用的 DynamicItemStack 预制体")]
+    [Tooltip("（旧）DynamicItemStack 预制体；分发逻辑已改为 portableHandStackPrefab")]
     public GameObject stackPrefab;
+    [Tooltip("从本堆分发到玩家手上时 Instantiate 的网络 DirtyPlateStack 预制体（需 NI）；未填则 ServerDispense 失败")]
+    public DirtyPlateStack portableHandStackPrefab;
     [Tooltip("垂直堆叠的Y轴间隔，决定了垒起来的高度间距")]
     public float stackYOffset = 0.05f;
     [Tooltip("存放所有视觉盘子的父节点")]
@@ -141,93 +139,47 @@ public class DirtyPlateStack : CarryableItem
     }
 
     /// <summary>
-    /// 仅由服务器端调用：生成物品并自动向全网进行Spawn注册
+    /// 仅服务端：生成分发到玩家手上的网络整堆（短按/长按一致）；数量受 maxDispensePerStack 限制。
     /// </summary>
     [Server]
     public GameObject ServerDispenseItem(bool isLongPress)
     {
+        _ = isLongPress; // 短按/长按行为一致，保留参数以兼容 CmdRequestDispenseBox
         if (plateCount <= 0) return null;
+
+        DirtyPlateStack prefabSrc = portableHandStackPrefab;
+        if (prefabSrc == null)
+        {
+            if (debugLog) Debug.LogError("[DirtyPlateStack] portableHandStackPrefab 未设置，无法分发整堆。");
+            return null;
+        }
+
         if (singlePlatePrefab == null) return null;
 
-        // 解除隐身锁
         if (forcedHidden)
-        {
             forcedHidden = false;
-        }
 
-        if (isLongPress && stackPrefab != null && plateCount >= 2)
+        int takeCount = Mathf.Min(maxDispensePerStack, plateCount);
+        GameObject go = Instantiate(prefabSrc.gameObject, new Vector3(-9999f, -9999f, -9999f), Quaternion.identity);
+        DirtyPlateStack spawned = go.GetComponent<DirtyPlateStack>();
+        if (spawned == null)
         {
-            return DispenseStackServer();
-        }
-        else
-        {
-            return DispenseSingleServer();
-        }
-    }
-
-    [Server]
-    GameObject DispenseSingleServer()
-    {
-        GameObject obj = Instantiate(singlePlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-        CarryableItem item = obj.GetComponent<CarryableItem>();
-        if (item == null)
-        {
-            Destroy(obj);
+            Destroy(go);
             return null;
         }
 
-        plateCount--;
+        spawned.plateCount = Mathf.Max(1, takeCount);
+
+        plateCount -= takeCount;
         if (boundTable != null)
-            boundTable.OnDirtyPlatesDispensed(1);
+            boundTable.OnDirtyPlatesDispensed(takeCount);
 
-        NetworkServer.Spawn(obj);
+        NetworkServer.Spawn(go);
 
-        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 吐出了一个脏盘子，剩余: {plateCount}");
+        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 分发网络整堆 x{takeCount}，地上剩余: {plateCount}");
 
         AfterDispense();
-        return obj;
-    }
-
-    [Server]
-    GameObject DispenseStackServer()
-    {
-        int dispenseCount = Mathf.Min(maxDispensePerStack, plateCount);
-
-        if (dispenseCount <= 1)
-            return DispenseSingleServer();
-
-        GameObject stackObj = Instantiate(stackPrefab, Vector3.one * -9999f, Quaternion.identity);
-        DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
-        if (stack == null)
-        {
-            Debug.LogError("[DirtyPlateStack] Stack 预制体上没有 DynamicItemStack 组件!");
-            Destroy(stackObj);
-            return null;
-        }
-
-        stack.InitializeFromPrefab(singlePlatePrefab, dispenseCount,
-            maxDispensePerStack, dispenseLayout, stackYOffset,
-            dispenseGridCols, dispenseGridRows, dispenseGridSpacing);
-
-        plateCount -= dispenseCount;
-        if (boundTable != null)
-            boundTable.OnDirtyPlatesDispensed(dispenseCount);
-
-        NetworkServer.Spawn(stackObj);
-
-        // 如果内部物体也带 NetworkIdentity，需一并 Spawn
-        foreach (var stackedItem in stack.GetItems())
-        {
-            if (stackedItem != null && stackedItem.GetComponent<NetworkIdentity>() != null)
-            {
-                NetworkServer.Spawn(stackedItem.gameObject);
-            }
-        }
-
-        if (debugLog) Debug.Log($"<color=#8B4513>[DirtyPlateStack-Server]</color> 吐出了脏盘Stack({dispenseCount}个)，剩余: {plateCount}");
-
-        AfterDispense();
-        return stackObj;
+        return go;
     }
 
     /// <summary>

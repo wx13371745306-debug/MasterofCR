@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 8457608618360046022}
   - component: {fileID: 2235822670805113803}
   - component: {fileID: 358812515614084988}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -113,7 +113,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1087020844740678282}
   - component: {fileID: 1471052445983113737}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: DishWashingStation
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -278,7 +278,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5761230595521361276}
   - component: {fileID: 4901951297686218732}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: PlateSpawnPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -315,11 +315,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemPlacePoint
   attachPoint: {fileID: 0}
   sensorHighlight: {fileID: 2589874351972949414}
-  allowAnyCategory: 1
-  allowedCategories: 0
+  allowAnyCategory: 0
+  allowedCategories: 128
   linkedCarryable: {fileID: 0}
   switchColliderLayerOnOccupy: 0
   targetCollider: {fileID: 0}
+  externalLock: 0
 --- !u!1 &3255108904803207307
 GameObject:
   m_ObjectHideFlags: 0
@@ -332,7 +333,7 @@ GameObject:
   - component: {fileID: 8469994862181809305}
   - component: {fileID: 5475034469981596837}
   - component: {fileID: 205871119793851463}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: ModelCollider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -443,7 +444,7 @@ GameObject:
   - component: {fileID: 4553479927395845314}
   - component: {fileID: 971685576709989245}
   - component: {fileID: 759544645397484571}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: WashingStation
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -486,14 +487,19 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   highlightObject: {fileID: 7811858952649070433}
-  debugLog: 0
+  debugLog: 1
   inputDropPoint: {fileID: 8019887932254479337}
   outputPlacePoint: {fileID: 4901951297686218732}
   cleanPlatePrefab: {fileID: 8858006345147724, guid: 263f8c0af825b024b87bcf60534760e8, type: 3}
   initialCleanPlates: 10
+  maxCleanPlatesAtOutput: 20
+  plateVisualRoot: {fileID: 47563763593815745}
+  cleanPlateVisualPrefab: {fileID: 3179079746596471596, guid: 44115717520f1e040aa207fddea95a26, type: 3}
+  cleanPlateVerticalOffset: 0.05
+  moveAttachWithStack: 1
+  stackAnchor: {fileID: 0}
   baseProcessingSpeed: 1
   requiredWashTimePerPlate: 2
-  dirtyPlatesInSink: 0
   currentWashProgress: 0
   singleDirtyPlateVisual: {fileID: 8549049122132773693, guid: f05b0425177dd954ab25a12d37fb77ba, type: 3}
   dirtyVisualRoot: {fileID: 8886710463647514380}
@@ -525,7 +531,7 @@ GameObject:
   - component: {fileID: 6683887265053809477}
   - component: {fileID: 4883925662365568413}
   - component: {fileID: 6135060225053209879}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Background
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -598,7 +604,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 47563763593815745}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Visual Root
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -629,7 +635,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5660344346396715960}
-  m_Layer: 0
+  - component: {fileID: 897447802741246950}
+  m_Layer: 3
   m_Name: CleanPlateOutputArea
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -654,6 +661,24 @@ Transform:
   - {fileID: 47563763593815745}
   m_Father: {fileID: 1087020844740678282}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &897447802741246950
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7693223544979529218}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12698977ea17c2c41a8c71acf57ac24f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CleanPlateDispenserStation
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  highlightObject: {fileID: 5275352441778378780}
+  debugLog: 1
+  dishWashing: {fileID: 971685576709989245}
 --- !u!1 &8514707162551001108
 GameObject:
   m_ObjectHideFlags: 0
@@ -663,7 +688,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8886710463647514380}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: DirtyVisualRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -696,7 +721,7 @@ GameObject:
   - component: {fileID: 3605360568860708622}
   - component: {fileID: 274981934233490707}
   - component: {fileID: 5322674813196524096}
-  m_Layer: 5
+  m_Layer: 3
   m_Name: Fill
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -812,6 +837,7 @@ MonoBehaviour:
   linkedCarryable: {fileID: 0}
   switchColliderLayerOnOccupy: 0
   targetCollider: {fileID: 0}
+  externalLock: 0
 --- !u!65 &7082302347786480457
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -897,13 +923,25 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -5568371526223589888, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: -1990968323811559735, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: fa9de41bc4efff14f8af27ef4021962f, type: 2}
+    - target: {fileID: -391268320553695201, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_Name
       value: PlaceableHighlight
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_IsActive
@@ -1011,9 +1049,25 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -5764725420169720540, guid: 7b2e68293c434fa48a128da05c5890e7, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 7b2e68293c434fa48a128da05c5890e7, type: 3}
       propertyPath: m_Name
       value: Model
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 7b2e68293c434fa48a128da05c5890e7, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8590067468806308668, guid: 7b2e68293c434fa48a128da05c5890e7, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 8808639470802435914, guid: 7b2e68293c434fa48a128da05c5890e7, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1089,13 +1143,25 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -5568371526223589888, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: -1990968323811559735, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: de763e33858c8d54792e3984ba23acef, type: 2}
+    - target: {fileID: -391268320553695201, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_Name
       value: CarryableHighlight
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_IsActive
@@ -1203,13 +1269,25 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -5568371526223589888, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: -1990968323811559735, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 63974cbc493b3c34fafd25c882247e91, type: 2}
+    - target: {fileID: -391268320553695201, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_Name
       value: UsableHighlight
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
+      propertyPath: m_Layer
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 4f3d6a52d4a5a124b9ca57c6efa6ae59, type: 3}
       propertyPath: m_IsActive

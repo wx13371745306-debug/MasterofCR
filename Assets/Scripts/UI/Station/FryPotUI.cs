@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class FryPotUI : MonoBehaviour
 {
+    static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+
     [Header("UI References")]
     public Canvas canvas;
     public Image fillImage;
@@ -11,18 +13,22 @@ public class FryPotUI : MonoBehaviour
     public bool alwaysFaceCamera = true;
     public bool hideWhenEmpty = true;
 
-    [Header("糊菜闪烁")]
-    [Tooltip("闪烁时的警告色")]
-    public Color burnWarningColor = Color.red;
-    [Tooltip("闪烁的起始速度（Hz）")]
-    public float burnFlashBaseSpeed = 2f;
-    [Tooltip("倒计时结束时闪烁速度的倍率")]
-    public float burnFlashMaxSpeedMul = 8f;
+    [Header("糊菜警告")]
+    [Tooltip("危险阶段且锅在煎炸台上时显示，Emission 在双色间闪烁")]
+    public GameObject burnWarningMotionTarget;
+    [Tooltip("若为空则从 burnWarningMotionTarget 上取 Renderer（含子物体）")]
+    public Renderer burnWarningRenderer;
+    [Tooltip("Emission 闪烁一端的 HDR 颜色（白）")]
+    public Color burnEmissionColorA = Color.white;
+    [Tooltip("Emission 闪烁另一端（红）")]
+    public Color burnEmissionColorB = new Color(1f, 0f, 0f, 1f);
+    [Tooltip("Emission 来回切换的速度")]
+    public float burnEmissionFlashSpeed = 2f;
 
     private FryPot pot;
     private Camera mainCamera;
     private Color normalFillColor;
-    private float flashAccum;
+    private MaterialPropertyBlock emissionMpb;
 
     void Start()
     {
@@ -34,6 +40,14 @@ public class FryPotUI : MonoBehaviour
 
         if (canvas != null && hideWhenEmpty)
             canvas.gameObject.SetActive(false);
+
+        if (burnWarningRenderer == null && burnWarningMotionTarget != null)
+            burnWarningRenderer = burnWarningMotionTarget.GetComponentInChildren<Renderer>(true);
+
+        if (burnWarningMotionTarget != null)
+            burnWarningMotionTarget.SetActive(false);
+
+        ApplyBurnEmission(Color.black);
     }
 
     void LateUpdate()
@@ -47,6 +61,9 @@ public class FryPotUI : MonoBehaviour
         if (pot.cookingFinished)
             shouldShow = false;
 
+        if (!shouldShow)
+            ResetBurnWarningVisual();
+
         if (hideWhenEmpty && canvas.gameObject.activeSelf != shouldShow)
             canvas.gameObject.SetActive(shouldShow);
 
@@ -59,7 +76,7 @@ public class FryPotUI : MonoBehaviour
         else
         {
             UpdateCookingUI();
-            flashAccum = 0f;
+            ResetBurnWarningVisual();
         }
 
         if (alwaysFaceCamera && mainCamera != null)
@@ -68,6 +85,9 @@ public class FryPotUI : MonoBehaviour
 
     void UpdateCookingUI()
     {
+        if (!fillImage.gameObject.activeSelf)
+            fillImage.gameObject.SetActive(true);
+
         float progress = 0f;
         if (pot.requiredProgress > 0.001f)
             progress = Mathf.Clamp01(pot.currentProgress / pot.requiredProgress);
@@ -78,23 +98,46 @@ public class FryPotUI : MonoBehaviour
 
     void UpdateBurnUI()
     {
-        float ratio = pot.BurnRatio;
-        fillImage.fillAmount = 1f - ratio;
+        if (fillImage.gameObject.activeSelf)
+            fillImage.gameObject.SetActive(false);
 
+        float ratio = pot.BurnRatio;
         float safeRatio = pot.BurnSafeRatio;
-        if (ratio <= safeRatio)
+        bool inDanger = ratio > safeRatio;
+        bool showDanger = inDanger && pot.ReceivesStationHeat;
+
+        if (!showDanger || burnWarningMotionTarget == null)
         {
-            fillImage.color = normalFillColor;
-            flashAccum = 0f;
+            SetBurnWarningActive(false);
+            ApplyBurnEmission(Color.black);
             return;
         }
 
-        // 危险阶段：蓝红闪烁，速度随 ratio 递增
-        float dangerProgress = Mathf.InverseLerp(safeRatio, 1f, ratio);
-        float speed = Mathf.Lerp(burnFlashBaseSpeed, burnFlashBaseSpeed * burnFlashMaxSpeedMul, dangerProgress);
-        flashAccum += Time.deltaTime * speed;
+        SetBurnWarningActive(true);
+        float t = Mathf.PingPong(Time.time * burnEmissionFlashSpeed, 1f);
+        ApplyBurnEmission(Color.Lerp(burnEmissionColorA, burnEmissionColorB, t));
+    }
 
-        float t = Mathf.PingPong(flashAccum, 1f);
-        fillImage.color = Color.Lerp(normalFillColor, burnWarningColor, t);
+    void ResetBurnWarningVisual()
+    {
+        SetBurnWarningActive(false);
+        ApplyBurnEmission(Color.black);
+    }
+
+    void SetBurnWarningActive(bool on)
+    {
+        if (burnWarningMotionTarget == null) return;
+        if (burnWarningMotionTarget.activeSelf != on)
+            burnWarningMotionTarget.SetActive(on);
+    }
+
+    void ApplyBurnEmission(Color c)
+    {
+        if (burnWarningRenderer == null) return;
+        if (emissionMpb == null)
+            emissionMpb = new MaterialPropertyBlock();
+        burnWarningRenderer.GetPropertyBlock(emissionMpb);
+        emissionMpb.SetColor(EmissionColorId, c);
+        burnWarningRenderer.SetPropertyBlock(emissionMpb);
     }
 }

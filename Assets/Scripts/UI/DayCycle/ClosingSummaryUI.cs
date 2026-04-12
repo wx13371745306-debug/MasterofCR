@@ -144,6 +144,13 @@ public class ClosingSummaryUI : MonoBehaviour
 
     void DoNextDay()
     {
+        var bridge = NetworkDayCycleBridge.Instance;
+        if (bridge != null && Mirror.NetworkClient.active)
+        {
+            bridge.NetworkRequestNextDay();
+            return;
+        }
+
         var d = ResolveDayCycle();
         if (d != null)
             d.RequestNextDay();

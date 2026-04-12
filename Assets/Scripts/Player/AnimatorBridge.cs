@@ -1,4 +1,5 @@
 using UnityEngine;
+using Mirror;
 
 public class AnimatorBridge : MonoBehaviour
 {
@@ -14,6 +15,7 @@ public class AnimatorBridge : MonoBehaviour
     private Rigidbody rb;
     private Animator animator;
     private bool lastIsWalking;
+    private PlayerNetworkController netCtrl;
 
     private void Awake()
     {
@@ -22,6 +24,7 @@ public class AnimatorBridge : MonoBehaviour
             rb = GetComponentInParent<Rigidbody>();
 
         animator = GetComponentInChildren<Animator>();
+        netCtrl = GetComponent<PlayerNetworkController>();
 
         if (rb == null)
             Debug.LogError("[AnimatorBridge] 未找到 Rigidbody!");
@@ -31,6 +34,10 @@ public class AnimatorBridge : MonoBehaviour
 
     private void Update()
     {
+        // 联网时远端玩家的 Animator 参数由 NetworkAnimator 同步，本地不驱动
+        if (netCtrl != null && NetworkClient.active && !netCtrl.isLocalPlayer)
+            return;
+
         if (rb == null || animator == null) return;
 
         Vector3 v = rb.linearVelocity;

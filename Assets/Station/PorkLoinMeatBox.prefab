@@ -332,6 +332,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   rb: {fileID: 3899933832762253609}
   itemColliders:
   - {fileID: 8294561567331402773}
@@ -345,7 +348,8 @@ MonoBehaviour:
   disableCollidersOnAttach: 1
   leftHandGrip: {fileID: 0}
   rightHandGrip: {fileID: 0}
-  debugLog: 1
+  debugLog: 0
+  lastHolderPlayer: {fileID: 0}
 --- !u!114 &4963858730225910187
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -358,6 +362,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4eeab940e5f422d45a2181e9f48f3bf0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SupplyBox
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   highlightObject: {fileID: 4007742793928181756}
   debugLog: 1
   itemPrefab: {fileID: 7096165798621821909, guid: 6ff383c4ddc53e444ae144acbede74ef, type: 3}
@@ -377,6 +384,7 @@ MonoBehaviour:
   lastItemModel: {fileID: 5880497205962611419}
   itemIconUI: {fileID: 3795424644177398672}
   emptyIconUI: {fileID: 4688781598229119704}
+  isOpened: 0
 --- !u!114 &7138757784160180968
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -424,7 +432,7 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0

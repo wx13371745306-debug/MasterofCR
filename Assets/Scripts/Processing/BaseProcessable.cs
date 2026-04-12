@@ -16,7 +16,7 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
 
     public abstract ProcessType SupportedProcessType { get; }
 
-    public float CurrentProgress => currentProgress;
+    public float CurrentProgress { get => currentProgress; set => currentProgress = value; }
     public float RequiredProgress => requiredProgress;
     public float NormalizedProgress => Mathf.Clamp01(currentProgress / requiredProgress);
     public bool IsComplete => hasCompleted || currentProgress >= requiredProgress;
@@ -72,64 +72,46 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
         Quaternion spawnRot = transform.rotation;
         Transform spawnParent = transform.parent;
 
-        // 1. 先生成新物体
         GameObject newObj = Instantiate(resultPrefab, spawnPos, spawnRot, spawnParent);
-        if (Mirror.NetworkServer.active)
-        {
-            Mirror.NetworkServer.Spawn(newObj);
-        }
         CarryableItem newItem = newObj.GetComponent<CarryableItem>();
 
-        // 【核心修复】：让新生成的物体继承放置点记录
         if (newItem != null && oldItem != null)
-        {
-            // 继承原来的初始放置点
-            newItem.initialPlacePoint = oldPlacePoint; 
-        }
+            newItem.initialPlacePoint = oldPlacePoint;
 
-        // === 腐烂进度继承系统 ===
         DecayableProp oldDecay = GetComponent<DecayableProp>();
         DecayableProp newDecay = newObj.GetComponent<DecayableProp>();
 
         if (newDecay != null)
         {
             if (oldDecay != null)
-            {
                 oldDecay.CopyStateTo(newDecay);
-            }
             else
             {
-                // 如果原食材没有腐烂值，生成食材有，则按默认值1初始化并弹Log
                 newDecay.ForceSetFreshness(1);
                 if (debugLog)
-                {
-                    Debug.Log($"[{GetType().Name}] 原食材 {gameObject.name} 无腐烂组件，加工成品 {newObj.name} 有腐烂组件，强制设置新鲜度为 1。");
-                }
+                    Debug.Log($"[{GetType().Name}] 原食材无腐烂组件，成品强制新鲜度=1");
             }
         }
-        // =======================
 
-        // 2. 如果旧物体原本在 PlacePoint 上，就让新物体重新正式放上去
         if (oldPlacePoint != null)
         {
-            // 【修正1】：使用新架构的无参清空方法
-            oldPlacePoint.ClearOccupant(); 
+            oldPlacePoint.ClearOccupant();
 
             if (newItem != null)
             {
-                // 【修正2】：使用新架构的 TryAcceptItem 替代原来的 ForcePlace
-                bool placed = oldPlacePoint.TryAcceptItem(newItem); 
-
+                newItem.SetNetworkTransformSync(false);
+                bool placed = oldPlacePoint.TryAcceptItem(newItem);
                 if (!placed && debugLog)
                     Debug.LogWarning($"[{GetType().Name}] TryAcceptItem failed for {newObj.name}");
             }
-            else if (debugLog)
-            {
-                Debug.LogWarning($"[{GetType().Name}] Result prefab {newObj.name} has no CarryableItem.");
-            }
         }
 
-        // 3. 销毁旧物体
-        Destroy(gameObject);
+        if (Mirror.NetworkServer.active)
+            Mirror.NetworkServer.Spawn(newObj);
+
+        if (Mirror.NetworkServer.active)
+            Mirror.NetworkServer.Destroy(gameObject);
+        else
+            Destroy(gameObject);
     }
 }

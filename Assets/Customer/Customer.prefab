@@ -70,6 +70,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29057292cd2a3dc47b8032d551ae5d44, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomerAI
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   agent: {fileID: 6340687636778815559}
   aiCollider: {fileID: 4332655182205527415}
   modelPrefabs:
@@ -85,6 +88,8 @@ MonoBehaviour:
   customerAnimController: {fileID: 9100000, guid: 2374a77389db6084a8da5f81151aa42a, type: 2}
   arrivalRadius: 1
   debugLog: 1
+  syncTableId: -1
+  syncChairIndex: -1
 --- !u!114 &-8438629945060381985
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -126,11 +131,11 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0
-  overlayColor: {r: 0, g: 0, b: 0, a: 0.5}
+  overlayColor: {r: 0.7119428, g: 1, b: 0, a: 0.5}
   onlySyncOnChangeCorrectionMultiplier: 2
   useFixedUpdate: 0
   rotationSensitivity: 0.01

@@ -23,6 +23,9 @@ public class ItemPlacePoint : MonoBehaviour
     // 【新增事件】：当有物体合法放上来时触发，取代 Update 轮询！
     public event System.Action<CarryableItem> OnItemPlacedEvent;
 
+    /// <summary>放置点被清空时触发（被拾取、被挤占前清空等）。参数为刚被移出占位的物体。</summary>
+    public event System.Action<CarryableItem> OnOccupantCleared;
+
     /// <summary>
     /// 外部锁：为 true 时 CanPlace 对玩家手持物一律返回 false。
     /// 由 OrderResponse 等上层逻辑在状态不对时设置。
@@ -55,7 +58,7 @@ public class ItemPlacePoint : MonoBehaviour
         if (!CanPlace(item)) return false;
 
         if (currentItem != null && currentItem != item)
-            ClearOccupant(); // 挤走旧的
+            ClearOccupant(silent: true); // 挤走旧的，不触发 OnOccupantCleared（避免与随后 OnItemPlaced 重复扣库存）
 
         currentItem = item;
         item.InternalSetPlacedState(this);
@@ -67,8 +70,11 @@ public class ItemPlacePoint : MonoBehaviour
         return true;
     }
 
-    public void ClearOccupant()
+    /// <param name="silent">为 true 时不触发 OnOccupantCleared（例如 TryAcceptItem 挤占旧物时）</param>
+    public void ClearOccupant(bool silent = false)
     {
+        CarryableItem cleared = currentItem;
+
         if (currentItem != null)
         {
             currentItem.ClearPlaceState();
@@ -77,6 +83,9 @@ public class ItemPlacePoint : MonoBehaviour
 
         if (linkedCarryable != null) linkedCarryable.isPickable = true;
         SetTargetColliderLayer(false);
+
+        if (!silent && cleared != null)
+            OnOccupantCleared?.Invoke(cleared);
     }
 
     private void SetTargetColliderLayer(bool occupied)

@@ -1,37 +1,78 @@
 using UnityEngine;
+using Mirror;
 
 /// <summary>
-/// 翻新后的洗碗池逻辑。
-/// 洗碗不再借助 CleanPlateDispenser 而是直接管理输出点位。
-/// 洗完后，出口如果为空，会生成单个盘子；如果有1个普通盘子，会堆成盘子堆；如果是盘子堆，会塞入其中。
-/// 盘子堆满时，洗碗池停止工作，关闭交互高亮（Sensor 检测时会把 IsOutputFull() 作为返回 false 的条件）。
+/// 洗碗池：脏盘入池按进度洗净；干净盘出口为库存计数 + Visual Root 纯视觉叠放。
+/// 玩家从出口取盘请使用 <see cref="CleanPlateDispenserStation"/>（按 J 向服务端请求生成网络盘子），勿依赖出口常驻实体。
+/// 放回干净盘仍使用 outputPlacePoint。预制体：outputPlacePoint、plateVisualRoot、cleanPlatePrefab（仅用于发放时生成）。
 /// </summary>
 public class DishWashingStation : BaseStation
 {
     [Header("Sink Settings")]
     [Tooltip("脏盘子的放置点，注意把它的 AllowedCategories 改为 DirtyPlate")]
     public ItemPlacePoint inputDropPoint;
-    
-    [Tooltip("【新增】洗完后干净盘子生成的放置点")]
+
+    [Tooltip("干净盘子放置/拾取点（通常为 CleanPlateOutputArea/PlateSpawnPoint）")]
     public ItemPlacePoint outputPlacePoint;
-    
-    [Tooltip("【新增】干净盘子的预制体（必须挂载了 CarryableItem 和 StackableProp）")]
+
+    [Tooltip("可拾取的干净盘子网络预制体（需 CarryableItem + NetworkIdentity）")]
     public GameObject cleanPlatePrefab;
-    
-    [Tooltip("【新增】游戏开始时，默认在出口生成的干净盘子数量")]
+
+    [Tooltip("游戏开始时出口干净盘库存数量")]
     public int initialCleanPlates = 5;
+
+    [Tooltip("出口干净盘最大数量（达到后洗碗暂停往出口增加）")]
+    public int maxCleanPlatesAtOutput = 20;
+
+    [Header("Clean Plate Visual Stack")]
+    [Tooltip("叠放视觉父节点（通常为 CleanPlateOutputArea/Visual Root）")]
+    public Transform plateVisualRoot;
+
+    [Tooltip("除顶层可拾取盘外，其余层使用的纯视觉预制体（无网络组件）；可留空则仅显示顶层实体")]
+    public GameObject cleanPlateVisualPrefab;
+
+    [Tooltip("叠放每层垂直间距（与脏盘 dirtyStackYOffset 含义类似）")]
+    public float cleanPlateVerticalOffset = 0.05f;
+
+    [Tooltip("若 outputPlacePoint.attachPoint 为 stackAnchor 子物体，则随库存高度调整其 localPosition.y")]
+    public bool moveAttachWithStack = true;
+
+    [Tooltip("叠放锚点（堆底）。默认可不填，将使用 plateVisualRoot")]
+    public Transform stackAnchor;
 
     [Header("Washing Process")]
     [Tooltip("洗碗的基础速度，暂设为1")]
     public float baseProcessingSpeed = 1f;
     [Tooltip("每洗净一个盘子需要的进度量，原为需要的总时间")]
     public float requiredWashTimePerPlate = 2f;
-    public int dirtyPlatesInSink = 0;
-    
+
+    [SyncVar(hook = nameof(OnSyncDirtyPlatesInSinkChanged))]
+    private int syncDirtyPlatesInSink;
+
+    /// <summary>池内脏盘数量（联机由 SyncVar 同步，供 UI/调试读取）。</summary>
+    public int dirtyPlatesInSink => syncDirtyPlatesInSink;
+
     // 【公开字段】供 UI 显示当前洗碗进度
     public float currentWashProgress = 0f;
 
+    /// <summary>当前出口干净盘库存（与 SyncVar 同步）。</summary>
+    public int CleanPlateStock => syncCleanPlateCount;
+
+    [SyncVar(hook = nameof(OnSyncCleanPlateCountChanged))]
+    private int syncCleanPlateCount;
+
+    /// <summary>服务端自动逻辑时跳过 OnCleanPlateReturned 吸收。</summary>
+    private bool suppressOutputPlacedAbsorb;
+
     private bool isWashing = false;
+
+    /// <summary>客机 UI 用：当前这一盘洗碗进度 0~1（与 ChoppingStation 的 syncProcessProgress 同理）。</summary>
+    [SyncVar]
+    private float syncWashProgress01;
+
+    /// <summary>客机 UI 用：是否处于长按 K 洗碗中（服务端权威）。</summary>
+    [SyncVar]
+    private bool syncWashingActive;
 
     [Header("Visual Inside Sink")]
     public GameObject singleDirtyPlateVisual;
@@ -39,239 +80,230 @@ public class DishWashingStation : BaseStation
     public float dirtyStackYOffset = 0.05f;
     private System.Collections.Generic.List<GameObject> dirtyVisualPlates = new System.Collections.Generic.List<GameObject>();
 
+    public override void OnStartServer()
+    {
+        base.OnStartServer();
+        ApplyCleanPlateCountOnServer(Mathf.Clamp(initialCleanPlates, 0, maxCleanPlatesAtOutput));
+    }
+
     protected override void Awake()
     {
         base.Awake();
         if (inputDropPoint != null)
-        {
-            // 监听丢盘子进来的事件
             inputDropPoint.OnItemPlacedEvent += OnDirtyPlateDropped;
-        }
-    }
 
-    private void Start()
-    {
-        // 初始生成一叠干净盘子
-        if (initialCleanPlates > 0)
-        {
-            SpawnCleanPlates(initialCleanPlates);
-        }
+        if (outputPlacePoint != null)
+            outputPlacePoint.OnItemPlacedEvent += OnCleanPlateReturned;
     }
 
     private void OnDestroy()
     {
         if (inputDropPoint != null)
             inputDropPoint.OnItemPlacedEvent -= OnDirtyPlateDropped;
+
+        if (outputPlacePoint != null)
+            outputPlacePoint.OnItemPlacedEvent -= OnCleanPlateReturned;
+    }
+
+    private void OnSyncCleanPlateCountChanged(int oldVal, int newVal)
+    {
+        RebuildCleanPlateVisualsLocal();
+        AlignOutputAttachPoint(newVal);
+    }
+
+    void OnSyncDirtyPlatesInSinkChanged(int oldVal, int newVal)
+    {
+        UpdateDirtyVisuals();
+    }
+
+    /// <summary>仅在服务端修改库存并同步（不再在出口生成常驻可拾取实体）。</summary>
+    private void ApplyCleanPlateCountOnServer(int newCount)
+    {
+        if (!NetworkServer.active) return;
+
+        newCount = Mathf.Clamp(newCount, 0, maxCleanPlatesAtOutput);
+        syncCleanPlateCount = newCount;
+    }
+
+    /// <summary>服务端：从库存取 1 个干净盘网络物体（虚空生成，与 SupplyBox 发蛋类似）。</summary>
+    public GameObject ServerTryDispenseCleanPlate()
+    {
+        if (!NetworkServer.active) return null;
+        if (syncCleanPlateCount <= 0 || cleanPlatePrefab == null) return null;
+
+        ApplyCleanPlateCountOnServer(syncCleanPlateCount - 1);
+
+        GameObject obj = Instantiate(cleanPlatePrefab, new Vector3(-9999f, -9999f, -9999f), Quaternion.identity);
+        NetworkServer.Spawn(obj);
+        return obj;
+    }
+
+    private void RebuildCleanPlateVisualsLocal()
+    {
+        if (plateVisualRoot == null) return;
+
+        for (int i = plateVisualRoot.childCount - 1; i >= 0; i--)
+            Destroy(plateVisualRoot.GetChild(i).gameObject);
+
+        int count = syncCleanPlateCount;
+        if (count <= 0 || cleanPlateVisualPrefab == null) return;
+
+        for (int i = 0; i < count; i++)
+        {
+            GameObject go = Instantiate(cleanPlateVisualPrefab, plateVisualRoot);
+            go.transform.localPosition = new Vector3(0, i * cleanPlateVerticalOffset, 0);
+            go.transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    private Transform ResolveStackAnchor()
+    {
+        if (stackAnchor != null) return stackAnchor;
+        return plateVisualRoot;
+    }
+
+    private void AlignOutputAttachPoint(int count)
+    {
+        if (!moveAttachWithStack || outputPlacePoint == null || outputPlacePoint.attachPoint == null)
+            return;
+
+        Transform anchor = ResolveStackAnchor();
+        if (anchor == null) return;
+
+        Transform ap = outputPlacePoint.attachPoint;
+        if (!ap.IsChildOf(anchor))
+            return;
+
+        float y = Mathf.Max(0, count - 1) * cleanPlateVerticalOffset;
+        Vector3 lp = ap.localPosition;
+        ap.localPosition = new Vector3(lp.x, y, lp.z);
+    }
+
+    /// <summary>玩家放回干净盘：销毁实体并增加库存（仅服务端）。</summary>
+    private void OnCleanPlateReturned(CarryableItem item)
+    {
+        if (item == null || !NetworkServer.active) return;
+        if (suppressOutputPlacedAbsorb) return;
+        // 以类别为准（预制体 categories 损坏时 HasAnyCategory 也会失败，需在预制体勾选 CleanPlate）
+        if (!item.HasAnyCategory(ItemCategory.CleanPlate))
+            return;
+
+        if (IsOutputFull())
+            return;
+
+        outputPlacePoint.ClearOccupant(silent: true);
+        NetworkServer.Destroy(item.gameObject);
+        ApplyCleanPlateCountOnServer(syncCleanPlateCount + 1);
     }
 
     /// <summary>获取实际洗碗速度（含羁绊加成和属性修正）。</summary>
     public float GetEffectiveWashingSpeed()
     {
-        // 1. 获取基础速度
         float speed = baseProcessingSpeed;
 
-        // 2. 累乘玩家属性
         float playerMulti = 1.0f;
         if (CurrentPlayerAttributes != null)
             playerMulti = CurrentPlayerAttributes.washSpeedMultiplier;
 
-        // 3. 累加全局加成
         float globalAddon = 0f;
         if (GlobalOrderManager.Instance != null)
             globalAddon = GlobalOrderManager.Instance.globalWashSpeedAddon;
 
-        // 4. 计算公式：最终速度 = (基础速度 * 玩家乘数) + 全局加成
         float finalSpeed = (speed * playerMulti) + globalAddon;
-
-        // 安全界限限制（保证最小有0.01速度运转防止卡死）
         return Mathf.Max(0.01f, finalSpeed);
     }
 
     private void Update()
     {
+        if (!NetworkServer.active) return;
+
         bool isOutputFull = IsOutputFull();
 
-        // 当洗碗池输出已满时，如果正在洗也是强制中断
         if (isWashing && isOutputFull)
         {
             isWashing = false;
             currentWashProgress = 0f;
-            if (debugLog) Debug.LogWarning("<color=#00FFFF>[DishWashingStation]</color> 出口盘子堆已满！已强制停止清洗！");
+            if (debugLog) Debug.LogWarning("<color=#00FFFF>[DishWashingStation]</color> 出口干净盘已满！已强制停止清洗！");
         }
 
-        if (isWashing && dirtyPlatesInSink > 0 && !isOutputFull)
+        if (isWashing && syncDirtyPlatesInSink > 0 && !isOutputFull)
         {
             currentWashProgress += GetEffectiveWashingSpeed() * Time.deltaTime;
-            
+
             if (currentWashProgress >= requiredWashTimePerPlate)
             {
-                // 完成清洗一个盘子
                 currentWashProgress = 0f;
-                dirtyPlatesInSink--;
-                UpdateDirtyVisuals();
+                syncDirtyPlatesInSink--;
 
-                SpawnCleanPlates(1); // 洗出一个新盘子发配到出口
-                
-                if (debugLog) Debug.Log($"<color=#00FFFF>[DishWashingStation]</color> 成功洗完 1 个盘子！目前水池里还剩: {dirtyPlatesInSink} 个。");
+                ApplyCleanPlateCountOnServer(syncCleanPlateCount + 1);
 
-                // 如果此时刚好满或者没脏盘子了，自动停掉
-                if (dirtyPlatesInSink <= 0 || IsOutputFull())
+                if (debugLog) Debug.Log($"<color=#00FFFF>[DishWashingStation]</color> 成功洗完 1 个盘子！目前水池里还剩: {syncDirtyPlatesInSink} 个。");
+
+                if (syncDirtyPlatesInSink <= 0 || IsOutputFull())
                 {
                     isWashing = false;
                     currentWashProgress = 0f;
                 }
             }
         }
+
+        PushWashProgressToSyncVars();
+    }
+
+    /// <summary>仅服务端：把当前洗碗进度同步给客机 UI。</summary>
+    void PushWashProgressToSyncVars()
+    {
+        if (!NetworkServer.active) return;
+
+        bool washing = isWashing && syncDirtyPlatesInSink > 0 && !IsOutputFull();
+        syncWashingActive = washing;
+
+        if (washing && requiredWashTimePerPlate > 0f)
+            syncWashProgress01 = Mathf.Clamp01(currentWashProgress / requiredWashTimePerPlate);
+        else
+            syncWashProgress01 = 0f;
     }
 
     private void OnDirtyPlateDropped(CarryableItem item)
     {
-        if (item == null) return;
+        if (item == null || !NetworkServer.active) return;
 
         DirtyPlateStack dirtyStack = item as DirtyPlateStack;
         DynamicItemStack dynamicStack = item as DynamicItemStack;
 
         if (dirtyStack != null)
         {
-            dirtyPlatesInSink += dirtyStack.plateCount;
+            syncDirtyPlatesInSink += dirtyStack.plateCount;
             inputDropPoint.ClearOccupant();
-            Destroy(dirtyStack.gameObject);
+            NetworkServer.Destroy(dirtyStack.gameObject);
         }
         else if (dynamicStack != null && item.HasAnyCategory(ItemCategory.DirtyPlate))
         {
             int stackCount = dynamicStack.Count;
-            dirtyPlatesInSink += Mathf.Max(1, stackCount);
+            syncDirtyPlatesInSink += Mathf.Max(1, stackCount);
             inputDropPoint.ClearOccupant();
 
             foreach (var stackedItem in dynamicStack.GetItems())
             {
                 if (stackedItem != null)
-                    Destroy(stackedItem.gameObject);
+                    NetworkServer.Destroy(stackedItem.gameObject);
             }
-            Destroy(dynamicStack.gameObject);
+            NetworkServer.Destroy(dynamicStack.gameObject);
         }
-        else if (item.HasAnyCategory(ItemCategory.DirtyPlate)) 
+        else if (item.HasAnyCategory(ItemCategory.DirtyPlate))
         {
-            dirtyPlatesInSink += 1;
+            syncDirtyPlatesInSink += 1;
             inputDropPoint.ClearOccupant();
-            Destroy(item.gameObject);
+            NetworkServer.Destroy(item.gameObject);
         }
 
-        UpdateDirtyVisuals();
-        
-        if (debugLog) Debug.Log($"<color=#00FFFF>[DishWashingStation]</color> 接收了脏盘子，当前总数: {dirtyPlatesInSink}");
+        if (debugLog) Debug.Log($"<color=#00FFFF>[DishWashingStation]</color> 接收了脏盘子，当前总数: {syncDirtyPlatesInSink}");
     }
 
-    /// <summary>
-    /// 生成 N 个盘子放入出口的位置。
-    /// 涵盖：无盘子(变单个)、单个(合并变堆)、已有堆(推入)、初始批量建堆 等所有情况
-    /// </summary>
-    private void SpawnCleanPlates(int count)
-    {
-        if (outputPlacePoint == null || cleanPlatePrefab == null || count <= 0) return;
-
-        CarryableItem currentItem = outputPlacePoint.CurrentItem;
-        StackableProp sp = cleanPlatePrefab.GetComponent<StackableProp>();
-
-        if (sp == null)
-        {
-            Debug.LogError("[DishWashingStation] 你的 cleanPlatePrefab 上缺少 StackableProp！洗碗机功能部分失效。");
-            return;
-        }
-
-        if (currentItem == null)
-        {
-            // 当前完全是空的
-            if (count > 1)
-            {
-                // [初始化调用] 需要直接捏一个完整的堆出来
-                if (Mirror.NetworkServer.active)
-                {
-                    int maxCap = (sp.layoutType == StackLayout.Grid) ? sp.gridColumns * sp.gridRows : sp.maxStackCount;
-                    GameObject stackObj = Instantiate(sp.dynamicStackPrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
-                    Mirror.NetworkServer.Spawn(stackObj);
-                    DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
-
-                    stack.InitializeFromPrefab(cleanPlatePrefab, count, maxCap, sp.layoutType, sp.stackYOffset, sp.gridColumns, sp.gridRows, sp.gridSpacing);
-                    stack.ForcePlaceAtStart(outputPlacePoint);
-                }
-            }
-            else
-            {
-                // 洗完第一个盘子，出来是一个普通单盘被放在台上
-                if (Mirror.NetworkServer.active)
-                {
-                    GameObject obj = Instantiate(cleanPlatePrefab, outputPlacePoint.attachPoint.position, Quaternion.identity);
-                    Mirror.NetworkServer.Spawn(obj);
-                    CarryableItem singlePlate = obj.GetComponent<CarryableItem>();
-                    singlePlate.ForcePlaceAtStart(outputPlacePoint);
-                }
-            }
-        }
-        else
-        {
-            // 台上已经有东西了
-            if (currentItem is DynamicItemStack stack)
-            {
-                // 已经成堆了，那就往里塞
-                for (int i = 0; i < count; i++)
-                {
-                    if (stack.IsFull) break;
-
-                    // 在远处产卵避免物理异常
-                    if (Mirror.NetworkServer.active)
-                    {
-                        GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-                        Mirror.NetworkServer.Spawn(obj);
-                        CarryableItem newPlate = obj.GetComponent<CarryableItem>();
-                        stack.PushItem(newPlate);
-                    }
-                }
-            }
-            else
-            {
-                // 台上是个单盘：它与第一块刚洗好的盘子合并成一坨新堆
-                // 因为目前洗碗基本 count = 1，仅考虑这个场景引发合并
-                if (count == 1)
-                {
-                    // 这里借用了已有的 MergeIntoStack 方法，它会自动吸纳这个单盘与传入的心盘并把自己替换为 DynamicItemStack
-                    StackableProp existProp = currentItem.GetComponent<StackableProp>();
-                    // 此处通过实例化一个假盘子传给它进行合并，合并后俩东西都被吸扯进一个新堆
-                    if (existProp != null && existProp.CanStackWith(cleanPlatePrefab.GetComponent<CarryableItem>()))
-                    {
-                        if (Mirror.NetworkServer.active)
-                        {
-                            GameObject obj = Instantiate(cleanPlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-                            Mirror.NetworkServer.Spawn(obj);
-                            CarryableItem newPlate = obj.GetComponent<CarryableItem>();
-                            existProp.MergeIntoStack(newPlate, null);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// 检查出口点位是不是已经饱和了
-    /// </summary>
+    /// <summary>检查出口干净盘是否已达上限。</summary>
     public bool IsOutputFull()
     {
-        if (outputPlacePoint == null) return false;
-        CarryableItem currentItem = outputPlacePoint.CurrentItem;
-
-        if (currentItem == null) return false;
-
-        // 如果是个堆装，它提供了公开的满载查询方法
-        if (currentItem is DynamicItemStack stack)
-        {
-            return stack.IsFull;
-        }
-        else
-        {
-            // 如果只有 1 个盘子，肯定没满（默认可堆叠）
-            return false;
-        }
+        return syncCleanPlateCount >= maxCleanPlatesAtOutput;
     }
 
     private void UpdateDirtyVisuals()
@@ -284,7 +316,7 @@ public class DishWashingStation : BaseStation
         }
         dirtyVisualPlates.Clear();
 
-        for (int i = 0; i < dirtyPlatesInSink; i++)
+        for (int i = 0; i < syncDirtyPlatesInSink; i++)
         {
             GameObject plate = Instantiate(singleDirtyPlateVisual, dirtyVisualRoot);
             plate.transform.localPosition = new Vector3(0, i * dirtyStackYOffset, 0);
@@ -295,31 +327,41 @@ public class DishWashingStation : BaseStation
 
     public override bool CanInteract(PlayerItemInteractor interactor)
     {
-        // 关键条件：
-        // 1. 水池里得有待洗的脏盘子
-        // 2. 并且由于洗碗必定会往出口放盘子，所以必须保证出口没满
-        return dirtyPlatesInSink > 0 && !IsOutputFull();
+        return syncDirtyPlatesInSink > 0 && !IsOutputFull();
     }
 
     public override void BeginInteract(PlayerItemInteractor interactor)
     {
-        if (CanInteract(interactor))
+        if (!CanInteract(interactor))
         {
-            cachedInteractor = interactor; // 记录当前互动玩家
-            isWashing = true;
-            if (debugLog) Debug.Log("<color=#00FFFF>[DishWashingStation]</color> 玩家开始洗碗！长按 K...");
+            if (debugLog)
+                Debug.Log($"<color=#FF6666>[DishWashingStation]</color> BeginInteract 被拒绝（服务端）: dirtyInSink={syncDirtyPlatesInSink} outputFull={IsOutputFull()} | 若客户端曾高亮，多为显示与权威不同步或池内实际为 0。");
+            return;
         }
+
+        cachedInteractor = interactor;
+        isWashing = true;
+        PushWashProgressToSyncVars();
+        if (debugLog)
+            Debug.Log("<color=#00FFFF>[DishWashingStation]</color> 玩家开始洗碗！长按 K 保持…");
     }
 
     public override void EndInteract(PlayerItemInteractor interactor)
     {
         isWashing = false;
+        PushWashProgressToSyncVars();
         if (debugLog) Debug.Log("<color=#00FFFF>[DishWashingStation]</color> 玩家松开了洗碗按键。");
     }
 
     public float GetWashProgressNormalized()
     {
-        if (requiredWashTimePerPlate <= 0) return 0f;
-        return Mathf.Clamp01(currentWashProgress / requiredWashTimePerPlate);
+        if (requiredWashTimePerPlate <= 0f) return 0f;
+        // 服务端（含 Host）用本地累计值；纯客机用 SyncVar，否则进度条不涨
+        if (NetworkServer.active)
+            return Mathf.Clamp01(currentWashProgress / requiredWashTimePerPlate);
+        return Mathf.Clamp01(syncWashProgress01);
     }
+
+    /// <summary>纯客机：是否正在洗碗（用于 UI 可选逻辑）。</summary>
+    public bool IsWashingSynced => syncWashingActive;
 }

@@ -14,6 +14,8 @@ public class BondActivationStateSO : ScriptableObject
         public string description = "该buff已激活";
         [Tooltip("羁绊图标，激活后在 UI 列表中显示此图")]
         public Sprite icon;
+        [Tooltip("该羁绊激活后提供的暴击加成（0 表示无加成）")]
+        public float critBonus = 0f;
         [Tooltip("运行时由逻辑写入，不要手动勾选")]
         public bool isActive;
     }
@@ -98,6 +100,15 @@ public class BondActivationStateSO : ScriptableObject
 
             Debug.Log($"[Bond] 羁绊 '{b.displayName}'(tag={b.tag}): {(b.isActive ? "激活" : "未激活")}{(wasPreviouslyActive != b.isActive ? " ← 状态变更!" : "")}");
         }
+    }
+
+    /// <summary>累加所有已激活羁绊的暴击加成。</summary>
+    public float GetTotalActiveCritBonus()
+    {
+        float total = 0f;
+        foreach (var b in bonds)
+            if (b.isActive) total += b.critBonus;
+        return total;
     }
 
     /// <summary>全部重置为未激活。</summary>

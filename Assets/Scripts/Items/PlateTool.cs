@@ -30,6 +30,14 @@ public class PlateTool : MonoBehaviour, IHoldUseTool
             return false;
         }
 
+        // 联机：Host/Guest 均走服务端 Command，禁止客户端调用 Serve（否则会本地 ResetPot、盘子异常）
+        PlayerNetworkController netCtrl = interactor.GetComponent<PlayerNetworkController>();
+        if (netCtrl != null && NetworkClient.active)
+        {
+            netCtrl.CmdRequestPlateToolServe(pot.gameObject, selfItem.gameObject);
+            return true;
+        }
+
         GameObject resultPrefab = pot.Serve();
         if (resultPrefab == null)
         {
@@ -37,6 +45,8 @@ public class PlateTool : MonoBehaviour, IHoldUseTool
                 Debug.LogWarning("[PlateTool] Use failed: pot returned null resultPrefab.");
             return false;
         }
+
+        DishQuality servedQuality = pot.LastServedQuality;
 
         CarryableItem resultItemPrefab = resultPrefab.GetComponent<CarryableItem>();
         if (resultItemPrefab == null)
@@ -57,6 +67,10 @@ public class PlateTool : MonoBehaviour, IHoldUseTool
         GameObject newDishObj = Object.Instantiate(resultPrefab);
         if (NetworkServer.active)
             NetworkServer.Spawn(newDishObj);
+
+        DishQualityTag qualityTag = newDishObj.GetComponent<DishQualityTag>();
+        if (qualityTag != null)
+            qualityTag.ApplyQuality(servedQuality);
 
         CarryableItem newDishItem = newDishObj.GetComponent<CarryableItem>();
 

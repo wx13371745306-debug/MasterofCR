@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Mirror;
 
 public class OrderResponse : BaseStation
 {
@@ -21,15 +22,18 @@ public class OrderResponse : BaseStation
     public OrderGenerator orderGenerator;
     public FryRecipeDatabase recipeDatabase;
     public DrinkRecipeDatabase drinkRecipeDatabase;
-    [Tooltip("生成的整体脏盘子堆预制体")]
+    [Tooltip("桌上/配置用脏盘堆预制体（含 singlePlatePrefab 等视觉参数）")]
     public DirtyPlateStack dirtyPlateStackPrefab;
+    [Tooltip("玩家从本桌收走全部脏盘时生成在手上的网络 DirtyPlateStack；未填则使用 dirtyPlateStackPrefab")]
+    public DirtyPlateStack dirtyPlateStackHandPrefab;
 
     [Header("Table Identity")]
     public int tableId = 0;
 
     [Header("State (ReadOnly)")]
+    [SyncVar(hook = nameof(OnCurrentStateSynced))]
     public TableState currentState = TableState.Empty;
-    public float currentOrderProgress = 0f;
+    [SyncVar] public float currentOrderProgress = 0f;
     public float currentEatTime = 0f; // 当前剩余用餐时间
     
     // 【新增】：预定锁。只要被分配了哪怕人还没到，这桌也不能再接客了
@@ -51,8 +55,8 @@ public class OrderResponse : BaseStation
     [HideInInspector] public float effectivePatienceCap = 100f;
     [HideInInspector] public float effectiveImpatientThreshold = 40f;
 
-    public float currentPatienceOrder;
-    public float currentPatienceFood;
+    [SyncVar] public float currentPatienceOrder;
+    [SyncVar] public float currentPatienceFood;
 
     [Header("Order Settings")]
     [Tooltip("桌子物理上限（兜底），实际点菜数以顾客组配置为准")]
@@ -62,6 +66,11 @@ public class OrderResponse : BaseStation
     [HideInInspector] public int currentMinDishes = 1;
 
     private readonly List<FryRecipeDatabase.FryRecipe> currentOrder = new List<FryRecipeDatabase.FryRecipe>();
+    private readonly List<FryRecipeDatabase.FryRecipe> clientOrderView = new List<FryRecipeDatabase.FryRecipe>();
+
+    /// <summary>服务端维护；客户端通过 SyncList 还原 GetCurrentOrder。</summary>
+    public readonly SyncList<string> syncedOrderRecipeNames = new SyncList<string>();
+
     private Coroutine eatRoutine;
 
     [System.Serializable]
@@ -74,14 +83,85 @@ public class OrderResponse : BaseStation
 
     private readonly List<PlacedDishRecord> dishesOnTable = new List<PlacedDishRecord>();
 
-    // 【新增】：用来存储纯净无害的“吃完后”独立视觉模型，防止跟物理逻辑产生任何藕断丝连
+    // 【新增】：用来存储纯净无害的“吃完后”独立视觉模型，防止跟物理逻辑产生任何藕断丝连（仅服务端）
     private readonly List<GameObject> activeEatenModels = new List<GameObject>();
-    private int pendingDirtyPlatesCount = 0;
+    /// <summary>纯客户端：RpcSpawnClientEatenVisuals 生成的残羹副本，与 activeEatenModels 对应。</summary>
+    private readonly List<GameObject> clientReplicaEatenModels = new List<GameObject>();
+
+    [SyncVar(hook = nameof(OnPendingDirtyPlatesHook))]
+    private int syncPendingDirtyPlates;
+
+    /// <summary>待收脏盘数量（联机由 SyncVar 同步；单机无 Mirror 时直接写 syncPendingDirtyPlates）。</summary>
+    public int PendingDirtyPlatesCount => syncPendingDirtyPlates;
 
     private bool isInteracting = false;
     private CustomerGroup boundGroup;
     private bool isAbandoningPatience;
     private Coroutine readingMenuCoroutine;
+
+    void SetPendingDirtyPlates(int value)
+    {
+        value = Mathf.Max(0, value);
+        if (NetworkServer.active)
+            syncPendingDirtyPlates = value;
+        else if (!NetworkClient.active && !NetworkServer.active)
+            syncPendingDirtyPlates = value;
+    }
+
+    void OnPendingDirtyPlatesHook(int oldVal, int newVal)
+    {
+        if (NetworkServer.active) return;
+        if (newVal == 0 && clientReplicaEatenModels.Count > 0)
+            ClearAllClientReplicaEaten();
+    }
+
+    void ClearAllClientReplicaEaten()
+    {
+        foreach (var go in clientReplicaEatenModels)
+        {
+            if (go != null) Destroy(go);
+        }
+        clientReplicaEatenModels.Clear();
+    }
+
+    [ClientRpc]
+    void RpcSpawnClientEatenVisuals(string[] recipeNames, Vector3[] positions, Quaternion[] rotations)
+    {
+        if (NetworkServer.active) return;
+        if (recipeNames == null || positions == null || rotations == null) return;
+        int n = Mathf.Min(recipeNames.Length, positions.Length, rotations.Length);
+        for (int i = 0; i < n; i++)
+        {
+            if (string.IsNullOrEmpty(recipeNames[i])) continue;
+            FryRecipeDatabase.FryRecipe recipe = recipeDatabase != null ? recipeDatabase.FindByName(recipeNames[i]) : null;
+            if (recipe == null && drinkRecipeDatabase != null)
+                recipe = drinkRecipeDatabase.FindByName(recipeNames[i]);
+            if (recipe == null || recipe.eatenPrefab == null) continue;
+            GameObject go = Instantiate(recipe.eatenPrefab, positions[i], rotations[i], transform);
+            clientReplicaEatenModels.Add(go);
+        }
+    }
+
+    [ClientRpc]
+    void RpcRemoveClientEatenReplicas(int count)
+    {
+        if (NetworkServer.active) return;
+        if (count <= 0) return;
+        int remove = Mathf.Min(count, clientReplicaEatenModels.Count);
+        for (int i = 0; i < remove; i++)
+        {
+            int idx = clientReplicaEatenModels.Count - 1;
+            if (clientReplicaEatenModels[idx] != null)
+                Destroy(clientReplicaEatenModels[idx]);
+            clientReplicaEatenModels.RemoveAt(idx);
+        }
+    }
+
+    void ServerNotifyClientEatenLeftovers(List<string> names, List<Vector3> poss, List<Quaternion> rots)
+    {
+        if (!NetworkServer.active || names == null || names.Count == 0) return;
+        RpcSpawnClientEatenVisuals(names.ToArray(), poss.ToArray(), rots.ToArray());
+    }
 
     public void RegisterCustomerGroup(CustomerGroup group) => boundGroup = group;
 
@@ -135,17 +215,32 @@ public class OrderResponse : BaseStation
         if (drinkRecipeDatabase == null && GlobalOrderManager.Instance != null)
             drinkRecipeDatabase = GlobalOrderManager.Instance.drinkRecipeDatabase;
 
-        SetState(TableState.Empty);
+        // SyncVar 仅服务端初始化；客机依赖同步与 hook 更新 itemPlacePoint
+        if (!NetworkClient.active || NetworkServer.active)
+            SetState(TableState.Empty);
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+        ApplyItemPlaceLockForState(currentState);
+    }
+
+    void OnCurrentStateSynced(TableState oldState, TableState newState)
+    {
+        ApplyItemPlaceLockForState(newState);
+    }
+
+    void ApplyItemPlaceLockForState(TableState state)
+    {
+        if (itemPlacePoint == null) return;
+        bool allowServe = (state == TableState.WaitingForFood || state == TableState.Eating);
+        itemPlacePoint.externalLock = !allowServe;
     }
 
     void SetState(TableState newState)
     {
         currentState = newState;
-        if (itemPlacePoint != null)
-        {
-            bool allowServe = (newState == TableState.WaitingForFood || newState == TableState.Eating);
-            itemPlacePoint.externalLock = !allowServe;
-        }
     }
 
     // ================== 【耐心数据注入接口】 ==================
@@ -175,9 +270,12 @@ public class OrderResponse : BaseStation
         maxDishes = Mathf.Max(group.maxDishes, maxDishes); // 取较大值作为上限兜底
         currentCustomerCount = group.groupSize;
 
-        // 预设初始耐心
-        currentPatienceOrder = effectiveMaxPatienceOrder;
-        currentPatienceFood  = effectiveMaxPatienceFood;
+        // 预设初始耐心（SyncVar 仅服务端或单机写入）
+        if (!NetworkClient.active || NetworkServer.active)
+        {
+            currentPatienceOrder = effectiveMaxPatienceOrder;
+            currentPatienceFood = effectiveMaxPatienceFood;
+        }
 
         if (debugLog) Debug.Log($"[OrderResponse] 桌号 {tableId} 接收顾客组配置 | " +
             $"耐心Order={effectiveMaxPatienceOrder:F0} Loss={effectiveLossPerSecondOrder:F1}/s | " +
@@ -188,6 +286,9 @@ public class OrderResponse : BaseStation
 
     void Update()
     {
+        bool isServerOrOffline = !Mirror.NetworkClient.active || Mirror.NetworkServer.active;
+        if (!isServerOrOffline) return;
+
         if (isInteracting && currentState == TableState.Ordering)
         {
             currentOrderProgress += Time.deltaTime;
@@ -211,7 +312,6 @@ public class OrderResponse : BaseStation
             }
             else if (currentState == TableState.WaitingForFood)
             {
-                // 衰减速度已在 ApplyGroupConfig 中整合了全局修正（含羁绊），直接使用
                 currentPatienceFood -= effectiveLossPerSecondFood * Time.deltaTime;
                 if (currentPatienceFood <= 0f)
                 {
@@ -230,6 +330,7 @@ public class OrderResponse : BaseStation
     [ContextMenu("测试：模拟顾客入座")]
     public void GroupSeated()
     {
+        if (NetworkClient.active && !NetworkServer.active) return;
         if (currentState != TableState.Empty) return;
 
         // 【修改点】：不再直接等待点单，而是进入看菜单状态
@@ -249,14 +350,78 @@ public class OrderResponse : BaseStation
 
         SetState(TableState.WaitingToOrder);
         currentOrderProgress = 0f;
-        currentPatienceOrder = effectiveMaxPatienceOrder;
+        if (!NetworkClient.active || NetworkServer.active)
+            currentPatienceOrder = effectiveMaxPatienceOrder;
         Debug.Log($"[OrderResponse] 桌号 {tableId} 顾客看完了，头顶亮起图标请求点单！");
+    }
+
+    /// <summary>
+    /// 服务端：生成整堆网络脏盘、清桌并交给指定玩家（J/K 收盘共用）。
+    /// </summary>
+    public bool ServerTakeAllDirtyPlatesFor(PlayerNetworkController player)
+    {
+        if (!NetworkServer.active) return false;
+        if (player == null) return false;
+        if (currentState != TableState.WaitingForCleanup || syncPendingDirtyPlates <= 0) return false;
+
+        PlayerItemInteractor pi = player.GetComponent<PlayerItemInteractor>();
+        if (pi != null && pi.IsHoldingItem()) return false;
+
+        DirtyPlateStack prefabRoot = dirtyPlateStackHandPrefab != null ? dirtyPlateStackHandPrefab : dirtyPlateStackPrefab;
+        if (prefabRoot == null)
+        {
+            if (debugLog) Debug.LogError($"[OrderResponse] 桌 {tableId} 未配置 dirtyPlateStackPrefab，无法收盘。");
+            return false;
+        }
+
+        int count = syncPendingDirtyPlates;
+        GameObject go = Instantiate(prefabRoot.gameObject, new Vector3(-9999f, -9999f, -9999f), Quaternion.identity);
+        DirtyPlateStack stack = go.GetComponent<DirtyPlateStack>();
+        if (stack == null)
+        {
+            Destroy(go);
+            return false;
+        }
+
+        stack.plateCount = Mathf.Max(1, count);
+        NetworkServer.Spawn(go);
+
+        CleanUpTable();
+        player.ServerAssignPickupToCaller(go, false);
+        return true;
+    }
+
+    /// <summary>
+    /// 无 Mirror 网络时：本地 Instantiate 整堆并清桌。
+    /// </summary>
+    public void TryTakeAllDirtyPlatesOffline(PlayerItemInteractor interactor)
+    {
+        if (NetworkClient.active || NetworkServer.active) return;
+        if (interactor == null || interactor.IsHoldingItem()) return;
+        if (currentState != TableState.WaitingForCleanup || syncPendingDirtyPlates <= 0) return;
+
+        DirtyPlateStack prefabRoot = dirtyPlateStackHandPrefab != null ? dirtyPlateStackHandPrefab : dirtyPlateStackPrefab;
+        if (prefabRoot == null) return;
+
+        int count = syncPendingDirtyPlates;
+        GameObject go = Instantiate(prefabRoot.gameObject, new Vector3(-9999f, -9999f, -9999f), Quaternion.identity);
+        DirtyPlateStack stack = go.GetComponent<DirtyPlateStack>();
+        if (stack == null)
+        {
+            Destroy(go);
+            return;
+        }
+
+        stack.plateCount = Mathf.Max(1, count);
+        stack.BeginHold(interactor.GetHoldPoint());
+        interactor.ReplaceHeldItem(stack);
+        CleanUpTable();
     }
 
     // ================== 【BaseStation 交互接口实现】 ==================
     public override bool CanInteract(PlayerItemInteractor interactor)
     {
-        if (currentState == TableState.WaitingForCleanup && pendingDirtyPlatesCount > 0 && !interactor.IsHoldingItem()) return true;
+        if (currentState == TableState.WaitingForCleanup && syncPendingDirtyPlates > 0 && !interactor.IsHoldingItem()) return true;
         return currentState == TableState.WaitingToOrder || currentState == TableState.Ordering;
     }
 
@@ -270,58 +435,15 @@ public class OrderResponse : BaseStation
         }
         else if (currentState == TableState.WaitingForCleanup)
         {
-            if (pendingDirtyPlatesCount > 0 && !interactor.IsHoldingItem())
+            // 仅服务端执行（K 经 CmdSetStationInteractState）；J 走 CmdRequestTakeAllDirtyPlatesFromTable
+            if (syncPendingDirtyPlates > 0 && !interactor.IsHoldingItem() && NetworkServer.active)
             {
-                if (debugLog) Debug.Log($"[OrderResponse] 玩家端起桌号 {tableId} 的所有脏盘子 (数量: {pendingDirtyPlatesCount})");
-                
-                if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount == 1)
-                {
-                    GameObject obj = Instantiate(dirtyPlateStackPrefab.singlePlatePrefab, Vector3.one * -9999f, Quaternion.identity);
-                    if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(obj);
-                    CarryableItem item = obj.GetComponent<CarryableItem>();
-                    if (item != null)
-                    {
-                        item.BeginHold(interactor.GetHoldPoint());
-                        interactor.ReplaceHeldItem(item);
-                    }
-                }
-                else if (dirtyPlateStackPrefab != null && pendingDirtyPlatesCount > 1)
-                {
-                    GameObject stackPrefabToUse = dirtyPlateStackPrefab.stackPrefab;
-                    StackableProp sp = dirtyPlateStackPrefab.singlePlatePrefab != null ? dirtyPlateStackPrefab.singlePlatePrefab.GetComponent<StackableProp>() : null;
-                    if (stackPrefabToUse == null && sp != null)
-                    {
-                        stackPrefabToUse = sp.dynamicStackPrefab;
-                    }
-
-                    if (stackPrefabToUse == null)
-                    {
-                        Debug.LogError($"[OrderResponse] 无法生成多盘堆叠，因为没有找到有效的 stackPrefab 参数！请检查 {dirtyPlateStackPrefab.name}");
-                        return;
-                    }
-
-                    GameObject stackObj = Instantiate(stackPrefabToUse, Vector3.one * -9999f, Quaternion.identity);
-                    if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(stackObj);
-                    DynamicItemStack stack = stackObj.GetComponent<DynamicItemStack>();
-                    if (stack != null)
-                    {
-                        int maxStack = sp != null && sp.layoutType == StackLayout.Grid && sp.gridColumns * sp.gridRows > 0 ? sp.gridColumns * sp.gridRows : (sp != null ? sp.maxStackCount : pendingDirtyPlatesCount);
-                        StackLayout layout = sp != null ? sp.layoutType : StackLayout.Vertical;
-                        float offset = dirtyPlateStackPrefab.stackYOffset;
-                        int cols = sp != null ? sp.gridColumns : 1;
-                        int rows = sp != null ? sp.gridRows : 1;
-                        float spacing = sp != null ? sp.gridSpacing : 0.15f;
-                        
-                        stack.InitializeFromPrefab(dirtyPlateStackPrefab.singlePlatePrefab, pendingDirtyPlatesCount, maxStack, layout, offset, cols, rows, spacing);
-                        stack.BeginHold(interactor.GetHoldPoint());
-                        interactor.ReplaceHeldItem(stack);
-                    }
-                }
-                
-                pendingDirtyPlatesCount = 0;
-                CleanUpTable();  // 自动销毁残羹、重置桌面状态
-                isInteracting = false;
+                if (debugLog) Debug.Log($"[OrderResponse] 玩家端起桌号 {tableId} 的所有脏盘子 (数量: {syncPendingDirtyPlates})");
+                PlayerNetworkController pnc = interactor.GetComponent<PlayerNetworkController>();
+                if (pnc != null)
+                    ServerTakeAllDirtyPlatesFor(pnc);
             }
+            isInteracting = false;
         }
     }
 
@@ -354,23 +476,69 @@ public class OrderResponse : BaseStation
         {
             var next = orderGenerator.GenerateOrder(currentMinDishes, maxDishes, dishPlaceSystem, currentCustomerCount);
             currentOrder.AddRange(next);
+            ServerRefreshSyncedOrderList();
 
             if (GlobalOrderManager.Instance != null)
             {
-                // 这里发送到全局，由于还没写 UI，暂时在后台起作用
-                GlobalOrderManager.Instance.RegisterOrdersForTable(tableId, currentOrder);
+                var created = GlobalOrderManager.Instance.RegisterOrdersForTable(tableId, currentOrder);
+                if (NetworkServer.active && created != null && created.Count > 0)
+                {
+                    int n = created.Count;
+                    var ids = new string[n];
+                    var names = new string[n];
+                    for (int i = 0; i < n; i++)
+                    {
+                        ids[i] = created[i].orderId;
+                        names[i] = created[i].recipe != null ? created[i].recipe.recipeName : "";
+                    }
+                    RpcMirrorGlobalOrdersAdded(tableId, ids, names);
+                }
             }
             Debug.Log($"[OrderResponse] 桌号 {tableId} 订单生成完毕！");
         }
     }
 
+    /// <summary>纯客户端：仅同步桌面摆盘表现（DishPlaceSystem），不执行金钱/订单/统计。</summary>
+    void ClientOnlyMirrorDishPlacement(CarryableItem item)
+    {
+        if (dishPlaceSystem == null) return;
+
+        if (currentState != TableState.WaitingForFood && currentState != TableState.Eating)
+            return;
+
+        FryRecipeDatabase.FryRecipe recipe = ResolveRecipeFromDish(item);
+        if (recipe == null)
+        {
+            Debug.LogWarning($"[OrderResponse] 客户端镜像：无法解析 {item.name} 的配方，跳过 DishPlaceSystem。");
+            return;
+        }
+
+        bool placed = dishPlaceSystem.AcceptDish(item, recipe.size);
+        if (!placed)
+        {
+            // 客机无 dishesOnTable，无法按服务端逻辑隐藏最老盘；满载时强制塞入以对齐多数情况
+            dishPlaceSystem.ForceAcceptDish(item, recipe.size);
+        }
+
+        if (itemPlacePoint != null)
+            itemPlacePoint.ClearOccupant();
+
+        item.isPickable = false;
+    }
+
     void OnItemPlaced(CarryableItem item)
     {
         if (item == null) return;
-        
+
         // 【关键防护】：由于生成大脏盘堆并放入中心点时也会触发此事件，
         // 且它不属于“上餐”行为，所以遇到脏盘堆直接放行，切勿执行拦截拒收和订单判定逻辑！
         if (item is DirtyPlateStack) return;
+
+        if (NetworkClient.active && !NetworkServer.active)
+        {
+            ClientOnlyMirrorDishPlacement(item);
+            return;
+        }
 
         // 1. 只有 WaitingForFood 和 Eating 阶段允许上菜
         if (currentState != TableState.WaitingForFood && currentState != TableState.Eating)
@@ -398,26 +566,50 @@ public class OrderResponse : BaseStation
         {
             if (GlobalOrderManager.Instance != null)
             {
-                GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName);
+                if (GlobalOrderManager.Instance.TryFulfillOrder(tableId, recipe.recipeName, out string removedOrderId))
+                {
+                    if (!string.IsNullOrEmpty(removedOrderId))
+                        RpcMirrorGlobalOrderRemoved(removedOrderId);
+                }
             }
+
+            DishQualityTag qt = item.GetComponent<DishQualityTag>();
+            float qualityMul = qt != null ? qt.PriceMultiplier : 1f;
+            int finalPrice = Mathf.RoundToInt(recipe.price * qualityMul);
+
             if (MoneyManager.Instance != null)
             {
-                MoneyManager.Instance.AddMoney(recipe.price);
+                MoneyManager.Instance.AddMoney(finalPrice);
                 TableOrderProgressUI uiComponent = GetComponentInChildren<TableOrderProgressUI>(true);
                 if (uiComponent == null && transform.parent != null)
                 {
                     uiComponent = transform.parent.GetComponentInChildren<TableOrderProgressUI>(true);
                 }
-                if (uiComponent != null) uiComponent.ShowMoneyEarned(recipe.price);
+                if (uiComponent != null) uiComponent.ShowMoneyEarned(finalPrice);
+
+                // 蝴蝶结小费：检查端菜玩家是否有小费加成
+                PlayerAttributes serverPlayer = item.lastHolderPlayer;
+                if (serverPlayer != null && serverPlayer.accessoryTipRate > 0f)
+                {
+                    int tip = Mathf.RoundToInt(finalPrice * serverPlayer.accessoryTipRate);
+                    if (tip > 0)
+                    {
+                        MoneyManager.Instance.AddMoney(tip);
+                        if (uiComponent != null) uiComponent.ShowMoneyEarned(tip);
+                        Debug.Log($"[OrderResponse] 蝴蝶结小费: +{tip} (端菜玩家小费率={serverPlayer.accessoryTipRate})");
+                    }
+                }
             }
             if (DayStatsTracker.Instance != null)
             {
                 DayStatsTracker.Instance.RegisterPlacedItem(true, recipe.size == DishSize.D);
                 if (DayCycleManager.Instance != null && DayCycleManager.Instance.ShouldRecordOrderRevenue())
-                    DayStatsTracker.Instance.RegisterRevenue(recipe.price);
+                    DayStatsTracker.Instance.RegisterRevenue(finalPrice);
             }
             currentOrder.RemoveAt(idx);
-            Debug.Log($"[OrderResponse] 桌号 {tableId} 成功上对菜: {recipe.recipeName}。剩 {currentOrder.Count} 道菜！消单加钱！");
+            ServerRefreshSyncedOrderList();
+            string qualityStr = qt != null ? $" [{qt.quality} x{qualityMul}]" : "";
+            Debug.Log($"[OrderResponse] 桌号 {tableId} 成功上对菜: {recipe.recipeName}{qualityStr}。售价 {finalPrice}。剩 {currentOrder.Count} 道菜！");
         }
         else
         {
@@ -529,6 +721,9 @@ public class OrderResponse : BaseStation
         Debug.Log($"[Debug-Eat] 桌号 {tableId} 开始执行用餐完毕逻辑，当前桌上记录菜品数量: {dishesOnTable.Count}");
         
         int dirtyCount = 0;
+        var clientRpcNames = new List<string>();
+        var clientRpcPoss = new List<Vector3>();
+        var clientRpcRots = new List<Quaternion>();
 
         foreach (var d in dishesOnTable)
         {
@@ -558,6 +753,12 @@ public class OrderResponse : BaseStation
                 GameObject cleanEatenVisual = Instantiate(d.recipe.eatenPrefab, pos, rot, this.transform);
                 activeEatenModels.Add(cleanEatenVisual);
                 Debug.Log($"[Debug-Eat] - 成功生成【{cleanEatenVisual.name}】并加入 activeEatenModels 列表。当前列表总量: {activeEatenModels.Count}");
+                if (d.recipe != null && NetworkServer.active)
+                {
+                    clientRpcNames.Add(d.recipe.recipeName);
+                    clientRpcPoss.Add(pos);
+                    clientRpcRots.Add(rot);
+                }
             }
         }
 
@@ -567,8 +768,11 @@ public class OrderResponse : BaseStation
         dishesOnTable.Clear();
 
         // 2. 将脏盘子计数并直接转为待清理状态
-        pendingDirtyPlatesCount = dirtyCount;
-        if (debugLog) Debug.Log($"[OrderResponse] 客人用餐完毕，桌号 {tableId} 剩余 {pendingDirtyPlatesCount} 个脏盘子待端走。");
+        SetPendingDirtyPlates(dirtyCount);
+        if (debugLog) Debug.Log($"[OrderResponse] 客人用餐完毕，桌号 {tableId} 剩余 {dirtyCount} 个脏盘子待端走。");
+
+        if (NetworkServer.active && clientRpcNames.Count > 0)
+            ServerNotifyClientEatenLeftovers(clientRpcNames, clientRpcPoss, clientRpcRots);
         
         SetState(TableState.WaitingForCleanup);
         if (DayStatsTracker.Instance != null)
@@ -588,7 +792,7 @@ public class OrderResponse : BaseStation
         eatRoutine = null;
 
         // 如果刚好没留下任何脏盘子，代表桌子可以直接用了（比如全员饮品吸收了）
-        if (pendingDirtyPlatesCount == 0)
+        if (dirtyCount == 0)
         {
             CleanUpTable();
         }
@@ -596,6 +800,8 @@ public class OrderResponse : BaseStation
 
     public void CleanUpTable()
     {
+        SetPendingDirtyPlates(0);
+
         if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
         dishesOnTable.Clear(); // 清理记录
         
@@ -636,6 +842,7 @@ public class OrderResponse : BaseStation
     /// </summary>
     public void TryForceLeaveForBusinessEnd()
     {
+        if (NetworkClient.active && !NetworkServer.active) return;
         if (isAbandoningPatience) return;
         if (currentState == TableState.Empty) return;
         if (currentState == TableState.WaitingForFood || currentState == TableState.Eating ||
@@ -672,12 +879,20 @@ public class OrderResponse : BaseStation
         }
 
         if (GlobalOrderManager.Instance != null)
+        {
             GlobalOrderManager.Instance.RemoveAllOrdersForTable(tableId);
+            if (NetworkServer.active)
+                RpcMirrorGlobalRemoveTableOrders(tableId);
+        }
 
         if (dishesOnTable.Count > 0)
         {
             // 有已经上的菜，转为脏盘子并进入 WaitingForCleanup
             int dirtyCount = 0;
+            var clientRpcNames = new List<string>();
+            var clientRpcPoss = new List<Vector3>();
+            var clientRpcRots = new List<Quaternion>();
+
             foreach (var d in dishesOnTable)
             {
                 if (d.physicalItem == null) continue;
@@ -691,14 +906,24 @@ public class OrderResponse : BaseStation
                 {
                     GameObject cleanEatenVisual = Instantiate(d.recipe.eatenPrefab, pos, rot, this.transform);
                     activeEatenModels.Add(cleanEatenVisual);
+                    if (NetworkServer.active)
+                    {
+                        clientRpcNames.Add(d.recipe.recipeName);
+                        clientRpcPoss.Add(pos);
+                        clientRpcRots.Add(rot);
+                    }
                 }
             }
 
             if (dishPlaceSystem != null) dishPlaceSystem.ClearAllDishes();
             dishesOnTable.Clear();
             currentOrder.Clear();
-            
-            pendingDirtyPlatesCount = dirtyCount;
+            ServerRefreshSyncedOrderList();
+
+            SetPendingDirtyPlates(dirtyCount);
+            if (NetworkServer.active && clientRpcNames.Count > 0)
+                ServerNotifyClientEatenLeftovers(clientRpcNames, clientRpcPoss, clientRpcRots);
+
             SetState(TableState.WaitingForCleanup);
             
             if (boundGroup != null)
@@ -707,7 +932,7 @@ public class OrderResponse : BaseStation
                 boundGroup.BeginLeaveGroup();
             }
             
-            if (pendingDirtyPlatesCount == 0)
+            if (dirtyCount == 0)
             {
                 CleanUpTable(); // 如果全是饮料，没有留下真正需要收的盘子，就直接重置
             }
@@ -725,6 +950,7 @@ public class OrderResponse : BaseStation
 
             dishesOnTable.Clear();
             currentOrder.Clear();
+            ServerRefreshSyncedOrderList();
 
             if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
             {
@@ -760,6 +986,8 @@ public class OrderResponse : BaseStation
     /// </summary>
     public void HandleDayTransition()
     {
+        if (NetworkClient.active && !NetworkServer.active) return;
+
         // WaitingForCleanup：保留脏盘子、残羹模型，只清理顾客相关引用
         if (currentState == TableState.WaitingForCleanup)
         {
@@ -767,6 +995,7 @@ public class OrderResponse : BaseStation
             isReserved = false;
             isAbandoningPatience = false;
             currentOrder.Clear();
+            ServerRefreshSyncedOrderList();
             dishesOnTable.Clear();
             currentOrderProgress = 0f;
             currentPatienceOrder = effectiveMaxPatienceOrder;
@@ -796,7 +1025,11 @@ public class OrderResponse : BaseStation
         }
 
         if (GlobalOrderManager.Instance != null)
+        {
             GlobalOrderManager.Instance.RemoveAllOrdersForTable(tableId);
+            if (NetworkServer.active)
+                RpcMirrorGlobalRemoveTableOrders(tableId);
+        }
 
         if (dishPlaceSystem != null)
             dishPlaceSystem.ClearAllDishes();
@@ -808,6 +1041,7 @@ public class OrderResponse : BaseStation
         activeEatenModels.Clear();
         dishesOnTable.Clear();
         currentOrder.Clear();
+        ServerRefreshSyncedOrderList();
 
         if (itemPlacePoint != null && itemPlacePoint.CurrentItem != null)
         {
@@ -829,6 +1063,52 @@ public class OrderResponse : BaseStation
         Debug.Log($"[OrderResponse] 桌号 {tableId} 天数切换：非预期状态 → 强制重置为 Empty");
     }
 
+    void ServerRefreshSyncedOrderList()
+    {
+        if (!NetworkServer.active) return;
+        syncedOrderRecipeNames.Clear();
+        foreach (var r in currentOrder)
+        {
+            if (r != null && !string.IsNullOrEmpty(r.recipeName))
+                syncedOrderRecipeNames.Add(r.recipeName);
+        }
+    }
+
+    void RebuildClientOrderViewFromSyncList()
+    {
+        clientOrderView.Clear();
+        foreach (var name in syncedOrderRecipeNames)
+        {
+            if (string.IsNullOrEmpty(name)) continue;
+            var r = recipeDatabase != null ? recipeDatabase.FindByName(name) : null;
+            if (r == null && drinkRecipeDatabase != null)
+                r = drinkRecipeDatabase.FindByName(name);
+            if (r != null)
+                clientOrderView.Add(r);
+        }
+    }
+
+    [ClientRpc]
+    void RpcMirrorGlobalOrdersAdded(int tableId, string[] orderIds, string[] recipeNames)
+    {
+        if (NetworkServer.active) return;
+        GlobalOrderManager.Instance?.ClientMirrorRegisterOrders(tableId, orderIds, recipeNames);
+    }
+
+    [ClientRpc]
+    void RpcMirrorGlobalOrderRemoved(string orderId)
+    {
+        if (NetworkServer.active) return;
+        GlobalOrderManager.Instance?.ClientMirrorFulfillOrder(orderId);
+    }
+
+    [ClientRpc]
+    void RpcMirrorGlobalRemoveTableOrders(int tableId)
+    {
+        if (NetworkServer.active) return;
+        GlobalOrderManager.Instance?.ClientMirrorRemoveAllOrdersForTable(tableId);
+    }
+
     public float GetOrderProgressNormalized() => requiredOrderTime > 0f ? Mathf.Clamp01(currentOrderProgress / requiredOrderTime) : 0f;
 
     /// <summary>等待点菜阶段：始终显示「呼叫点餐」Icon（颜色由 UI 根据耐心值渐变）。</summary>
@@ -837,12 +1117,25 @@ public class OrderResponse : BaseStation
     /// <summary>等上菜阶段：耐心低于阈值时显示不耐烦 Icon（颜色由 UI 根据耐心值渐变）。</summary>
     public bool ShouldShowWaitingFoodImpatientIcon =>
         currentState == TableState.WaitingForFood && currentPatienceFood < effectiveImpatientThreshold;
-    public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder() => currentOrder;
+    public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder()
+    {
+        if (!NetworkClient.active && !NetworkServer.active)
+            return currentOrder;
+        if (isServer)
+            return currentOrder;
+        RebuildClientOrderViewFromSyncList();
+        return clientOrderView;
+    }
 
     /// <summary>
     /// 桌上「特殊残羹」视觉数量（与 DirtyPlateStack.plateCount 应对齐）。
     /// </summary>
-    public int GetActiveEatenModelCount() => activeEatenModels.Count;
+    public int GetActiveEatenModelCount()
+    {
+        if (NetworkClient.active && !NetworkServer.active)
+            return clientReplicaEatenModels.Count;
+        return activeEatenModels.Count;
+    }
 
     /// <summary>
     /// 玩家从本桌的 <see cref="DirtyPlateStack"/> 取走 count 个盘子时调用：按栈顶顺序销毁对应数量的特殊残羹模型。
@@ -858,5 +1151,7 @@ public class OrderResponse : BaseStation
                 Destroy(activeEatenModels[idx]);
             activeEatenModels.RemoveAt(idx);
         }
+        if (NetworkServer.active)
+            RpcRemoveClientEatenReplicas(remove);
     }
 }

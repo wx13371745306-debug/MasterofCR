@@ -2,9 +2,14 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
+using Mirror;
 
+/// <summary>
+/// 顾客 AI：服务端驱动寻路与入座；位姿由 NetworkTransform（建议 coordinateSpace=World）全程同步。
+/// 入座/离座状态用 SyncVar 驱动各端动画与 Agent/Collider，不再关 NT、不再 Rpc 对齐 Transform。
+/// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
-public class CustomerAI : MonoBehaviour
+public class CustomerAI : NetworkBehaviour
 {
     [Header("Components")]
     public NavMeshAgent agent;
@@ -24,11 +29,19 @@ public class CustomerAI : MonoBehaviour
     [Header("Debug")]
     public bool debugLog = false;
 
+    [SyncVar] public int syncTableId = -1;
+    [SyncVar] public int syncChairIndex = -1;
+
+    [SyncVar(hook = nameof(OnSyncSeatedChanged))]
+    bool syncIsSeated;
+
     private Transform targetChair;
-    private Action onSeatedCallback; 
+    private Action onSeatedCallback;
     private bool isSittingDown = false;
     private bool isLeaving;
     private Animator modelAnimator;
+    private bool guestInitialized;
+    private Vector3 prevPos;
 
     void Awake()
     {
@@ -59,24 +72,68 @@ public class CustomerAI : MonoBehaviour
         if (placeholder != null) placeholder.enabled = false;
     }
 
+    void OnSyncSeatedChanged(bool oldVal, bool newVal)
+    {
+        isSittingDown = newVal;
+        SetSitting(newVal);
+        if (newVal)
+        {
+            if (agent != null) agent.enabled = false;
+            if (aiCollider != null) aiCollider.enabled = false;
+        }
+    }
+
+    /// <summary>Guest：SyncVar 已同步后缓存椅子引用（动画等）。</summary>
+    void TryGuestInit()
+    {
+        if (guestInitialized || isServer) return;
+        if (syncTableId < 0 || syncChairIndex < 0) return;
+
+        guestInitialized = true;
+
+        var tables = FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
+        OrderResponse table = null;
+        foreach (var t in tables)
+        {
+            if (t.tableId == syncTableId) { table = t; break; }
+        }
+
+        if (table == null || syncChairIndex >= table.chairs.Count)
+        {
+            if (debugLog) Debug.LogWarning($"[CustomerAI] Guest 找不到桌子 tableId={syncTableId} 或椅子索引越界");
+            return;
+        }
+
+        targetChair = table.chairs[syncChairIndex];
+        if (agent != null) agent.enabled = false;
+        if (debugLog) Debug.Log($"[CustomerAI] Guest 端缓存椅子引用 桌号={syncTableId} 椅子={syncChairIndex}");
+    }
+
     public void MoveToChair(Transform approachPoint, Transform chair, Action onSeated)
     {
         targetChair = chair;
         onSeatedCallback = onSeated;
-        
+
         agent.enabled = true;
-        agent.SetDestination(approachPoint.position); 
-        
+        agent.SetDestination(approachPoint.position);
+
         if (debugLog) Debug.Log($"<color=#00FF00>[CustomerAI]</color> {gameObject.name} 正在前往桌子集结点: {approachPoint.name}");
     }
 
     void Update()
     {
+        if (!isServer)
+        {
+            TryGuestInit();
+            UpdateAnimation();
+            return;
+        }
+
         UpdateAnimation();
 
         if (isLeaving) return;
 
-        if (!isSittingDown && !agent.pathPending && agent.remainingDistance <= arrivalRadius)
+        if (!isSittingDown && agent.enabled && !agent.pathPending && agent.remainingDistance <= arrivalRadius)
         {
             if (!agent.hasPath || agent.velocity.sqrMagnitude == 0f || agent.remainingDistance <= arrivalRadius)
             {
@@ -89,7 +146,17 @@ public class CustomerAI : MonoBehaviour
     {
         if (modelAnimator == null) return;
 
-        bool isWalking = agent != null && agent.enabled && agent.velocity.sqrMagnitude > 0.01f;
+        bool isWalking;
+        if (isServer || (!guestInitialized && agent != null && agent.enabled))
+        {
+            isWalking = agent != null && agent.enabled && agent.velocity.sqrMagnitude > 0.01f;
+        }
+        else
+        {
+            float delta = (transform.position - prevPos).sqrMagnitude;
+            isWalking = delta > 0.0001f;
+            prevPos = transform.position;
+        }
         modelAnimator.SetBool("IsWalking", isWalking);
     }
 
@@ -107,6 +174,8 @@ public class CustomerAI : MonoBehaviour
 
     private IEnumerator SitDownRoutine()
     {
+        if (targetChair == null) yield break;
+
         isSittingDown = true;
 
         agent.enabled = false;
@@ -115,14 +184,15 @@ public class CustomerAI : MonoBehaviour
         SetWalking(false);
 
         Vector3 currentPos = transform.position;
-        float walkToChairDuration = 1.0f; 
+        float walkToChairDuration = 1.0f;
         float tWalk = 0;
 
         while (tWalk < 1f)
         {
             tWalk += Time.deltaTime / walkToChairDuration;
+            if (targetChair == null) yield break;
             transform.position = Vector3.Lerp(currentPos, targetChair.position, tWalk);
-            
+
             Vector3 direction = (targetChair.position - currentPos).normalized;
             if (direction != Vector3.zero)
             {
@@ -132,28 +202,21 @@ public class CustomerAI : MonoBehaviour
         }
 
         transform.SetParent(targetChair);
-        
-        Vector3 startPos = transform.localPosition;
-        Quaternion startRot = transform.localRotation;
-        float sitDuration = 0.5f; 
-        float tSit = 0;
-
-        while (tSit < 1f)
-        {
-            tSit += Time.deltaTime / sitDuration;
-            transform.localPosition = Vector3.Lerp(startPos, Vector3.zero, tSit);
-            transform.localRotation = Quaternion.Lerp(startRot, Quaternion.identity, tSit); 
-            yield return null;
-        }
-
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
 
-        SetSitting(true);
+        syncIsSeated = true;
 
-        if (debugLog) Debug.Log($"<color=#00FF00>[CustomerAI]</color> {gameObject.name} 完美落座完毕！");
+        if (debugLog) Debug.Log($"<color=#00FF00>[CustomerAI]</color> {gameObject.name} 落座完毕（NT 同步位姿）。");
 
         onSeatedCallback?.Invoke();
+    }
+
+    [ClientRpc]
+    void RpcBeginLeave()
+    {
+        if (isServer) return;
+        if (aiCollider != null) aiCollider.enabled = true;
     }
 
     /// <summary>
@@ -169,14 +232,20 @@ public class CustomerAI : MonoBehaviour
 
     private IEnumerator LeaveRoutine(Transform exit, Action onDestroyed)
     {
-        SetSitting(false);
+        syncIsSeated = false;
         transform.SetParent(null);
+
+        if (isServer)
+            RpcBeginLeave();
 
         if (exit == null)
         {
             if (debugLog) Debug.Log($"[PatienceLeave][{name}] 消失点为 NULL → 原地销毁（若需走路，请在 CustomerSpawner 配置 customerExitPoint）");
             onDestroyed?.Invoke();
-            Destroy(gameObject);
+            if (NetworkServer.active)
+                NetworkServer.Destroy(gameObject);
+            else
+                Destroy(gameObject);
             yield break;
         }
 
@@ -217,6 +286,9 @@ public class CustomerAI : MonoBehaviour
             Debug.LogWarning($"[PatienceLeave][{name}] 离场超时(45s)，仍销毁。remainingDist={agent.remainingDistance:F2} pathPending={agent.pathPending}");
 
         onDestroyed?.Invoke();
-        Destroy(gameObject);
+        if (NetworkServer.active)
+            NetworkServer.Destroy(gameObject);
+        else
+            Destroy(gameObject);
     }
 }

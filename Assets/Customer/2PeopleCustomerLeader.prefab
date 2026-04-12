@@ -46,6 +46,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d8c3e8882b048864cb1610dafc2719da, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomerGroup
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   customerPrefab: {fileID: 6024237698049485340, guid: bc4e9d03e4d1f714aa49f4d4fc95a76b, type: 3}
   groupSize: 2
   minDishes: 1
@@ -99,7 +102,7 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0

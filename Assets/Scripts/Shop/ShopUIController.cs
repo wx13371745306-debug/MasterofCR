@@ -33,6 +33,10 @@ public class ShopUIController : MonoBehaviour
     [Tooltip("从 ComputerStation 打开且未传入 PlayerMoveRB 时，用此引用锁定水平移动")]
     [SerializeField] private PlayerMoveRB playerMoveFallback;
 
+    [Header("ComputerStation · 回到主界面")]
+    [Tooltip("拖入场景中的 ComputerPanelUIController；「返回电脑主界面」按钮绑定 OnReturnToComputerHomeClicked")]
+    [SerializeField] private ComputerPanelUIController computerPanel;
+
     [Header("Debug")]
     [Tooltip("勾选后在 Console 输出商品卡/购物车行调试日志；取消勾选则不输出")]
     [SerializeField] private bool enableShopDebugLogs;
@@ -228,6 +232,27 @@ public class ShopUIController : MonoBehaviour
             return;
         }
 
+        if (MoneyManager.Instance.CurrentMoney < total)
+        {
+            ShowError("余额不足");
+            return;
+        }
+
+        // 联网时统一走 NetworkShopBridge（Host 端也走此路径以保证一致性）
+        var bridge = NetworkShopBridge.Instance;
+        if (bridge != null && Mirror.NetworkClient.active)
+        {
+            var copy = new Dictionary<string, int>(cart, StringComparer.Ordinal);
+            bridge.NetworkPlaceOrder(copy, total);
+
+            cart.Clear();
+            RefreshCartUI();
+            RefreshTotals();
+            ClearError();
+            return;
+        }
+
+        // 单机回退路径
         bool hasDelivery = deliverySpawner != null ||
             (shopDeliveryQueue != null && shopDeliveryQueue.DeliverySpawner != null);
         if (!hasDelivery)
@@ -281,6 +306,15 @@ public class ShopUIController : MonoBehaviour
     public void OnCloseShopClicked()
     {
         Close();
+    }
+
+    /// <summary>关闭商店并回到电脑主界面（带商店/菜单按钮）；需在 Inspector 中赋值 computerPanel。</summary>
+    public void OnReturnToComputerHomeClicked()
+    {
+        if (computerPanel != null)
+            computerPanel.ReturnToComputerHome();
+        else
+            Close();
     }
 
     void ShowError(string msg)

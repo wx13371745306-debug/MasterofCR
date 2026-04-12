@@ -108,3 +108,18 @@ MonoBehaviour:
     dishIcon: {fileID: 0}
     price: 50
     eatTime: 10
+  ingredientPotVisualCatalog:
+  - ingredientId: TomatoChunk
+    visualInPotPrefab: {fileID: 3450154557753847644, guid: f4aa77928aba16c43a810eacbe909ac4, type: 3}
+  - ingredientId: Egg
+    visualInPotPrefab: {fileID: 9042197215933979286, guid: 90671ca829867ca4595759bb2448f9e8, type: 3}
+  - ingredientId: GreenPepperChunk
+    visualInPotPrefab: {fileID: 8385399957628962730, guid: ab84ff13b84761e4abd05ab162c7fa63, type: 3}
+  - ingredientId: PorkLoinMeatChunk
+    visualInPotPrefab: {fileID: 8920576066055232287, guid: 9b74f001e2b54db4f95ba462be56b62a, type: 3}
+  - ingredientId: PepperChunk
+    visualInPotPrefab: {fileID: 3450154557753847644, guid: 109471fc04841524fa5e3860071dc58c, type: 3}
+  - ingredientId: DoufuChunk
+    visualInPotPrefab: {fileID: 3450154557753847644, guid: 3b95312a141eae6408c7ee47b5ae829a, type: 3}
+  - ingredientId: PixianBeanPaste
+    visualInPotPrefab: {fileID: 3450154557753847644, guid: f4aa77928aba16c43a810eacbe909ac4, type: 3}

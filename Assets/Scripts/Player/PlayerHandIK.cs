@@ -23,11 +23,22 @@ public class PlayerHandIK : MonoBehaviour
         animator = GetComponent<Animator>();
     }
 
+    private CarryableItem cachedHeld;
+
     private void Update()
     {
         if (interactor == null) return;
 
         CarryableItem held = interactor.GetHeldItem();
+
+        if (held == null)
+        {
+            Transform hp = interactor.GetHoldPoint();
+            if (hp != null)
+                held = hp.GetComponentInChildren<CarryableItem>();
+        }
+
+        cachedHeld = held;
         bool holding = held != null;
 
         Transform leftGrip = holding ? held.leftHandGrip : null;
@@ -36,9 +47,7 @@ public class PlayerHandIK : MonoBehaviour
         bool hasRight = rightGrip != null;
         bool hasNeither = !hasLeft && !hasRight;
 
-        // 左手目标权重：有自定义左手点，或两个都没配（走默认）
         float leftTarget = holding && (hasLeft || hasNeither) ? 1f : 0f;
-        // 右手目标权重：有自定义右手点，或两个都没配（走默认）
         float rightTarget = holding && (hasRight || hasNeither) ? 1f : 0f;
 
         leftIkWeight = Mathf.MoveTowards(leftIkWeight, leftTarget, ikSmoothSpeed * Time.deltaTime);
@@ -50,7 +59,7 @@ public class PlayerHandIK : MonoBehaviour
         if (animator == null || interactor == null) return;
 
         Transform holdPoint = interactor.GetHoldPoint();
-        CarryableItem held = interactor.GetHeldItem();
+        CarryableItem held = cachedHeld;
 
         // 左手
         if (leftIkWeight > 0.01f && holdPoint != null)

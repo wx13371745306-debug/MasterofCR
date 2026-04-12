@@ -182,6 +182,7 @@ MonoBehaviour:
   leftHandGrip: {fileID: 0}
   rightHandGrip: {fileID: 0}
   debugLog: 0
+  lastHolderPlayer: {fileID: 0}
 --- !u!114 &2943789578518126812
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -201,6 +202,7 @@ MonoBehaviour:
   linkedCarryable: {fileID: 7633457637363568201}
   switchColliderLayerOnOccupy: 0
   targetCollider: {fileID: 0}
+  externalLock: 0
 --- !u!114 &1206908479343527711
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -269,7 +271,7 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0

@@ -13,6 +13,7 @@ public class PlayerInteractionSensor : MonoBehaviour
     public Transform playerRoot;
     [Tooltip("用于计算距离的基准点（建议设置在玩家胸口或头部）。如果不填则默认使用 playerRoot")]
     public Transform sensorOrigin;
+    [Tooltip("持锅装盘候选与拾取同源：由本物体 Trigger 的 collidersInRange 决定，勿另设球形半径。")]
     public PlayerItemInteractor interactor;
 
     [Header("Debug")]
@@ -22,6 +23,7 @@ public class PlayerInteractionSensor : MonoBehaviour
     private ItemPlacePoint currentPlacePoint;
     private IInteractiveStation currentStation;
     private CarryableItem currentStackTarget;
+    private CarryableItem currentServablePlate;
 
     private readonly HashSet<Collider> collidersInRange = new HashSet<Collider>();
 
@@ -69,6 +71,7 @@ public class PlayerInteractionSensor : MonoBehaviour
         PickNearestPlacePoint(originPos);
         PickNearestStation(originPos);
         PickNearestStackTarget(originPos);
+        PickNearestServableEmptyPlate(originPos);
     }
 
     void PickNearestItem(Vector3 originPos)
@@ -83,6 +86,7 @@ public class PlayerInteractionSensor : MonoBehaviour
             CarryableItem item = col.GetComponentInParent<CarryableItem>();
             if (item == null || !item.enabled || !item.gameObject.activeInHierarchy) continue;
             if (item.State == CarryableItem.ItemState.Held) continue;
+            if (item is AccessoryItem acc && acc.IsEquipped) continue;
 
             if (debugLog && !debugItems.Contains(item)) debugItems.Add(item);
 
@@ -195,10 +199,51 @@ public class PlayerInteractionSensor : MonoBehaviour
         currentStackTarget = best;
     }
 
+    /// <summary>
+    /// 与日常拾取同源：仅 collidersInRange + itemMask，候选须通过 <see cref="PlateServeValidation.IsValidEmptyPlate"/>。
+    /// 仅手持可出锅的 FryPot 时更新。
+    /// </summary>
+    void PickNearestServableEmptyPlate(Vector3 originPos)
+    {
+        currentServablePlate = null;
+
+        CarryableItem held = interactor != null ? interactor.GetHeldItem() : null;
+        if (held == null) return;
+
+        FryPot pot = held.GetComponent<FryPot>();
+        if (pot == null || !pot.CanServe()) return;
+
+        CarryableItem best = null;
+        float bestDist = float.MaxValue;
+
+        foreach (Collider col in collidersInRange)
+        {
+            if ((1 << col.gameObject.layer & itemMask) == 0) continue;
+
+            CarryableItem item = col.GetComponentInParent<CarryableItem>();
+            if (item == null || !item.enabled || !item.gameObject.activeInHierarchy) continue;
+            if (item == held) continue;
+            if (item.State == CarryableItem.ItemState.Held) continue;
+            if (!PlateServeValidation.IsValidEmptyPlate(item)) continue;
+
+            float sqrDist = (originPos - item.transform.position).sqrMagnitude;
+            if (sqrDist < bestDist)
+            {
+                bestDist = sqrDist;
+                best = item;
+            }
+        }
+
+        currentServablePlate = best;
+    }
+
     public CarryableItem GetCurrentItem() => currentItem;
     public ItemPlacePoint GetCurrentPlacePoint() => currentPlacePoint;
     public IInteractiveStation GetCurrentStation() => currentStation;
     public CarryableItem GetCurrentStackTarget() => currentStackTarget;
+
+    /// <summary>持锅装盘时空盘目标（与 Trigger 范围一致）。</summary>
+    public CarryableItem GetCurrentServablePlateTarget() => currentServablePlate;
 
     public void RegisterItem(CarryableItem item) { }
     public void UnregisterItem(CarryableItem item) { }

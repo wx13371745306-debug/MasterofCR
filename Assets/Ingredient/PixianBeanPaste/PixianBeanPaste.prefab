@@ -52,6 +52,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   rb: {fileID: 8067401005603049707}
   itemColliders:
   - {fileID: 0}
@@ -66,6 +69,7 @@ MonoBehaviour:
   leftHandGrip: {fileID: 0}
   rightHandGrip: {fileID: 0}
   debugLog: 1
+  lastHolderPlayer: {fileID: 0}
 --- !u!114 &1708343872688826049
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -180,7 +184,7 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0

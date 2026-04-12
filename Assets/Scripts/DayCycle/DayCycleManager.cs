@@ -1,8 +1,10 @@
 using System;
 using UnityEngine;
+using Mirror;
 
 /// <summary>
 /// 挂在 GlobalManagers 上。准备(15s)+营业(300s) 共 315s 倒计时；之后延迟营业→打烊→次日。
+/// 联网时，Host 驱动全部逻辑，Guest 通过 NetworkDayCycleBridge 的 SyncVar 同步阶段。
 /// </summary>
 [DefaultExecutionOrder(-100)]
 public class DayCycleManager : MonoBehaviour
@@ -46,6 +48,9 @@ public class DayCycleManager : MonoBehaviour
     float prepElapsed;
     float remainingClockSeconds;
     OrderResponse[] cachedTables;
+
+    /// <summary>联网模式下，当前机器是纯客户端（Guest）而非 Host/Server</summary>
+    bool IsNetworkGuest => NetworkClient.active && !NetworkServer.active;
 
     public DayCyclePhase Phase => phase;
     public int CurrentDayIndex => currentDayIndex;
@@ -140,6 +145,14 @@ public class DayCycleManager : MonoBehaviour
 
     void Update()
     {
+        if (IsNetworkGuest)
+        {
+            var bridge = NetworkDayCycleBridge.Instance;
+            if (bridge != null)
+                remainingClockSeconds = bridge.GetSyncedRemainingClock();
+            return;
+        }
+
         switch (phase)
         {
             case DayCyclePhase.Prep:
@@ -313,5 +326,75 @@ public class DayCycleManager : MonoBehaviour
     {
         int next = (currentDayIndex + 1) % 7;
         return GetPlannedGuestCountForDay(next);
+    }
+
+    // ── 网络同步入口（仅供 NetworkDayCycleBridge 在 Guest 端调用）──
+
+    /// <summary>
+    /// Guest 端收到 Host 的阶段同步后，直接跳转到对应阶段并触发本地事件/表现。
+    /// </summary>
+    public void ApplyNetworkPhase(DayCyclePhase newPhase, int dayIndex)
+    {
+        if (debugLog)
+            Debug.Log($"[DayCycle] ApplyNetworkPhase: {phase} → {newPhase}, dayIndex={dayIndex}");
+
+        DayCyclePhase oldPhase = phase;
+        phase = newPhase;
+        currentDayIndex = dayIndex;
+
+        switch (newPhase)
+        {
+            case DayCyclePhase.DayZero:
+                prepElapsed = 0f;
+                remainingClockSeconds = 0f;
+                customerSpawner?.SetSpawningPaused(true);
+                SetGlobalOrdersVisible(false);
+                OnEnterDayZero?.Invoke();
+                break;
+
+            case DayCyclePhase.NextDayTransition:
+                if (cachedTables == null || cachedTables.Length == 0)
+                    cachedTables = FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
+                if (oldPhase == DayCyclePhase.Closing)
+                {
+                    foreach (var t in cachedTables)
+                        if (t != null) t.HandleDayTransition();
+                }
+                TeleportPlayerToSpawn();
+                break;
+
+            case DayCyclePhase.Prep:
+                prepElapsed = 0f;
+                remainingClockSeconds = prepDuration + businessDuration;
+                if (statsTracker != null) statsTracker.ClearDay();
+                shopDeliveryQueue?.OnNewPrepStarted();
+                customerSpawner?.ConfigureForDay(currentDayIndex);
+                customerSpawner?.SetSpawningPaused(true);
+                SetGlobalOrdersVisible(false);
+                OnPrepStart?.Invoke();
+                break;
+
+            case DayCyclePhase.Business:
+                customerSpawner?.SetSpawningPaused(false);
+                SetGlobalOrdersVisible(true);
+                OnBusinessStart?.Invoke();
+                break;
+
+            case DayCyclePhase.ExtendedBusiness:
+                customerSpawner?.SetSpawningPaused(true);
+                OnBusinessTimerEnded?.Invoke();
+                break;
+
+            case DayCyclePhase.Closing:
+                SetGlobalOrdersVisible(false);
+                customerSpawner?.SetSpawningPaused(true);
+                OnEnterClosing?.Invoke();
+                break;
+        }
+
+        OnPhaseChanged?.Invoke(newPhase);
+
+        if (newPhase == DayCyclePhase.Prep && oldPhase != DayCyclePhase.DayZero)
+            OnDayAdvanced?.Invoke();
     }
 }

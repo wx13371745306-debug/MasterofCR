@@ -13,5 +13,6 @@ public enum ItemCategory
     DirtyPlate = 1 << 6,
     CleanPlate = 1 << 7,
     Item = 1 << 8,
+    Accessory = 1 << 9,
     Any = ~0
 }

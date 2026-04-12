@@ -17,19 +17,23 @@ MonoBehaviour:
     displayName: "\u53C8\u9999\u53C8\u8FA3"
     description: "(3) \u5BA2\u4EBA\u70B9\u996E\u6599\u7684\u6982\u7387\u5927\u5E45\u63D0\u5347"
     icon: {fileID: 21300000, guid: f764275a74aaad045880d0ed38c7b506, type: 3}
+    critBonus: 0
     isActive: 1
   - tag: 2
     displayName: "\u5BB6\u7684\u5473\u9053"
     description: "(2) \u5BA2\u4EBA\u8010\u5FC3\u503C\u964D\u4F4E\u7684\u901F\u5EA6\u53D8\u6162"
     icon: {fileID: 21300000, guid: cd0ac4f46f8c0224e93acd0ac3e1fcb3, type: 3}
+    critBonus: 0
     isActive: 1
   - tag: 4
     displayName: "\u5FEB\u5200\u65A9\u4E71\u9EBB"
     description: "\u5F53\u83DC\u5355\u4E2D\u7D20\u83DC\u7684\u6570\u91CF\u5927\u4E8E\u8089\u83DC\u65F6\uFF0C\u5207\u83DC\u7684\u5927\u5E45\u589E\u52A0"
     icon: {fileID: 21300000, guid: be61669a7610f7b44a14ac9f309198fa, type: 3}
+    critBonus: 1
     isActive: 0
   - tag: 8
     displayName: "\u65E0\u8089\u4E0D\u6B22"
     description: "\u5F53\u83DC\u5355\u4E2D\u8089\u83DC\u7684\u6570\u91CF\u5927\u4E8E\u7D20\u83DC\u65F6\uFF0C\u73A9\u5BB6\u7684\u79FB\u52A8\u901F\u5EA6\u5927\u5E45\u589E\u52A0"
     icon: {fileID: 21300000, guid: 93a5bdccd38602546b14f3494561525f, type: 3}
+    critBonus: 0
     isActive: 1

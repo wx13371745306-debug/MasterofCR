@@ -35,6 +35,13 @@ public class MoneyManager : MonoBehaviour
         OnMoneyChanged?.Invoke(currentMoney);
     }
 
+    /// <summary>供网络同步层强制覆写当前金额（不走增减逻辑）。</summary>
+    public void ForceSetMoney(int value)
+    {
+        currentMoney = Mathf.Max(0, value);
+        OnMoneyChanged?.Invoke(currentMoney);
+    }
+
     /// <summary>
     /// 扣除金钱；余额不足时返回 false 且不修改当前金额。
     /// </summary>

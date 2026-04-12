@@ -76,6 +76,24 @@ public class ComputerPanelUIController : MonoBehaviour
         Cursor.visible = savedCursorVisible;
     }
 
+    /// <summary>
+    /// 从商店/菜单子界面回到电脑初始主界面（带「商店」「菜单」按钮的面板）。
+    /// 供子界面按钮或 <see cref="ComputerStation"/> 调用。
+    /// </summary>
+    public void ReturnToComputerHome()
+    {
+        if (shopUI != null && shopUI.IsOpen)
+            shopUI.Close();
+        if (menuUI != null && menuUI.IsOpen)
+            menuUI.Close();
+
+        if (panelRoot != null)
+            panelRoot.SetActive(true);
+
+        if (debugLog)
+            Debug.Log("[ComputerPanelUIController] ReturnToComputerHome：已关闭子界面并显示主面板");
+    }
+
     private void OnShopButtonClicked()
     {
         if (shopUI == null) return;

@@ -472,6 +472,7 @@ MonoBehaviour:
   recipeDatabase: {fileID: 11400000, guid: 730e8ac883ba229498c2807b9329f4bd, type: 2}
   drinkRecipeDatabase: {fileID: 0}
   dirtyPlateStackPrefab: {fileID: 4430841268297836081, guid: cf8b2abf0b92e0844b30889cab3c6fdd, type: 3}
+  dirtyPlateStackHandPrefab: {fileID: 4430841268297836081, guid: cf8b2abf0b92e0844b30889cab3c6fdd, type: 3}
   tableId: 0
   currentState: 0
   currentOrderProgress: 0

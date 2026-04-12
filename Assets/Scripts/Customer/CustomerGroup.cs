@@ -1,7 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Mirror;
 
-public class CustomerGroup : MonoBehaviour
+public class CustomerGroup : NetworkBehaviour
 {
     public static int ActiveGroupCount { get; private set; }
 
@@ -46,21 +47,13 @@ public class CustomerGroup : MonoBehaviour
     private int totalMembers;
     private int seatedMembers = 0;
     private OrderResponse assignedTable;
-    /// <summary>由生成器传入：离场目标（与桌子数量无关，集中管理）</summary>
     private Transform customerExitPoint;
 
-    /// <summary>
-    /// 生成时缓存的 AI。入座后 <see cref="CustomerAI"/> 会 SetParent 到椅子，不再是本物体子节点，
-    /// 因此不能用 GetComponentsInChildren，必须用此列表离场。
-    /// </summary>
     private readonly List<CustomerAI> memberAis = new List<CustomerAI>();
 
     /// <summary>
-    /// 初始化并生成队伍。groupSize 直接从预制体自身字段读取。
+    /// 由 Host 端 CustomerSpawner 调用。生成子顾客 AI 并通过 RPC 让 Guest 端执行相同的桌子绑定。
     /// </summary>
-    /// <param name="table">他们要去的桌子</param>
-    /// <param name="spawnPoint">出生点</param>
-    /// <param name="exitPoint">消失点（可为空，则离场时在原地销毁）</param>
     public void InitGroup(OrderResponse table, Transform spawnPoint, Transform exitPoint = null)
     {
         totalMembers = groupSize;
@@ -69,29 +62,30 @@ public class CustomerGroup : MonoBehaviour
 
         if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> 成功组建 {groupSize} 人小队，目标桌号: {table.tableId}");
 
-        // 防止生成的数量超过桌子的椅子数量
         int actualSpawnCount = Mathf.Min(groupSize, table.chairs.Count);
 
         for (int i = 0; i < actualSpawnCount; i++)
         {
-            // 在出生点生成 AI，并把当前 GameObject 设为他们的父物体，方便管理
-            GameObject aiObj = Instantiate(customerPrefab, spawnPoint.position, Quaternion.identity, transform);
-            aiObj.name = $"Customer_{table.tableId}_{i+1}"; // 起个名字方便 Debug 观察
-            
+            GameObject aiObj = Instantiate(customerPrefab, spawnPoint.position, Quaternion.identity);
+            aiObj.name = $"Customer_{table.tableId}_{i + 1}";
+
             CustomerAI ai = aiObj.GetComponent<CustomerAI>();
             if (ai != null)
             {
-                memberAis.Add(ai);
-                // 指挥 AI 走向对应的椅子，并把 OnMemberSeated 方法作为回调传给它
-                ai.MoveToChair(table.approachPoint, table.chairs[i], OnMemberSeated);
+                ai.syncTableId = table.tableId;
+                ai.syncChairIndex = i;
             }
-            else
+
+            if (NetworkServer.active)
+                NetworkServer.Spawn(aiObj);
+
+            if (ai != null)
             {
-                Debug.LogError($"<color=#FF0000>[CustomerGroup 错误]</color> 预制体 {customerPrefab.name} 上缺少 CustomerAI 脚本！");
+                memberAis.Add(ai);
+                ai.MoveToChair(table.approachPoint, table.chairs[i], OnMemberSeated);
             }
         }
 
-        // 注入耐心与点菜配置给桌子
         table.ApplyGroupConfig(this);
         table.RegisterCustomerGroup(this);
         ActiveGroupCount++;
@@ -102,6 +96,53 @@ public class CustomerGroup : MonoBehaviour
             if (dcm == null || dcm.Phase == DayCyclePhase.Business)
                 DayStatsTracker.Instance?.RegisterFootfall(actualSpawnCount);
         }
+
+        if (NetworkServer.active)
+            RpcInitGroupOnClients(table.tableId);
+    }
+
+    /// <summary>Guest 端收到后，将本组绑定到对应桌子。各个 CustomerAI 通过 SyncVar 自行初始化椅子。</summary>
+    [ClientRpc]
+    void RpcInitGroupOnClients(int tableId)
+    {
+        if (NetworkServer.active) return;
+
+        OrderResponse table = FindTableById(tableId);
+        if (table == null)
+        {
+            if (debugLog) Debug.LogWarning($"[CustomerGroup] Guest 找不到 tableId={tableId} 的桌子");
+            return;
+        }
+
+        assignedTable = table;
+        totalMembers = groupSize;
+
+        var spawner = Object.FindAnyObjectByType<CustomerSpawner>();
+        if (spawner != null)
+            customerExitPoint = spawner.customerExitPoint;
+
+        table.ApplyGroupConfig(this);
+        table.RegisterCustomerGroup(this);
+        ActiveGroupCount++;
+
+        var allAIs = FindObjectsByType<CustomerAI>(FindObjectsSortMode.None);
+        foreach (var ai in allAIs)
+        {
+            if (ai != null && ai.syncTableId == tableId)
+                memberAis.Add(ai);
+        }
+
+        if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> Guest 端绑定桌号 {tableId}，收集到 {memberAis.Count} 名 AI");
+    }
+
+    static OrderResponse FindTableById(int tableId)
+    {
+        var tables = Object.FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
+        foreach (var t in tables)
+        {
+            if (t.tableId == tableId) return t;
+        }
+        return null;
     }
 
     void OnDestroy()
@@ -109,9 +150,6 @@ public class CustomerGroup : MonoBehaviour
         ActiveGroupCount = Mathf.Max(0, ActiveGroupCount - 1);
     }
 
-    /// <summary>
-    /// 耐心归零等：全员走向 <see cref="customerExitPoint"/> 后销毁本组（消失点由 <see cref="CustomerSpawner"/> 在生成时注入）。
-    /// </summary>
     public void BeginLeaveGroup()
     {
         memberAis.RemoveAll(a => a == null);
@@ -120,15 +158,16 @@ public class CustomerGroup : MonoBehaviour
         if (debugLog)
         {
             string exitName = customerExitPoint != null ? customerExitPoint.name : "NULL";
-            Debug.Log($"[PatienceLeave][Group {name}] BeginLeaveGroup | AI数量={count}（缓存列表，入座后已不在子物体下）| 消失点={exitName}" +
-                      (customerExitPoint == null ? "（为 NULL 时 AI 会原地销毁，请在 CustomerSpawner 上绑定 customerExitPoint）" : ""));
+            Debug.Log($"[PatienceLeave][Group {name}] BeginLeaveGroup | AI数量={count} | 消失点={exitName}");
         }
 
         if (count == 0)
         {
-            if (debugLog) Debug.LogWarning($"[PatienceLeave][Group {name}] 无有效 CustomerAI（列表为空或已销毁），直接销毁组并 NotifyPatienceLeaveComplete");
             if (assignedTable != null) assignedTable.NotifyPatienceLeaveComplete();
-            Destroy(gameObject);
+            if (NetworkServer.active)
+                NetworkServer.Destroy(gameObject);
+            else
+                Destroy(gameObject);
             return;
         }
 
@@ -141,25 +180,22 @@ public class CustomerGroup : MonoBehaviour
                 pending--;
                 if (pending > 0) return;
                 if (assignedTable != null) assignedTable.NotifyPatienceLeaveComplete();
-                Destroy(gameObject);
+                if (NetworkServer.active)
+                    NetworkServer.Destroy(gameObject);
+                else
+                    Destroy(gameObject);
             });
         }
     }
 
-    /// <summary>
-    /// 当有队伍成员坐下时，会触发这个方法
-    /// </summary>
     private void OnMemberSeated()
     {
         seatedMembers++;
         if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> 汇报: 1 名成员已落座 (进度: {seatedMembers}/{totalMembers})");
 
-        // 当所有人都坐好后
         if (seatedMembers >= totalMembers)
         {
             if (debugLog) Debug.Log($"<color=#FFA500>[CustomerGroup]</color> 汇报: 全组落座完毕！正式通知桌子 {assignedTable.tableId} 进入点单流程。");
-            
-            // 触发桌子的状态机！
             assignedTable.GroupSeated();
         }
     }

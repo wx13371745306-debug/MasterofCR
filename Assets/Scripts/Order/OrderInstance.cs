@@ -13,10 +13,9 @@ public class OrderInstance
     public FryRecipeDatabase.FryRecipe recipe; // 具体的菜品配方数据
 
     // 构造函数，在生成订单时调用
-    public OrderInstance(int tableId, FryRecipeDatabase.FryRecipe recipe)
+    public OrderInstance(int tableId, FryRecipeDatabase.FryRecipe recipe, string existingOrderId = null)
     {
-        // 自动生成一个全球唯一的字符串作为 ID，例如 "d3f4b...a2"
-        this.orderId = Guid.NewGuid().ToString(); 
+        this.orderId = string.IsNullOrEmpty(existingOrderId) ? Guid.NewGuid().ToString() : existingOrderId;
         this.tableId = tableId;
         this.recipe = recipe;
     }

@@ -30,6 +30,10 @@ public class MenuSelectionUIController : MonoBehaviour
     [Header("UI - Tutorial Panel")]
     public RecipeTutorialPanel tutorialPanel;
 
+    [Header("ComputerStation · 回到主界面")]
+    [Tooltip("拖入 ComputerPanelUIController；「返回电脑主界面」按钮绑定 OnReturnToComputerHomeClicked")]
+    [SerializeField] private ComputerPanelUIController computerPanel;
+
     [Header("羁绊")]
     [Tooltip("羁绊状态 SO，选菜变化时实时刷新")]
     public BondActivationStateSO bondState;
@@ -118,7 +122,19 @@ public class MenuSelectionUIController : MonoBehaviour
             BondRuntimeBridge.Instance.Refresh();
         }
 
-        // 通知别的 UI （比如 HUD）
+        // 联网时将菜谱同步给所有端
+        var shopBridge = NetworkShopBridge.Instance;
+        if (shopBridge != null && Mirror.NetworkClient.active)
+        {
+            var names = new System.Collections.Generic.List<string>();
+            foreach (var r in menuSO.selectedRecipes)
+            {
+                if (r != null && !string.IsNullOrEmpty(r.recipeName))
+                    names.Add(r.recipeName);
+            }
+            shopBridge.NetworkSyncMenu(names);
+        }
+
         OnMenuConfirmed?.Invoke();
 
         Close();
@@ -128,6 +144,15 @@ public class MenuSelectionUIController : MonoBehaviour
     {
         if (debugLog) Debug.Log("[MenuSelection] 关闭按钮被点击");
         Close();
+    }
+
+    /// <summary>关闭选菜界面并回到电脑主界面；需在 Inspector 中赋值 computerPanel。</summary>
+    public void OnReturnToComputerHomeClicked()
+    {
+        if (computerPanel != null)
+            computerPanel.ReturnToComputerHome();
+        else
+            OnCloseClicked();
     }
 
     public void OpenTutorial(FryRecipeDatabase.FryRecipe recipe)

@@ -50,6 +50,18 @@ public class FridgeStation : BaseStation
     /// </summary>
     public bool TryPutHeldItem(PlayerItemInteractor interactor, CarryableItem item)
     {
+        if (!ServerTryStoreFromAuthority(item))
+            return false;
+
+        interactor.ReplaceHeldItem(null);
+        return true;
+    }
+
+    /// <summary>
+    /// 服务端权威放入（联机 Command 用）：不操作 interactor，逻辑与原先 TryPutHeldItem 一致。
+    /// </summary>
+    public bool ServerTryStoreFromAuthority(CarryableItem item)
+    {
         if (storedItems.Count >= maxCapacity)
         {
             if (debugLog) Debug.Log($"<color=#00FFFF>[FridgeStation]</color> {name} 已满 ({maxCapacity})，无法再放入！");
@@ -58,40 +70,47 @@ public class FridgeStation : BaseStation
 
         if (item == null) return false;
 
-        // 放手
-        interactor.ReplaceHeldItem(null);
-        item.DropToGround(); 
-        
-        // 移动到冰箱体系内并使其隐形但苟活（确保它能监听到换日事件）
-        item.transform.SetParent(storageVisualPivot != null ? storageVisualPivot : transform, false);
-        item.transform.localPosition = new Vector3(0, -9999f, 0); 
-        
-        // 彻底关闭其物理判定以防穿模或意外拿取
-        if (item.rb != null)
-        {
-            item.rb.isKinematic = true;
-            item.rb.useGravity = false;
-        }
-        if (item.itemColliders != null)
-        {
-            foreach (var coll in item.itemColliders)
-            {
-                if(coll != null) coll.enabled = false;
-            }
-        }
-
-        // 把腐烂组件设为冰箱内保护状态（保底腐烂度为 1 不会进入 Rotten）
-        DecayableProp itemDecay = item.GetComponent<DecayableProp>();
-        if (itemDecay != null)
-        {
-            itemDecay.isInFridge = true;
-        }
-
+        ApplyItemStoredVisualAndState(item);
         storedItems.Push(item);
         if (debugLog) Debug.Log($"<color=#00FFFF>[FridgeStation]</color> 放入了: {item.name}。当前容量 {storedItems.Count}/{maxCapacity}");
 
         UpdateVisuals();
         return true;
+    }
+
+    /// <summary>
+    /// 纯客户端补画面：物品被放入冰箱后的父级与隐藏（不含 storedItems，与主机服务端栈不同步时取物仍可能异常，后续可再做 Sync）。
+    /// </summary>
+    public void ClientMirrorItemStored(CarryableItem item)
+    {
+        if (item == null) return;
+        ApplyItemStoredVisualAndState(item);
+    }
+
+    void ApplyItemStoredVisualAndState(CarryableItem item)
+    {
+        item.DropToGround();
+
+        item.transform.SetParent(storageVisualPivot != null ? storageVisualPivot : transform, false);
+        item.transform.localPosition = new Vector3(0, -9999f, 0);
+
+        if (item.rb != null)
+        {
+            item.rb.isKinematic = true;
+            item.rb.useGravity = false;
+        }
+
+        if (item.itemColliders != null)
+        {
+            foreach (var coll in item.itemColliders)
+            {
+                if (coll != null) coll.enabled = false;
+            }
+        }
+
+        DecayableProp itemDecay = item.GetComponent<DecayableProp>();
+        if (itemDecay != null)
+            itemDecay.isInFridge = true;
     }
 
     /// <summary>

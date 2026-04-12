@@ -38,7 +38,9 @@ public class CarryableItem : NetworkBehaviour
     public Transform rightHandGrip;
 
     [Header("Debug")]
-    public bool debugLog = false;
+    public bool debugLog = false ;
+
+    [HideInInspector] public PlayerAttributes lastHolderPlayer;
 
     public ItemPlacePoint CurrentPlacePoint => currentPlacePoint;
     public ItemState State => state;
@@ -66,6 +68,17 @@ public class CarryableItem : NetworkBehaviour
 
         if (itemColliders == null || itemColliders.Length == 0)
             itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+        else
+        {
+            foreach (var c in itemColliders)
+            {
+                if (c == null)
+                {
+                    itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+                    break;
+                }
+            }
+        }
 
         if (useHighlightObject != null)
             useHighlightObject.SetActive(false);
@@ -96,15 +109,24 @@ public class CarryableItem : NetworkBehaviour
         return (categories & mask) != 0;
     }
 
-    public bool CanBePickedUp()
+    public virtual bool CanBePickedUp()
     {
         return isPickable && state != ItemState.Held;
+    }
+
+    /// <summary>
+    /// 带抓取点上下文（例如饰品需校验 PlayerAccessoryHolder 空槽），默认与无参一致。
+    /// </summary>
+    public virtual bool CanBePickedUp(Transform holdPoint)
+    {
+        return CanBePickedUp();
     }
 
     public virtual void BeginHold(Transform holdPoint)
     {
         if (holdPoint == null) return;
 
+        lastHolderPlayer = holdPoint.GetComponentInParent<PlayerAttributes>();
         lastPlacePointBeforeHold = currentPlacePoint;
 
         if (currentPlacePoint != null)
@@ -291,6 +313,9 @@ public class CarryableItem : NetworkBehaviour
         foreach (Transform child in obj.transform)
             SetLayerRecursively(child.gameObject, layer);
     }
+
+    /// <summary>供外部（如 PlayerNetworkController）在联机 hold/release 时开关 NetworkTransform 同步。</summary>
+    public void SetNetworkTransformSync(bool enabled) => SetNetTransformEnabled(enabled);
 
     private void SetNetTransformEnabled(bool enabled)
     {

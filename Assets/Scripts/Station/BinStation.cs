@@ -49,10 +49,11 @@ public class BinStation : BaseStation
     public bool TryDumpHeldItem(PlayerItemInteractor interactor, CarryableItem heldItem)
     {
         if (interactor == null || heldItem == null) return false;
+        if (heldItem is AccessoryItem) return false;
 
         FryPot pot = heldItem.GetComponent<FryPot>();
         if (pot != null)
-            return TryDumpPot(pot);
+            return TryDumpPot(pot, heldItem, interactor);
 
         DishRecipeTag dishTag = heldItem.GetComponent<DishRecipeTag>();
         if (dishTag != null)
@@ -61,12 +62,28 @@ public class BinStation : BaseStation
         return false;
     }
 
-    bool TryDumpPot(FryPot pot)
+    bool TryDumpPot(FryPot pot, CarryableItem heldItem, PlayerItemInteractor interactor)
     {
         if (!pot.CanDump())
         {
             if (debugLog)
                 Debug.Log("<color=#FF4444>[BinStation]</color> 锅是空的，无需清空。");
+            return false;
+        }
+
+        // 联机：必须在服务端清空，否则 Guest 本地 ForceClear 无效且会被 FryPotNetworkSync 覆盖
+        if (NetworkClient.active)
+        {
+            PlayerNetworkController net = interactor != null ? interactor.GetComponent<PlayerNetworkController>() : null;
+            if (net != null)
+            {
+                net.CmdRequestFryPotDump(heldItem.gameObject);
+                if (debugLog)
+                    Debug.Log("<color=#FF4444>[BinStation]</color> 已发起 CmdRequestFryPotDump。");
+                return true;
+            }
+            if (debugLog)
+                Debug.LogWarning("<color=#FF4444>[BinStation]</color> 无 PlayerNetworkController，无法倒锅。");
             return false;
         }
 

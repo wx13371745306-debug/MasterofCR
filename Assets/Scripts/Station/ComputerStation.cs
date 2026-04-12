@@ -42,6 +42,13 @@ public class ComputerStation : BaseStation
         // 松开 K 不关闭电脑界面；由距离检测或 UI 上的关闭按钮关闭。
     }
 
+    /// <summary>由 UI 按钮调用：关闭商店/菜单子面板并显示电脑初始主界面。</summary>
+    public void ReturnToComputerHome()
+    {
+        if (panelController != null)
+            panelController.ReturnToComputerHome();
+    }
+
     private void Update()
     {
         if (panelController == null || trackedPlayer == null) return;

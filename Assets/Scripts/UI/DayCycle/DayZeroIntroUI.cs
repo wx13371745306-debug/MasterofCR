@@ -108,6 +108,13 @@ public class DayZeroIntroUI : MonoBehaviour
 
     void DoStartFirstDay()
     {
+        var bridge = NetworkDayCycleBridge.Instance;
+        if (bridge != null && Mirror.NetworkClient.active)
+        {
+            bridge.NetworkRequestStartFirstDay();
+            return;
+        }
+
         var d = Resolve();
         if (d != null)
             d.RequestStartFirstDay();

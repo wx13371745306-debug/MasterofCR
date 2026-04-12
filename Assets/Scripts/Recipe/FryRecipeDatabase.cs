@@ -54,7 +54,33 @@ public class FryRecipeDatabase : ScriptableObject, IRecipeSource
     // --- 新增：失败兜底配方 ---
     [Header("Fallback")]
     [Tooltip("当放入的食材不满足任何配方时，默认生成的失败菜品配方")]
-    public FryRecipe failedDishRecipe; 
+    public FryRecipe failedDishRecipe;
+
+    [Header("联机：锅内散件视觉")]
+    [Tooltip("Guest 端无服务端 Instantiate 记录时，按 ingredientId 查找锅内视觉预制体；未配置则该食材在远端不显示散件模型（进度条仍同步）。")]
+    public List<IngredientPotVisualEntry> ingredientPotVisualCatalog = new List<IngredientPotVisualEntry>();
+
+    [System.Serializable]
+    public class IngredientPotVisualEntry
+    {
+        [Tooltip("与 FryIngredientTag 一致，如 TomatoChunk")]
+        public string ingredientId = "";
+        public GameObject visualInPotPrefab;
+    }
+
+    /// <summary>供联机同步在客户端实例化锅内食材散件视觉。</summary>
+    public GameObject TryGetVisualInPotPrefab(string ingredientId)
+    {
+        string id = FryIngredientTag.NormalizeId(ingredientId);
+        if (string.IsNullOrEmpty(id) || ingredientPotVisualCatalog == null) return null;
+        foreach (var e in ingredientPotVisualCatalog)
+        {
+            if (e == null || e.visualInPotPrefab == null) continue;
+            if (FryIngredientTag.NormalizeId(e.ingredientId) == id)
+                return e.visualInPotPrefab;
+        }
+        return null;
+    }
 
     public FryRecipe FindMatch(Dictionary<string, int> materialCounts)
     {

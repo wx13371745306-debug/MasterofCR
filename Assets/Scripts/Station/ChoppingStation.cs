@@ -1,4 +1,5 @@
 using UnityEngine;
+using Mirror;
 
 public class ChoppingStation : BaseStation
 {
@@ -18,6 +19,10 @@ public class ChoppingStation : BaseStation
     public Axis rotateAxis = Axis.Z;
     public float angleRange = 45f;
     public float swingSpeed = 5f;
+
+    [SyncVar] float syncProcessProgress;
+    /// <summary>与 Cmd 内 BeginInteract 同步：客机本地 isInteracting 恒为 false，需用此值驱动进度/UI。</summary>
+    [SyncVar] bool syncChoppingActive;
 
     private Quaternion initialRotation;
     private float currentPhase = 0f;
@@ -65,7 +70,11 @@ public class ChoppingStation : BaseStation
 
     void Update()
     {
-        if (!isInteracting)
+        bool chopping = isInteracting;
+        if (NetworkClient.active && !NetworkServer.active)
+            chopping = syncChoppingActive;
+
+        if (!chopping)
         {
             ResetVisualIfNeeded();
             return;
@@ -78,17 +87,30 @@ public class ChoppingStation : BaseStation
             return;
         }
 
+        bool isServerOrOffline = !NetworkClient.active || NetworkServer.active;
+
         IProcessable processable = GetCurrentProcessable();
         if (processable == null)
         {
-            EndInteract(cachedInteractor);
+            if (isServerOrOffline) EndInteract(cachedInteractor);
+            else ResetVisualIfNeeded();
             return;
         }
 
-        processable.ApplyProgress(stationProcessType, GetEffectiveProcessingSpeed() * Time.deltaTime, this);
+        if (isServerOrOffline)
+        {
+            processable.ApplyProgress(stationProcessType, GetEffectiveProcessingSpeed() * Time.deltaTime, this);
+            syncProcessProgress = processable.CurrentProgress;
+        }
+        else
+        {
+            var bp = processable as BaseProcessable;
+            if (bp != null) bp.CurrentProgress = syncProcessProgress;
+        }
+
         UpdateSwingVisual();
 
-        if (processable.IsComplete)
+        if (isServerOrOffline && processable.IsComplete)
         {
             EndInteract(cachedInteractor);
         }
@@ -107,17 +129,22 @@ public class ChoppingStation : BaseStation
 
         cachedInteractor = interactor;
         isInteracting = true;
+        if (NetworkServer.active)
+            syncChoppingActive = true;
+        isSensorTargeted = true;
         currentPhase = 0f;
 
-        if (debugLog) Debug.Log($"[ChoppingStation] Begin interact: {name}");
+        if (debugLog) Debug.Log($"[ChoppingStation] Begin interact: {name} | isServer={NetworkServer.active}");
     }
 
     public override void EndInteract(PlayerItemInteractor interactor)
     {
         isInteracting = false;
+        if (NetworkServer.active)
+            syncChoppingActive = false;
         ResetVisualIfNeeded();
 
-        if (debugLog) Debug.Log($"[ChoppingStation] End interact: {name}");
+        if (debugLog) Debug.Log($"[ChoppingStation] End interact: {name} | isServer={NetworkServer.active}");
     }
 
     // 重写基础高亮，接收 Interactor 的高亮指令

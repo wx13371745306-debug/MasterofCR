@@ -9,9 +9,6 @@ public class PlayerItemInteractor : MonoBehaviour
     public Transform holdPoint;
     public bool debugLog = true;
 
-    [Tooltip("持锅对台装盘：在 Sensor 原点周围搜索空盘")]
-    [SerializeField] float plateServeOverlapRadius = 2.2f;
-
     private CarryableItem heldItem;
     private IInteractiveStation activeStation;
 
@@ -84,6 +81,11 @@ public class PlayerItemInteractor : MonoBehaviour
             {
                 TryBeginStationInteract();
             }
+            else if (debugLog)
+            {
+                // 空手但仍占着上一台交互：Update 不会再次 TryBegin，K 无反应易被误判为「台子坏了」
+                Debug.Log($"<color=#FFAA00>[StationK]</color> 按下K但 activeStation 非空(仍占着交互)：{DescribeStation(activeStation)}。松K或先结束上一台交互。");
+            }
         }
 
         if (Keyboard.current.kKey.wasReleasedThisFrame && activeStation != null)
@@ -105,7 +107,7 @@ public class PlayerItemInteractor : MonoBehaviour
         {
             // 空手状态：可以捡起物体 (J)，可以互动台子 (K)
             CarryableItem item = sensor.GetCurrentItem();
-            if (item != null && (item.CanBePickedUp() || item is DirtyPlateStack))
+            if (item != null && (item.CanBePickedUp(holdPoint) || item is DirtyPlateStack))
             {
                 highlightedItem = item;
                 highlightedItem.SetSensorHighlight(true);
@@ -154,7 +156,7 @@ public class PlayerItemInteractor : MonoBehaviour
                 FryPot heldPot = heldItem.GetComponent<FryPot>();
                 if (heldPot != null && heldPot.CanServe())
                 {
-                    CarryableItem plateTarget = FindServablePlateTarget();
+                    CarryableItem plateTarget = sensor != null ? sensor.GetCurrentServablePlateTarget() : null;
                     if (plateTarget != null)
                     {
                         highlightedItem = plateTarget;
@@ -210,16 +212,41 @@ public class PlayerItemInteractor : MonoBehaviour
         {
             if (orderResponse.currentState == OrderResponse.TableState.WaitingForCleanup && orderResponse.CanInteract(this))
             {
-                orderResponse.BeginInteract(this);
+                if (networkController != null && NetworkClient.active)
+                {
+                    NetworkIdentity oni = orderResponse.GetComponent<NetworkIdentity>();
+                    if (oni != null)
+                        networkController.CmdRequestTakeAllDirtyPlatesFromTable(oni.netId);
+                    else if (debugLog)
+                        Debug.LogWarning("[大脑 拿取] OrderResponse 缺少 NetworkIdentity，无法联机收盘。");
+                }
+                else
+                    orderResponse.TryTakeAllDirtyPlatesOffline(this);
+
                 if (debugLog) Debug.Log($"<color=#FFA500>[大脑 拿取]</color> 按下J从餐桌 {orderResponse.name} 端起脏盘子");
+                return true;
+            }
+        }
+        else if (currentStation is CleanPlateDispenserStation cleanDispenser)
+        {
+            if (cleanDispenser.CanDispense() && networkController != null && NetworkClient.active)
+            {
+                NetworkIdentity anchorNi = cleanDispenser.GetComponentInParent<NetworkIdentity>();
+                if (anchorNi == null)
+                {
+                    if (debugLog)
+                        Debug.LogWarning("[大脑 拿取] 干净盘发放台不在带 NetworkIdentity 的物体下，无法发 Command。请把 NI 挂在洗碗机预制体根上。");
+                    return false;
+                }
+
+                networkController.CmdRequestDispenseCleanPlate(anchorNi.netId, isLongPress);
+                if (debugLog) Debug.Log("<color=#00FFFF>[大脑 拿取]</color> 请求从干净盘出口发放一盘");
                 return true;
             }
         }
 
         CarryableItem target = sensor.GetCurrentItem();
 
-        // 不仅要目标不为空，还要目标真的能被捡起来！
-        // 但 DirtyPlateStack 虽然 isPickable=false，我们仍然需要特殊处理它
         if (target == null)
             return false;
 
@@ -235,7 +262,7 @@ public class PlayerItemInteractor : MonoBehaviour
             return false;
         }
 
-        if (!target.CanBePickedUp())
+        if (!target.CanBePickedUp(holdPoint))
             return false;
 
         // 【动态堆逻辑改造】：判断目标是不是 DynamicItemStack 堆
@@ -282,12 +309,122 @@ public class PlayerItemInteractor : MonoBehaviour
         if (heldItem == null) return;
 
         CarryableItem item = heldItem;
+        PlayerNetworkController net = GetComponent<PlayerNetworkController>();
 
-        // 【优先级1】尝试堆叠 —— 如果 Sensor 发现了可堆叠目标
+        if (net != null && NetworkClient.active && item.GetComponent<NetworkIdentity>() != null)
+        {
+            if (TryResolveNetworkRelease(item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos))
+            {
+                net.CmdRequestReleaseHeld(kind, item.gameObject, auxNetObj, auxWorldPos);
+                return;
+            }
+        }
+
+        TryEndHoldLocal();
+    }
+
+    /// <summary>
+    /// 联机时解析应发送的放下类型；返回 false 时走本地 TryEndHoldLocal（如放置点被占需拒绝且不落回网络丢地）。
+    /// </summary>
+    /// <summary>
+    /// 联机时解析放下类型。
+    /// <para>有 NetworkIdentity 的目标（DynamicItemStack / CarryableItem 堆叠）→ auxNetObj。</para>
+    /// <para>无 NetworkIdentity 的目标（ItemPlacePoint / FridgeStation）→ auxWorldPos，服务端按坐标匹配。</para>
+    /// </summary>
+    bool TryResolveNetworkRelease(CarryableItem item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos)
+    {
+        kind = PlayerNetworkController.ReleaseDrop;
+        auxNetObj = null;
+        auxWorldPos = Vector3.zero;
+
+        // 脏盘整堆不可与其它 DynamicItemStack 合并/推入
+        if (item is DirtyPlateStack)
+        {
+            IInteractiveStation dirtyStation = sensor != null ? sensor.GetCurrentStation() : null;
+            if (dirtyStation is FridgeStation dirtyFridge && dirtyFridge.CanAcceptItem())
+            {
+                kind = PlayerNetworkController.ReleaseFridge;
+                auxWorldPos = ((Component)dirtyFridge).transform.position;
+                return true;
+            }
+
+            ItemPlacePoint dirtyPlacePoint = sensor != null ? sensor.GetCurrentPlacePoint() : null;
+            if (dirtyPlacePoint != null)
+            {
+                if (dirtyPlacePoint.CanPlace(item))
+                {
+                    kind = PlayerNetworkController.ReleasePlace;
+                    auxWorldPos = dirtyPlacePoint.transform.position;
+                    return true;
+                }
+                kind = PlayerNetworkController.ReleaseDrop;
+                return true;
+            }
+
+            kind = PlayerNetworkController.ReleaseDrop;
+            return true;
+        }
+
+        // 【优先级1】堆叠（目标继承自 CarryableItem → NetworkBehaviour，有 NetworkIdentity）
         CarryableItem stackTarget = sensor != null ? sensor.GetCurrentStackTarget() : null;
         if (stackTarget != null && item.GetComponent<StackableProp>() != null)
         {
-            // 情况A：目标是已有的 DynamicItemStack → 直接推入
+            DynamicItemStack existingStack = stackTarget as DynamicItemStack;
+            if (existingStack != null && existingStack.CanAccept(item))
+            {
+                kind = PlayerNetworkController.ReleasePushStack;
+                auxNetObj = existingStack.gameObject;
+                return true;
+            }
+
+            StackableProp targetProp = stackTarget.GetComponent<StackableProp>();
+            if (targetProp != null && targetProp.CanStackWith(item))
+            {
+                kind = PlayerNetworkController.ReleaseMergeStack;
+                auxNetObj = stackTarget.gameObject;
+                return true;
+            }
+        }
+
+        // 【优先级1.5】冰箱（无 NetworkIdentity → 传世界坐标）
+        IInteractiveStation station = sensor != null ? sensor.GetCurrentStation() : null;
+        if (station is FridgeStation fridge && fridge.CanAcceptItem())
+        {
+            kind = PlayerNetworkController.ReleaseFridge;
+            auxWorldPos = ((Component)fridge).transform.position;
+            return true;
+        }
+
+        // 【优先级2】放置点（无 NetworkIdentity → 传世界坐标）
+        ItemPlacePoint targetPoint = sensor != null ? sensor.GetCurrentPlacePoint() : null;
+        if (targetPoint != null)
+        {
+            if (targetPoint.CanPlace(item))
+            {
+                kind = PlayerNetworkController.ReleasePlace;
+                auxWorldPos = targetPoint.transform.position;
+                return true;
+            }
+            // 传感器指着某放置点但当前物品不允许放上：仍走网络丢地，避免仅本地 TryEndHoldLocal 与权威不同步
+            kind = PlayerNetworkController.ReleaseDrop;
+            return true;
+        }
+
+        // 丢地
+        kind = PlayerNetworkController.ReleaseDrop;
+        return true;
+    }
+
+    /// <summary>单机或非网络同步路径下的完整放下逻辑。</summary>
+    void TryEndHoldLocal()
+    {
+        if (heldItem == null) return;
+
+        CarryableItem item = heldItem;
+
+        CarryableItem stackTarget = sensor != null ? sensor.GetCurrentStackTarget() : null;
+        if (stackTarget != null && item.GetComponent<StackableProp>() != null && !(item is DirtyPlateStack))
+        {
             DynamicItemStack existingStack = stackTarget as DynamicItemStack;
             if (existingStack != null)
             {
@@ -300,7 +437,6 @@ public class PlayerItemInteractor : MonoBehaviour
             }
             else
             {
-                // 情况B：目标是另一个落单的同类物品 → 合并创建新 Stack
                 StackableProp targetProp = stackTarget.GetComponent<StackableProp>();
                 if (targetProp != null)
                 {
@@ -315,20 +451,17 @@ public class PlayerItemInteractor : MonoBehaviour
             }
         }
 
-        // 【优先级1.5】尝试放入冰箱
         IInteractiveStation station = sensor != null ? sensor.GetCurrentStation() : null;
         if (station is FridgeStation fridge)
         {
             if (fridge.TryPutHeldItem(this, item))
             {
-                // 如果成功放入冰箱，手中物品即已转移，直接返回
                 heldItem = null;
                 if (debugLog) Debug.Log($"<color=#00FFFF>[大脑 放下]</color> 成功将 {item.name} 放入进 {fridge.name}");
                 return;
             }
         }
 
-        // 【优先级2】正常放置到 PlacePoint
         ItemPlacePoint targetPoint = sensor != null ? sensor.GetCurrentPlacePoint() : null;
         if (targetPoint != null)
         {
@@ -339,12 +472,10 @@ public class PlayerItemInteractor : MonoBehaviour
                 return;
             }
 
-            // 场景B：PlacePoint 存在但已被占用 → 拒绝放置，物品留在手中
             if (debugLog) Debug.Log($"<color=#FF0000>[大脑 放下]</color> 拒绝放置: {targetPoint.name} 已占用 (占用者: {targetPoint.CurrentItem?.name ?? "N/A"})，物品留在手中");
             return;
         }
 
-        // 场景C：前方无任何 PlacePoint → 丢弃到地面
         if (debugLog) Debug.Log($"<color=#FFFF00>[大脑 放下]</color> 前方无放置点，{item.name} 丢弃到地面");
         item.DropToGround();
         heldItem = null;
@@ -352,25 +483,93 @@ public class PlayerItemInteractor : MonoBehaviour
 
     bool TryBeginStationInteract()
     {
-        if (sensor == null) return false;
+        if (sensor == null)
+        {
+            if (debugLog) Debug.Log("<color=#FFAA00>[StationK]</color> TryBeginStationInteract: sensor 为 null");
+            return false;
+        }
+
         IInteractiveStation station = sensor.GetCurrentStation();
-        if (station == null || !station.CanInteract(this)) return false;
+        if (station == null)
+        {
+            if (debugLog) Debug.Log("<color=#FFAA00>[StationK]</color> TryBeginStationInteract: GetCurrentStation()=null（传感器未指向任何 IInteractiveStation）");
+            return false;
+        }
+
+        if (!station.CanInteract(this))
+        {
+            if (debugLog)
+            {
+                string extra = "";
+                if (station is DishWashingStation dws)
+                    extra = $" | DishWashing: dirtyInSink={dws.dirtyPlatesInSink} outputFull={dws.IsOutputFull()}";
+                Debug.Log($"<color=#FFAA00>[StationK]</color> TryBeginStationInteract: CanInteract=false | 类型={station.GetType().Name}{extra}");
+            }
+            return false;
+        }
+
+        // 已与当前传感器指向的同一台子交互中（如长按洗碗）：勿重复 Begin
+        if (activeStation != null && ReferenceEquals(activeStation, station))
+        {
+            if (debugLog) Debug.Log($"<color=#FFAA00>[StationK]</color> TryBeginStationInteract: 已与同一台子交互中，短路 return true | {DescribeStation(station)}");
+            return true;
+        }
+
+        // 本地仍占着旧台子但传感器已指向新台 → 先 End，否则 Update 里 activeStation!=null 会阻止再次 TryBegin
+        if (activeStation != null && !ReferenceEquals(activeStation, station))
+            TryEndStationInteract();
 
         activeStation = station;
 
         PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
         bool isNetworked = networkController != null && Mirror.NetworkClient.active;
 
-        if (isNetworked && activeStation is Component comp)
+        if (debugLog)
         {
-            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), true);
+            GameObject netRoot = activeStation is Component compForNet ? FindNetworkedGameObject(compForNet) : null;
+            string niName = netRoot != null ? netRoot.name : "?";
+            Debug.Log($"<color=#FFAA00>[StationK]</color> TryBeginStationInteract: 将发起交互 | 类型={station.GetType().Name} | NetworkClient={isNetworked} | NI根={niName}");
+        }
+
+        // 电脑等纯本地 UI：必须在发起交互的客户端执行，不可走 Command（否则会在 Host 服务端打开界面）。
+        if (isNetworked && activeStation is ComputerStation)
+        {
+            activeStation.BeginInteract(this);
+        }
+        else if (isNetworked && activeStation is Component comp)
+        {
+            GameObject stationRoot = FindNetworkedGameObject(comp);
+            string stationTypeName = GetInteractiveStationTypeName(activeStation);
+            if (debugLog)
+            {
+                NetworkIdentity ni = stationRoot.GetComponent<NetworkIdentity>();
+                string netIdStr = ni != null ? ni.netId.ToString() : "无NI";
+                Debug.Log($"<color=#FFAA00>[StationK]</color> CmdSetStationInteractState(true) → stationRoot={stationRoot.name} netId={netIdStr} stationTypeName={stationTypeName}");
+            }
+            networkController.CmdSetStationInteractState(stationRoot, true, stationTypeName);
         }
         else
         {
+            if (debugLog) Debug.Log("<color=#FFAA00>[StationK]</color> 非联机或 NetworkClient 未激活：本地 BeginInteract");
             activeStation.BeginInteract(this);
         }
 
         return true;
+    }
+
+    static string DescribeStation(IInteractiveStation s)
+    {
+        if (s == null) return "null";
+        if (s is Component c) return $"{c.GetType().Name} on {c.gameObject.name}";
+        return s.GetType().Name;
+    }
+
+    /// <summary>供 Cmd 在服务端从同一 NI 根下多个 <see cref="BaseStation"/> 中解析目标脚本（传 <see cref="System.Type.Name"/>）。</summary>
+    static string GetInteractiveStationTypeName(IInteractiveStation station)
+    {
+        if (station is MonoBehaviour mb)
+            return mb.GetType().Name;
+        return "";
     }
 
     void TryEndStationInteract()
@@ -379,9 +578,14 @@ public class PlayerItemInteractor : MonoBehaviour
         PlayerNetworkController networkController = GetComponent<PlayerNetworkController>();
         bool isNetworked = networkController != null && Mirror.NetworkClient.active;
 
-        if (isNetworked && activeStation is Component comp)
+        if (isNetworked && activeStation is ComputerStation)
         {
-            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), false);
+            activeStation.EndInteract(this);
+        }
+        else if (isNetworked && activeStation is Component comp)
+        {
+            string stationTypeName = GetInteractiveStationTypeName(activeStation);
+            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), false, stationTypeName);
         }
         else
         {
@@ -428,7 +632,7 @@ public class PlayerItemInteractor : MonoBehaviour
         FryPot heldPot = heldItem.GetComponent<FryPot>();
         if (heldPot != null && heldPot.CanServe())
         {
-            CarryableItem targetPlate = FindServablePlateTarget();
+            CarryableItem targetPlate = sensor != null ? sensor.GetCurrentServablePlateTarget() : null;
             if (targetPlate != null)
             {
                 ExecutePotToPlateServe(heldPot, targetPlate);
@@ -439,79 +643,75 @@ public class PlayerItemInteractor : MonoBehaviour
         return false;
     }
 
-    CarryableItem FindServablePlateTarget()
+    void ExecutePotToPlateServe(FryPot pot, CarryableItem plate)
     {
-        if (sensor == null) return null;
-
-        Vector3 origin = sensor.sensorOrigin != null ? sensor.sensorOrigin.position : sensor.playerRoot.position;
-        Collider[] cols = Physics.OverlapSphere(
-            origin,
-            plateServeOverlapRadius,
-            sensor.itemMask,
-            QueryTriggerInteraction.Collide);
-
-        CarryableItem best = null;
-        float bestSqr = float.MaxValue;
-
-        foreach (var col in cols)
+        PlayerNetworkController net = GetComponent<PlayerNetworkController>();
+        if (net != null && NetworkClient.active)
         {
-            if (col == null) continue;
-            CarryableItem ci = col.GetComponentInParent<CarryableItem>();
-            if (ci == null || ci == heldItem) continue;
-            if (ci.State == CarryableItem.ItemState.Held) continue;
-            if (!IsValidEmptyPlate(ci)) continue;
-
-            float sqr = (origin - ci.transform.position).sqrMagnitude;
-            if (sqr < bestSqr)
+            CarryableItem potItem = pot.GetComponent<CarryableItem>();
+            if (potItem != null)
             {
-                bestSqr = sqr;
-                best = ci;
+                net.CmdRequestPotServe(potItem.gameObject, plate.gameObject);
+                return;
             }
         }
 
-        return best;
+        ExecutePotToPlateServeLocal(pot, plate);
     }
 
-    bool IsValidEmptyPlate(CarryableItem item)
-    {
-        if (item.GetComponent<PlateItem>() == null) return false;
-        if (item.GetComponent<DishRecipeTag>() != null) return false;
-        if (item is DynamicItemStack) return false;
-        if (item.GetComponentInParent<DirtyPlateStack>() != null) return false;
-        if (item.GetComponentInParent<SupplyBox>() != null) return false;
-        return true;
-    }
-
-    void ExecutePotToPlateServe(FryPot pot, CarryableItem plate)
+    /// <summary>仅由 Server(Host) 或单机执行的盛菜实际逻辑。联机时品质表现由 <see cref="PlayerNetworkController.RpcApplyDishQuality"/> 统一下发。</summary>
+    public GameObject ExecutePotToPlateServeLocal(FryPot pot, CarryableItem plate)
     {
         GameObject dishPrefab = pot.Serve();
-        if (dishPrefab == null) return;
+        if (dishPrefab == null)
+        {
+            if (debugLog) Debug.Log("<color=#FF0000>[盛菜]</color> pot.Serve() 返回 null");
+            return null;
+        }
+        DishQuality servedQuality = pot.LastServedQuality;
 
         ItemPlacePoint platePoint = plate.CurrentPlacePoint;
         Vector3 fallbackPos = plate.transform.position;
         Quaternion fallbackRot = plate.transform.rotation;
 
+        if (debugLog) Debug.Log($"<color=#00FF00>[盛菜]</color> platePoint={platePoint?.name ?? "null"} pos={fallbackPos}");
+
         if (platePoint != null)
             platePoint.ClearOccupant();
 
-        if (Mirror.NetworkServer.active)
-            Mirror.NetworkServer.Destroy(plate.gameObject);
+        if (NetworkServer.active)
+            NetworkServer.Destroy(plate.gameObject);
         else
             Destroy(plate.gameObject);
 
-        GameObject dishObj = Instantiate(dishPrefab);
-        if (Mirror.NetworkServer.active) Mirror.NetworkServer.Spawn(dishObj);
+        GameObject dishObj = Instantiate(dishPrefab, fallbackPos, fallbackRot);
         CarryableItem dishItem = dishObj.GetComponent<CarryableItem>();
 
+        // 先 Spawn 再放置，避免 NT 关闭状态下 Spawn 导致远端位姿为原点
+        if (NetworkServer.active)
+            NetworkServer.Spawn(dishObj);
+
+        bool placed = false;
         if (platePoint != null && dishItem != null)
         {
-            platePoint.TryAcceptItem(dishItem);
+            dishItem.SetNetworkTransformSync(false);
+            placed = platePoint.TryAcceptItem(dishItem);
         }
-        else
+
+        if (!placed && dishItem != null)
         {
+            dishItem.SetNetworkTransformSync(true);
             dishObj.transform.position = fallbackPos;
             dishObj.transform.rotation = fallbackRot;
         }
+
+        // 单机/无 NetworkManager：本地直接应用品质；联机由 Rpc 统一（避免仅服务端显隐）
+        DishQualityTag qualityTag = dishObj.GetComponent<DishQualityTag>();
+        if (qualityTag != null && !NetworkServer.active)
+            qualityTag.ApplyQuality(servedQuality);
+
+        if (debugLog) Debug.Log($"<color=#00FF00>[盛菜]</color> 完成 dish={dishObj.name} pos={dishObj.transform.position} placed={placed}");
+        return dishObj;
     }
 
     public void ReplaceHeldItem(CarryableItem newItem) { heldItem = newItem; }

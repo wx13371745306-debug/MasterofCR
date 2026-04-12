@@ -13,12 +13,11 @@ GameObject:
   - component: {fileID: 3561210101484174384}
   - component: {fileID: 5284964825234520712}
   - component: {fileID: 2145912563474435781}
-  - component: {fileID: 1796676767735703403}
   - component: {fileID: 8619213827739799384}
   - component: {fileID: -4437283390864494888}
   m_Layer: 3
   m_Name: Plate
-  m_TagString: Untagged
+  m_TagString: CleanPlate
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -40,6 +39,7 @@ Transform:
   - {fileID: 4615367387703926926}
   - {fileID: 9223010497750080333}
   - {fileID: 6700145129431922673}
+  - {fileID: 4147667207143101064}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1956669079667249750
@@ -54,12 +54,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5977703babc3dd40a1ced72d28defb6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CarryableItem
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
   rb: {fileID: 3561210101484174384}
   itemColliders:
-  - {fileID: 0}
+  - {fileID: 4661414546829236135}
   poseConfig: {fileID: 0}
   sensorHighlight: {fileID: 5868119238746507454}
-  categories: 138
+  categories: 128
   initialPlacePoint: {fileID: 0}
   isUsable: 1
   isPickable: 1
@@ -68,6 +71,7 @@ MonoBehaviour:
   leftHandGrip: {fileID: 9223010497750080333}
   rightHandGrip: {fileID: 6700145129431922673}
   debugLog: 0
+  lastHolderPlayer: {fileID: 0}
 --- !u!54 &3561210101484174384
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -120,26 +124,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlateTool
   debugLog: 0
---- !u!114 &1796676767735703403
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8858006345147724}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a054e05385c276247a79e099ff1a4636, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StackableProp
-  dynamicStackPrefab: {fileID: 2923466580099044001, guid: 412759ef71c51db448bddee28bdb1a10, type: 3}
-  layoutType: 0
-  maxStackCount: 10
-  stackYOffset: 0.05
-  gridColumns: 2
-  gridRows: 2
-  gridSpacing: 0.15
-  debugLog: 0
 --- !u!114 &8619213827739799384
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -181,7 +165,7 @@ MonoBehaviour:
   interpolatePosition: 1
   interpolateRotation: 1
   interpolateScale: 1
-  coordinateSpace: 0
+  coordinateSpace: 1
   timelineOffset: 1
   showGizmos: 0
   showOverlay: 0
@@ -217,6 +201,37 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -0.1793, y: -0.03, z: -0.002}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1659737987911455172}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1868770133685826778
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4147667207143101064}
+  m_Layer: 0
+  m_Name: Rhand (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4147667207143101064
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1868770133685826778}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.1621, y: -0.03, z: 0.005}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

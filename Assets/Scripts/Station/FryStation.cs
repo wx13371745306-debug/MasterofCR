@@ -1,3 +1,4 @@
+using Mirror;
 using UnityEngine;
 
 public class FryStation : BaseStation
@@ -8,8 +9,9 @@ public class FryStation : BaseStation
 
     [Header("Visual Effects")]
     [Tooltip("在此处拖入你的煎炸特效预制体或场景中的子物体")]
-    public GameObject fryEffect; 
+    public GameObject fryEffect;
 
+    FryPot _lastPot;
 
     protected override void Awake()
     {
@@ -49,27 +51,38 @@ public class FryStation : BaseStation
 
     void Update()
     {
+        // 煎炸模拟仅服务端权威；客户端由 FryPotNetworkSync 镜像状态
+        if (!NetworkServer.active) return;
+
         FryPot pot = CurrentPot();
 
-        // 如果没有锅，或者锅不能接收进度（没有食材或已做完）
-        if (pot == null || !pot.CanReceiveProgress())
+        if (_lastPot != null && _lastPot != pot)
+            _lastPot.NotifyStationHeat(this, false);
+        _lastPot = pot;
+
+        if (pot != null)
+            pot.NotifyStationHeat(this, true);
+
+        if (pot == null)
         {
-            // 关闭特效
             if (fryEffect != null && fryEffect.activeSelf)
-            {
                 fryEffect.SetActive(false);
-            }
             return;
         }
 
-        // 走到这里说明锅里有食材且未熟
-        // 开启特效
-        if (fryEffect != null && !fryEffect.activeSelf)
+        if (pot.CanReceiveProgress())
         {
-            fryEffect.SetActive(true);
+            if (fryEffect != null && !fryEffect.activeSelf)
+                fryEffect.SetActive(true);
+            pot.AddProgress(frySpeed * Time.deltaTime);
+        }
+        else if (fryEffect != null && fryEffect.activeSelf)
+        {
+            fryEffect.SetActive(false);
         }
 
-        // 自动增加进度
-        pot.AddProgress(frySpeed * Time.deltaTime);
+        // 仅在锅置于本站上时推进糊菜倒计时
+        if (pot.IsBurnCountdown)
+            pot.AdvanceBurn(Time.deltaTime);
     }
 }

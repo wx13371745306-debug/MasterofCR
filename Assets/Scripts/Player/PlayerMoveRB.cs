@@ -5,13 +5,28 @@ using UnityEngine.InputSystem;
 public class PlayerMoveRB : MonoBehaviour
 {
     public float moveSpeed = 6f;      // 最大水平速度
-    public float acceleration = 25f;  // 加速强度，越大越“跟手”
+    public float acceleration = 25f;  // 加速强度，越大越"跟手"
+
+    [Header("冲刺（由运动鞋饰品启用）")]
+    [Tooltip("冲刺速度")]
+    public float dashSpeed = 30f;
+    [Tooltip("冲刺持续时间（秒）")]
+    public float dashDuration = 0.15f;
+    [Tooltip("冲刺冷却时间（秒）")]
+    public float dashCooldown = 1f;
 
     private Rigidbody rb;
     private Vector2 moveInput;
 
     private bool horizontalPositionLocked;
     private Vector2 lockedXZ;
+
+    // 冲刺运行时状态
+    private bool isDashing;
+    private float dashTimer;
+    private float dashCooldownTimer;
+    private Vector3 dashDirection;
+    private PlayerAttributes playerAttributes;
 
     /// <summary>锁定水平位置（X/Z），Y 仍受重力等影响。用于商店等界面。</summary>
     public void SetHorizontalPositionLocked(bool locked)
@@ -47,12 +62,11 @@ public class PlayerMoveRB : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        playerAttributes = GetComponent<PlayerAttributes>();
     }
 
     private void Update()
     {
-        // 读取 New Input System 的“当前键盘状态”
-        // 这样做不需要 PlayerInput、不需要 OnMove 回调，最不容易出 bug
         var k = Keyboard.current;
         if (k == null)
         {
@@ -64,7 +78,23 @@ public class PlayerMoveRB : MonoBehaviour
         float y = (k.wKey.isPressed ? 1f : 0f) + (k.sKey.isPressed ? -1f : 0f);
 
         Vector2 v = new Vector2(x, y);
-        moveInput = v.sqrMagnitude > 1f ? v.normalized : v; // 防止斜向更快
+        moveInput = v.sqrMagnitude > 1f ? v.normalized : v;
+
+        // 冲刺冷却计时
+        if (dashCooldownTimer > 0f)
+            dashCooldownTimer -= Time.deltaTime;
+
+        // 冲刺触发：装备运动鞋 + 按下 Shift + 冷却完毕 + 未在冲刺中
+        if (playerAttributes != null && playerAttributes.hasDash
+            && k.leftShiftKey.wasPressedThisFrame
+            && dashCooldownTimer <= 0f && !isDashing
+            && !horizontalPositionLocked)
+        {
+            isDashing = true;
+            dashTimer = dashDuration;
+            // 冲刺方向：玩家当前朝向
+            dashDirection = transform.forward;
+        }
     }
 
     private void FixedUpdate()
@@ -84,11 +114,29 @@ public class PlayerMoveRB : MonoBehaviour
             return;
         }
 
+        // 冲刺中：高速直线位移，忽略正常移动输入
+        if (isDashing)
+        {
+            dashTimer -= Time.fixedDeltaTime;
+            rb.linearVelocity = new Vector3(
+                dashDirection.x * dashSpeed,
+                rb.linearVelocity.y,
+                dashDirection.z * dashSpeed);
+
+            if (dashTimer <= 0f)
+            {
+                isDashing = false;
+                dashCooldownTimer = dashCooldown;
+            }
+
+            rb.angularVelocity = Vector3.zero;
+            return;
+        }
+
         float effectiveSpeed = GetEffectiveMoveSpeed();
         Vector3 currentVel = rb.linearVelocity;
         Vector3 targetVel = new Vector3(moveInput.x * effectiveSpeed, currentVel.y, moveInput.y * effectiveSpeed);
 
-        // 用“加速度限制”的方式靠近目标速度：不会直接覆盖外力结果，更适合以后撞飞
         Vector3 newVel = Vector3.MoveTowards(currentVel, targetVel, acceleration * Time.fixedDeltaTime);
         rb.linearVelocity = newVel;
 
