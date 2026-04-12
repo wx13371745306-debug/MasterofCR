@@ -41,6 +41,13 @@ public class PlayerInteractionSensor : MonoBehaviour
         }
     }
 
+    void Start()
+    {
+        // 与局内设置菜单同步（PlayerPrefs）
+        if (PlayerPrefs.HasKey(GameplaySessionUIUtil.PrefKeySensorDebug))
+            debugLog = PlayerPrefs.GetInt(GameplaySessionUIUtil.PrefKeySensorDebug, 0) == 1;
+    }
+
     void OnTriggerEnter(Collider other)
     {
         if (other != null)

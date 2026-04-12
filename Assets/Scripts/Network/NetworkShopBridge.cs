@@ -24,6 +24,10 @@ public class NetworkShopBridge : NetworkBehaviour
     [SyncVar(hook = nameof(OnSyncedMoneyChanged))]
     private int syncedMoney;
 
+    /// <summary>Host 侧 ShopDeliveryQueue 是否有待交付记账；供 Guest UI 校验（与本地队列解耦）。</summary>
+    [SyncVar]
+    private bool syncedHasPendingShopOrders;
+
     // ── 菜谱同步 ──
     readonly SyncList<string> syncedRecipeNames = new SyncList<string>();
 
@@ -55,7 +59,24 @@ public class NetworkShopBridge : NetworkBehaviour
         {
             if (MoneyManager.Instance != null)
                 syncedMoney = MoneyManager.Instance.CurrentMoney;
+            if (shopDeliveryQueue != null)
+                syncedHasPendingShopOrders = shopDeliveryQueue.HasPendingOrders;
         }
+    }
+
+    /// <summary>联机时以 Host 为准；单机读本地 <see cref="ShopDeliveryQueue"/>。</summary>
+    public static bool HasPendingOrdersForUiValidation(ShopDeliveryQueue localQueue)
+    {
+        if (NetworkClient.active && Instance != null)
+            return Instance.GetAuthoritativeHasPendingOrders();
+        return localQueue != null && localQueue.HasPendingOrders;
+    }
+
+    bool GetAuthoritativeHasPendingOrders()
+    {
+        if (IsHostAuthority && shopDeliveryQueue != null)
+            return shopDeliveryQueue.HasPendingOrders;
+        return syncedHasPendingShopOrders;
     }
 
     // ── 金钱 SyncVar Hook ──

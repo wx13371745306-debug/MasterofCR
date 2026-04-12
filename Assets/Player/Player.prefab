@@ -1006,7 +1006,7 @@ MonoBehaviour:
   sensor: {fileID: 1547345450132018411}
   holdPoint: {fileID: 1513223606655305747}
   debugLog: 1
-  plateServeOverlapRadius: 2.2
+  debugChoppingHighlightDeny: 1
 --- !u!114 &1008561482671382456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1076,6 +1076,7 @@ MonoBehaviour:
   syncMode: 0
   syncInterval: 0
   debugLog: 1
+  debugReleasePlaceDiagnostics: 1
 --- !u!114 &4170403366159905687
 MonoBehaviour:
   m_ObjectHideFlags: 0

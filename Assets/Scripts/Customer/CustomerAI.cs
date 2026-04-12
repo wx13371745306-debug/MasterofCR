@@ -35,6 +35,9 @@ public class CustomerAI : NetworkBehaviour
     [SyncVar(hook = nameof(OnSyncSeatedChanged))]
     bool syncIsSeated;
 
+    /// <summary>是否已入座（SyncVar）；供外部查询并消除对 backing 字段的未使用警告。</summary>
+    public bool IsSeatedSynced => syncIsSeated;
+
     private Transform targetChair;
     private Action onSeatedCallback;
     private bool isSittingDown = false;

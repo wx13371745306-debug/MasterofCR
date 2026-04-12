@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using Mirror;
 
@@ -10,6 +12,10 @@ public class PlayerNetworkController : NetworkBehaviour
 {
     [Header("Debug Settings")]
     public bool debugLog = true;
+    [SerializeField, Tooltip("联机 ReleasePlace 诊断：打印客户端坐标 vs 服务端最近邻及槽位占用，用于排查双锅/架台匹配问题。平时请关闭。")]
+    bool debugReleasePlaceDiagnostics = false;
+    /// <summary>供 <see cref="PlayerItemInteractor"/> 在发送 Cmd 前打印客户端侧快照。</summary>
+    public bool DebugReleasePlaceDiagnostics => debugReleasePlaceDiagnostics;
 
     private PlayerMoveRB moveRB;
     private PlayerItemInteractor interactor;
@@ -261,9 +267,10 @@ public class PlayerNetworkController : NetworkBehaviour
     /// 服务端权威放下/放置/堆叠/入冰箱。
     /// <para><paramref name="auxNetObj"/>：有 NetworkIdentity 的辅助目标（DynamicItemStack / CarryableItem），用于堆叠。</para>
     /// <para><paramref name="auxWorldPos"/>：无 NetworkIdentity 的目标世界坐标（ItemPlacePoint / FridgeStation），服务端按位置匹配。</para>
+    /// <para><paramref name="releasePlacePotNetId"/>：仅 <see cref="ReleasePlace"/> 有效；为锅内食材槽所属「锅」根 <see cref="NetworkIdentity.netId"/>，用于消解与煎炸台架锅槽坐标重合时的最近邻歧义；0 表示未提供，仍按 aux 最近邻。</para>
     /// </summary>
     [Command]
-    public void CmdRequestReleaseHeld(byte releaseKind, GameObject itemObj, GameObject auxNetObj, Vector3 auxWorldPos)
+    public void CmdRequestReleaseHeld(byte releaseKind, GameObject itemObj, GameObject auxNetObj, Vector3 auxWorldPos, uint releasePlacePotNetId)
     {
         if (itemObj == null) return;
 
@@ -286,6 +293,9 @@ public class PlayerNetworkController : NetworkBehaviour
         }
 
         bool ok = false;
+        // 供 Rpc：客机用「与服务端一致的 placePoint 世界坐标」解析槽位，避免仅靠 auxWorldPos 最近邻失败导致 CurrentItem 不同步（砧台 CanInteract 闪烁）。
+        bool hasServerResolvedPlacePoint = false;
+        Vector3 serverResolvedPlacePointWorldPos = default;
 
         switch (releaseKind)
         {
@@ -296,7 +306,10 @@ public class PlayerNetworkController : NetworkBehaviour
 
             case ReleasePlace:
             {
-                ItemPlacePoint pp = FindNearestComponent<ItemPlacePoint>(auxWorldPos, 0.5f);
+                ItemPlacePoint pp = ResolveReleasePlaceItemPlacePoint(auxWorldPos, releasePlacePotNetId);
+                if (debugReleasePlaceDiagnostics)
+                    LogReleasePlaceServerDiagnostics(auxWorldPos, item, itemNi, pp, releasePlacePotNetId);
+
                 if (pp == null)
                 {
                     if (debugLog) Debug.LogWarning($"[CmdRequestReleaseHeld] ReleasePlace 未找到 ItemPlacePoint near {auxWorldPos}");
@@ -308,7 +321,13 @@ public class PlayerNetworkController : NetworkBehaviour
                     break;
                 }
                 if (pp.TryAcceptItem(item))
+                {
                     ok = true;
+                    hasServerResolvedPlacePoint = true;
+                    serverResolvedPlacePointWorldPos = pp.transform.position;
+                }
+                else if (debugReleasePlaceDiagnostics)
+                    Debug.LogWarning($"[ReleasePlaceDiag][Server] TryAcceptItem 返回 false（CanPlace 曾为 true 仍失败） point={pp.name} path={BuildHierarchyPath(pp.transform)}");
                 break;
             }
 
@@ -332,12 +351,12 @@ public class PlayerNetworkController : NetworkBehaviour
                     }
                 }
                 if (ok)
-                    RpcApplyReleaseHeld(releaseKind, itemObj, auxWorldPos);
+                    RpcApplyReleaseHeld(releaseKind, itemObj, auxWorldPos, false, default);
                 return;
 
             case ReleaseFridge:
             {
-                FridgeStation fridge = FindNearestComponent<FridgeStation>(auxWorldPos, 3f);
+                FridgeStation fridge = ItemPlacePointNetUtil.FindNearestComponent<FridgeStation>(auxWorldPos, 3f);
                 if (fridge != null && fridge.CanAcceptItem())
                     ok = fridge.ServerTryStoreFromAuthority(item);
                 break;
@@ -347,20 +366,102 @@ public class PlayerNetworkController : NetworkBehaviour
         if (!ok) return;
 
         itemNi.RemoveClientAuthority();
-        RpcApplyReleaseHeld(releaseKind, itemObj, auxWorldPos);
+        RpcApplyReleaseHeld(releaseKind, itemObj, auxWorldPos, hasServerResolvedPlacePoint, serverResolvedPlacePointWorldPos);
     }
 
-    /// <summary>按世界坐标在场景中查找最近的指定组件（用于 PlacePoint / FridgeStation 等无 NetworkIdentity 的对象）。</summary>
-    static T FindNearestComponent<T>(Vector3 worldPos, float maxDist) where T : Component
+    /// <summary>ReleasePlace：优先用客户端传来的锅 netId 得到 <see cref="FryPot.ingredientPlacePoint"/>，否则按 aux 最近邻。</summary>
+    static ItemPlacePoint ResolveReleasePlaceItemPlacePoint(Vector3 auxWorldPos, uint releasePlacePotNetId)
     {
-        float bestSqr = maxDist * maxDist;
-        T best = null;
-        foreach (var c in FindObjectsByType<T>(FindObjectsSortMode.None))
+        if (releasePlacePotNetId != 0 && NetworkServer.spawned.TryGetValue(releasePlacePotNetId, out NetworkIdentity potNi))
         {
-            float sqr = (c.transform.position - worldPos).sqrMagnitude;
-            if (sqr < bestSqr) { bestSqr = sqr; best = c; }
+            FryPot fp = potNi.GetComponent<FryPot>();
+            if (fp == null) fp = potNi.GetComponentInChildren<FryPot>(true);
+            if (fp != null && fp.ingredientPlacePoint != null)
+            {
+                ItemPlacePoint hinted = fp.ingredientPlacePoint;
+                float maxSqr = ItemPlacePointNetUtil.ReleasePlacePotHintMaxDistance * ItemPlacePointNetUtil.ReleasePlacePotHintMaxDistance;
+                if ((hinted.transform.position - auxWorldPos).sqrMagnitude <= maxSqr)
+                    return hinted;
+            }
         }
-        return best;
+
+        return ItemPlacePointNetUtil.FindNearestComponent<ItemPlacePoint>(auxWorldPos, ItemPlacePointNetUtil.ReleasePlaceSearchRadius);
+    }
+
+    /// <summary>服务端：列出半径内所有 ItemPlacePoint 与最近邻解析结果，便于对照客户端。</summary>
+    void LogReleasePlaceServerDiagnostics(Vector3 auxWorldPos, CarryableItem item, NetworkIdentity itemNi, ItemPlacePoint resolved, uint releasePlacePotNetId)
+    {
+        if (!debugReleasePlaceDiagnostics || !NetworkServer.active) return;
+
+        uint itemNetId = itemNi != null ? itemNi.netId : 0;
+        var sb = new StringBuilder();
+        sb.AppendLine($"[ReleasePlaceDiag][Server] auxWorldPos={auxWorldPos} potHintNetId={releasePlacePotNetId} 搜索半径={ItemPlacePointNetUtil.ReleasePlaceSearchRadius} 物品={item?.name} netId={itemNetId}");
+
+        float r2 = ItemPlacePointNetUtil.ReleasePlaceSearchRadius * ItemPlacePointNetUtil.ReleasePlaceSearchRadius;
+        var candidates = new List<(ItemPlacePoint p, float d)>();
+        foreach (var p in FindObjectsByType<ItemPlacePoint>(FindObjectsSortMode.None))
+        {
+            if (p == null) continue;
+            float sqr = (p.transform.position - auxWorldPos).sqrMagnitude;
+            if (sqr <= r2)
+                candidates.Add((p, Mathf.Sqrt(sqr)));
+        }
+        candidates.Sort((a, b) => a.d.CompareTo(b.d));
+
+        sb.AppendLine($"  半径内候选数: {candidates.Count}");
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            var (p, d) = candidates[i];
+            bool isResolved = resolved != null && p == resolved;
+            CarryableItem occ = p.CurrentItem;
+            uint occNet = 0;
+            if (occ != null)
+            {
+                NetworkIdentity on = occ.GetComponent<NetworkIdentity>();
+                if (on != null) occNet = on.netId;
+            }
+            CarryableItem parentPot = p.GetComponentInParent<CarryableItem>();
+            string potLabel = parentPot != null ? parentPot.name : "-";
+            sb.AppendLine(
+                $"  [{i + 1}] {(isResolved ? "←服务端最近邻" : "　")} dist={d:F4} point={p.name} pot={potLabel} " +
+                $"externalLock={p.externalLock} currentItem={(occ != null ? occ.name + " netId=" + occNet : "null")} " +
+                $"path={BuildHierarchyPath(p.transform)}");
+        }
+
+        if (resolved == null)
+            sb.AppendLine("  解析: 无 ItemPlacePoint 落在半径内（与 FindNearest 一致为 null）");
+        else
+        {
+            sb.AppendLine(
+                $"  解析: 最近邻 path={BuildHierarchyPath(resolved.transform)} CanPlace={resolved.CanPlace(item)} " +
+                $"原因={ExplainCanPlaceRejection(resolved, item)}");
+        }
+
+        Debug.Log(sb.ToString());
+    }
+
+    static string ExplainCanPlaceRejection(ItemPlacePoint pp, CarryableItem item)
+    {
+        if (pp == null) return "pp=null";
+        if (item == null) return "item=null";
+        if (pp.externalLock) return "externalLock";
+        CarryableItem cu = pp.CurrentItem;
+        if (cu != null && cu != item) return $"槽位已被占用 occupant={cu.name}";
+        if (!pp.allowAnyCategory && !item.HasAnyCategory(pp.allowedCategories)) return "品类不允许";
+        return "无（应可放置）";
+    }
+
+    static string BuildHierarchyPath(Transform t)
+    {
+        if (t == null) return "";
+        var parts = new List<string>(8);
+        while (t != null)
+        {
+            parts.Add(t.name);
+            t = t.parent;
+        }
+        parts.Reverse();
+        return string.Join("/", parts);
     }
 
     /// <summary>
@@ -368,7 +469,7 @@ public class PlayerNetworkController : NetworkBehaviour
     /// 服务端（Host）已在 Cmd 中完成实际逻辑；纯客户端（Guest）根据 releaseKind 镜像执行放置/丢地等表现。
     /// </summary>
     [ClientRpc]
-    void RpcApplyReleaseHeld(byte releaseKind, GameObject itemObj, Vector3 auxWorldPos)
+    void RpcApplyReleaseHeld(byte releaseKind, GameObject itemObj, Vector3 auxWorldPos, bool hasServerResolvedPlacePoint, Vector3 serverResolvedPlacePointWorldPos)
     {
         // 发起放下的玩家在所有端（含远端观察）都应清空 held，否则他端仍显示菜粘在手上
         if (interactor != null)
@@ -384,14 +485,25 @@ public class PlayerNetworkController : NetworkBehaviour
         {
             case ReleasePlace:
             {
-                ItemPlacePoint pp = FindNearestComponent<ItemPlacePoint>(auxWorldPos, 0.5f);
+                // 优先用服务端解析的槽位世界坐标（与主机 TryAcceptItem 为同一 ItemPlacePoint），避免客机仅用 auxWorldPos+小半径搜不到 → CurrentItem 永为 null
+                ItemPlacePoint pp = null;
+                if (hasServerResolvedPlacePoint)
+                    pp = ItemPlacePointNetUtil.FindItemPlacePointNearServerPosition(serverResolvedPlacePointWorldPos, ItemPlacePointNetUtil.ServerHintMatchRadius);
+                if (pp == null)
+                    pp = ItemPlacePointNetUtil.FindNearestComponent<ItemPlacePoint>(auxWorldPos, ItemPlacePointNetUtil.ReleasePlaceClientSearchRadius);
+                if (pp == null)
+                    pp = ItemPlacePointNetUtil.FindNearestComponent<ItemPlacePoint>(item.transform.position, ItemPlacePointNetUtil.ReleasePlaceClientSearchRadius);
+
                 if (pp != null)
                 {
                     item.SetNetworkTransformSync(false);
-                    pp.TryAcceptItem(item);
+                    if (!pp.TryAcceptItem(item) && debugLog)
+                        Debug.LogWarning($"[RpcApplyReleaseHeld][Client] TryAcceptItem 失败 item={item.name} point={pp.name}（请查品类/占用）");
                 }
                 else
                 {
+                    if (debugLog)
+                        Debug.LogWarning($"[RpcApplyReleaseHeld][Client] 无法解析 ItemPlacePoint：aux={auxWorldPos} hasHint={hasServerResolvedPlacePoint}");
                     item.transform.SetParent(null);
                     item.SetNetworkTransformSync(true);
                 }

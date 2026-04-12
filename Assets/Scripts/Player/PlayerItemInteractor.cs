@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Mirror;
@@ -8,6 +10,10 @@ public class PlayerItemInteractor : MonoBehaviour
     public PlayerInteractionSensor sensor;
     public Transform holdPoint;
     public bool debugLog = true;
+
+    [Header("Diagnostics")]
+    [Tooltip("Guest 砧台闪烁：传感器指向 ChoppingStation 但 CanInteract=false 时打印（与 ChoppingStation.debugFlickerDiagnostics 配合）。")]
+    [SerializeField] bool debugChoppingHighlightDeny = false;
 
     private CarryableItem heldItem;
     private IInteractiveStation activeStation;
@@ -21,6 +27,9 @@ public class PlayerItemInteractor : MonoBehaviour
     private float jKeyPressTime = 0f;
     private bool isJKeyHeld = false;
     private bool hasHandledJKeyThisPress = false;
+
+    float _nextChopHighlightDenyLogTime;
+    bool _lastChopHighlightDenied;
 
     public bool IsHoldingItem() => heldItem != null;
     public CarryableItem GetHeldItem() => heldItem;
@@ -95,6 +104,9 @@ public class PlayerItemInteractor : MonoBehaviour
     // 【核心新增模块】统一管理所有高亮
     void UpdateHighlights()
     {
+        if (IsHoldingItem())
+            _lastChopHighlightDenied = false;
+
         // 1. 清理上一帧的高亮
         if (highlightedItem != null) { highlightedItem.SetSensorHighlight(false); highlightedItem = null; }
         if (highlightedPlacePoint != null) { highlightedPlacePoint.SetSensorHighlight(false); highlightedPlacePoint = null; }
@@ -114,6 +126,34 @@ public class PlayerItemInteractor : MonoBehaviour
             }
 
             IInteractiveStation station = sensor.GetCurrentStation();
+            if (debugChoppingHighlightDeny && station is ChoppingStation chopDenied && !chopDenied.CanInteract(this))
+            {
+                CarryableItem placed = chopDenied.GetCurrentPlacedItem();
+                // 槽位有物但无可再切 IProcessable（成品）：规则预期，不作为「高亮拒绝」诊断刷屏
+                bool expectedFinishedProduct = placed != null && chopDenied.GetCurrentProcessable() == null;
+
+                if (expectedFinishedProduct)
+                    _lastChopHighlightDenied = false;
+                else
+                {
+                    bool edge = !_lastChopHighlightDenied;
+                    if (edge || Time.unscaledTime >= _nextChopHighlightDenyLogTime)
+                    {
+                        MonoBehaviour st = station as MonoBehaviour;
+                        string diagLabel = placed == null ? "[ChopHighlightDesync]" : "[ChopHighlightDeny]";
+                        Debug.Log(
+                            $"{diagLabel} frame={Time.frameCount} station={st?.name} " +
+                            $"CanInteract=false | {chopDenied.GetGuestProcessableDenyReasonLine()}",
+                            st);
+                        _nextChopHighlightDenyLogTime = Time.unscaledTime + 0.15f;
+                    }
+
+                    _lastChopHighlightDenied = true;
+                }
+            }
+            else
+                _lastChopHighlightDenied = false;
+
             if (station != null && station.CanInteract(this))
             {
                 highlightedStation = station;
@@ -313,9 +353,11 @@ public class PlayerItemInteractor : MonoBehaviour
 
         if (net != null && NetworkClient.active && item.GetComponent<NetworkIdentity>() != null)
         {
-            if (TryResolveNetworkRelease(item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos))
+            if (TryResolveNetworkRelease(item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos, out uint releasePlacePotNetId))
             {
-                net.CmdRequestReleaseHeld(kind, item.gameObject, auxNetObj, auxWorldPos);
+                if (kind == PlayerNetworkController.ReleasePlace && net.DebugReleasePlaceDiagnostics)
+                    LogReleasePlaceClientDiagnostics(sensor != null ? sensor.GetCurrentPlacePoint() : null, auxWorldPos, item, releasePlacePotNetId);
+                net.CmdRequestReleaseHeld(kind, item.gameObject, auxNetObj, auxWorldPos, releasePlacePotNetId);
                 return;
             }
         }
@@ -324,18 +366,16 @@ public class PlayerItemInteractor : MonoBehaviour
     }
 
     /// <summary>
-    /// 联机时解析应发送的放下类型；返回 false 时走本地 TryEndHoldLocal（如放置点被占需拒绝且不落回网络丢地）。
+    /// 联机时解析放下类型；返回 false 时走本地 TryEndHoldLocal。
+    /// <para>有 NetworkIdentity 的目标（堆叠）→ auxNetObj；无 NI（ItemPlacePoint / 冰箱）→ auxWorldPos。</para>
+    /// <para><paramref name="releasePlacePotNetId"/>：仅 ReleasePlace 可能非 0，为锅内食材槽对应锅根的 netId（消解煎炸台与锅内槽坐标重合）。</para>
     /// </summary>
-    /// <summary>
-    /// 联机时解析放下类型。
-    /// <para>有 NetworkIdentity 的目标（DynamicItemStack / CarryableItem 堆叠）→ auxNetObj。</para>
-    /// <para>无 NetworkIdentity 的目标（ItemPlacePoint / FridgeStation）→ auxWorldPos，服务端按坐标匹配。</para>
-    /// </summary>
-    bool TryResolveNetworkRelease(CarryableItem item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos)
+    bool TryResolveNetworkRelease(CarryableItem item, out byte kind, out GameObject auxNetObj, out Vector3 auxWorldPos, out uint releasePlacePotNetId)
     {
         kind = PlayerNetworkController.ReleaseDrop;
         auxNetObj = null;
         auxWorldPos = Vector3.zero;
+        releasePlacePotNetId = 0;
 
         // 脏盘整堆不可与其它 DynamicItemStack 合并/推入
         if (item is DirtyPlateStack)
@@ -355,6 +395,7 @@ public class PlayerItemInteractor : MonoBehaviour
                 {
                     kind = PlayerNetworkController.ReleasePlace;
                     auxWorldPos = dirtyPlacePoint.transform.position;
+                    releasePlacePotNetId = GetReleasePlacePotNetIdFromPlacePoint(dirtyPlacePoint);
                     return true;
                 }
                 kind = PlayerNetworkController.ReleaseDrop;
@@ -403,6 +444,7 @@ public class PlayerItemInteractor : MonoBehaviour
             {
                 kind = PlayerNetworkController.ReleasePlace;
                 auxWorldPos = targetPoint.transform.position;
+                releasePlacePotNetId = GetReleasePlacePotNetIdFromPlacePoint(targetPoint);
                 return true;
             }
             // 传感器指着某放置点但当前物品不允许放上：仍走网络丢地，避免仅本地 TryEndHoldLocal 与权威不同步
@@ -413,6 +455,58 @@ public class PlayerItemInteractor : MonoBehaviour
         // 丢地
         kind = PlayerNetworkController.ReleaseDrop;
         return true;
+    }
+
+    /// <summary>槽位在 <see cref="FryPot.ingredientPlacePoint"/> 上时，返回锅根 <see cref="NetworkIdentity.netId"/>；否则 0。</summary>
+    static uint GetReleasePlacePotNetIdFromPlacePoint(ItemPlacePoint targetPoint)
+    {
+        if (targetPoint == null) return 0;
+        FryPot fp = targetPoint.GetComponentInParent<FryPot>(true);
+        if (fp == null) return 0;
+        NetworkIdentity potNi = fp.transform.GetComponentInParent<NetworkIdentity>();
+        return potNi != null ? potNi.netId : 0;
+    }
+
+    /// <summary>与 <see cref="PlayerNetworkController"/> 的 ReleasePlace 诊断配对：记录客户端选用的放置点与发送坐标。</summary>
+    void LogReleasePlaceClientDiagnostics(ItemPlacePoint targetPoint, Vector3 sentPos, CarryableItem item, uint releasePlacePotNetId)
+    {
+        NetworkIdentity ni = item != null ? item.GetComponent<NetworkIdentity>() : null;
+        uint itemNetId = ni != null ? ni.netId : 0;
+        var sb = new StringBuilder();
+        sb.Append($"[ReleasePlaceDiag][Client] sentPos={sentPos} potHintNetId={releasePlacePotNetId} item={item?.name} netId={itemNetId}");
+        if (targetPoint == null)
+        {
+            sb.Append(" targetPoint=null（异常：不应与 ReleasePlace 同时出现）");
+            Debug.Log(sb.ToString());
+            return;
+        }
+
+        CarryableItem occ = targetPoint.CurrentItem;
+        uint occNet = 0;
+        if (occ != null)
+        {
+            NetworkIdentity on = occ.GetComponent<NetworkIdentity>();
+            if (on != null) occNet = on.netId;
+        }
+
+        CarryableItem potItem = targetPoint.GetComponentInParent<CarryableItem>();
+        sb.Append($" pointWorldPos={targetPoint.transform.position} point={targetPoint.name} pot={(potItem != null ? potItem.name : "-")} ");
+        sb.Append($"externalLock={targetPoint.externalLock} currentItem={(occ != null ? occ.name + " netId=" + occNet : "null")} ");
+        sb.Append($"CanPlace={targetPoint.CanPlace(item)} path={BuildDiagHierarchyPath(targetPoint.transform)}");
+        Debug.Log(sb.ToString());
+    }
+
+    static string BuildDiagHierarchyPath(Transform t)
+    {
+        if (t == null) return "";
+        var parts = new List<string>(8);
+        while (t != null)
+        {
+            parts.Add(t.name);
+            t = t.parent;
+        }
+        parts.Reverse();
+        return string.Join("/", parts);
     }
 
     /// <summary>单机或非网络同步路径下的完整放下逻辑。</summary>

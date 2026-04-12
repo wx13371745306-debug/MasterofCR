@@ -104,6 +104,14 @@ public class NetworkDayCycleBridge : NetworkBehaviour
         if (debugLog)
             Debug.Log($"[NetworkDayCycleBridge] Guest 收到阶段同步: {oldPhase} → {newPhase}");
 
+        if (newPhase == DayCyclePhase.NextDayTransition)
+        {
+            dayCycle.ApplyGuestNextDayTransitionWithFade(syncedDayIndex);
+            return;
+        }
+
+        // Prep 立即应用，使 OnPrepStart 与 Host 在 onMidBlack 后一致（全黑保持段即可切 UI），
+        // 不再等整段淡入+保持+淡出结束（IsBusy 会拖到黑屏结束才触发 Guest 的准备阶段 UI）。
         dayCycle.ApplyNetworkPhase(newPhase, syncedDayIndex);
     }
 }

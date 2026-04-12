@@ -127,7 +127,7 @@ public class ClosingSummaryUI : MonoBehaviour
         }
 
         // ========== 校验 Step 2：是否有已下单的待交付货物 ==========
-        bool hasOrders = shopDeliveryQueue != null && shopDeliveryQueue.HasPendingOrders;
+        bool hasOrders = NetworkShopBridge.HasPendingOrdersForUiValidation(shopDeliveryQueue);
 
         if (!hasOrders)
         {

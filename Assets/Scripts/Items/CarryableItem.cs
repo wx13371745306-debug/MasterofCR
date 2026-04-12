@@ -314,6 +314,37 @@ public class CarryableItem : NetworkBehaviour
             SetLayerRecursively(child.gameObject, layer);
     }
 
+    /// <summary>服务端 ReplaceWithResult Spawn 成品后调用：纯客户端将占位镜像到与主机同一 ItemPlacePoint（无 NI 的槽位需对端显式 TryAccept）。</summary>
+    [ClientRpc]
+    public void RpcMirrorRegisterAtPlacePoint(Vector3 serverPlacePointWorldPos)
+    {
+        if (NetworkServer.active) return;
+
+        ItemPlacePoint pp = ItemPlacePointNetUtil.FindItemPlacePointNearServerPosition(serverPlacePointWorldPos, ItemPlacePointNetUtil.ServerHintMatchRadius);
+        if (pp == null)
+            pp = ItemPlacePointNetUtil.FindNearestComponent<ItemPlacePoint>(transform.position, ItemPlacePointNetUtil.ReleasePlaceClientSearchRadius);
+
+        if (pp == null)
+        {
+            if (debugLog)
+                Debug.LogWarning($"[RpcMirrorRegisterAtPlacePoint] 无法解析 ItemPlacePoint serverPos={serverPlacePointWorldPos}");
+            return;
+        }
+
+        // 与主机 ReplaceWithResult 一致：先 Clear 再 TryAccept。客户端槽位仍可能指向上一食材（Destroy 时序常晚于本 Rpc），否则 CanPlace 直接失败且物体无法挂到 attachPoint。
+        if (pp.CurrentItem != null && pp.CurrentItem != this)
+            pp.ClearOccupant(silent: true);
+
+        SetNetworkTransformSync(false);
+        if (!pp.TryAcceptItem(this))
+        {
+            // 放置失败时恢复 NT，避免关闭同步后卡在默认位姿 (0,0,0)、无父节点
+            SetNetworkTransformSync(true);
+            if (debugLog)
+                Debug.LogWarning($"[RpcMirrorRegisterAtPlacePoint] TryAcceptItem 失败 item={name} point={pp.name}");
+        }
+    }
+
     /// <summary>供外部（如 PlayerNetworkController）在联机 hold/release 时开关 NetworkTransform 同步。</summary>
     public void SetNetworkTransformSync(bool enabled) => SetNetTransformEnabled(enabled);
 

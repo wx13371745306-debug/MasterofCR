@@ -24,9 +24,17 @@ public class ChoppingStation : BaseStation
     /// <summary>与 Cmd 内 BeginInteract 同步：客机本地 isInteracting 恒为 false，需用此值驱动进度/UI。</summary>
     [SyncVar] bool syncChoppingActive;
 
+    [Header("Diagnostics")]
+    [Tooltip("联机 Guest 砧台闪烁排查：syncChopping 开着但高亮/可加工条件丢失时打印（含节流到避免刷屏）。")]
+    [SerializeField] bool debugFlickerDiagnostics = false;
+
     private Quaternion initialRotation;
     private float currentPhase = 0f;
     private bool isInteracting = false;
+
+    /// <summary>上一帧 Guest 是否在「应显示切菜表现」的好状态（用于边沿检测）。</summary>
+    bool _lastGuestChopVisualOk = true;
+    float _nextFlickerDiagLogTime;
 
     void Start()
     {
@@ -114,6 +122,65 @@ public class ChoppingStation : BaseStation
         {
             EndInteract(cachedInteractor);
         }
+
+        LogGuestFlickerDiagIfNeeded(chopping);
+    }
+
+    /// <summary>供 PlayerItemInteractor 诊断：为何当前无法 GetCurrentProcessable。</summary>
+    public string GetGuestProcessableDenyReasonLine()
+    {
+        return BuildProcessableDenyDetail();
+    }
+
+    void LogGuestFlickerDiagIfNeeded(bool chopping)
+    {
+        if (!debugFlickerDiagnostics) return;
+        if (!NetworkClient.active || NetworkServer.active) return;
+        if (!chopping)
+        {
+            _lastGuestChopVisualOk = true;
+            return;
+        }
+
+        IProcessable proc = GetCurrentProcessable();
+        bool ok = isSensorTargeted && proc != null;
+        bool edgeToBad = _lastGuestChopVisualOk && !ok;
+        if (!ok && (edgeToBad || Time.unscaledTime >= _nextFlickerDiagLogTime))
+        {
+            string reason = proc == null ? BuildProcessableDenyDetail() : "processable ok";
+            Debug.Log(
+                $"[ChopFlickerDiag][Guest] frame={Time.frameCount} name={name} " +
+                $"syncChop={syncChoppingActive} isSensorTargeted={isSensorTargeted} procNull={proc == null} " +
+                $"syncProg={syncProcessProgress:F2} | {reason}",
+                this);
+            _nextFlickerDiagLogTime = Time.unscaledTime + 0.15f;
+        }
+
+        _lastGuestChopVisualOk = ok;
+    }
+
+    string BuildProcessableDenyDetail()
+    {
+        if (placePoint == null) return "placePoint=null";
+        CarryableItem item = placePoint.CurrentItem;
+        if (item == null) return "placePoint.CurrentItem=null";
+
+        MonoBehaviour[] all = item.GetComponents<MonoBehaviour>();
+        foreach (var mb in all)
+        {
+            if (mb is IProcessable p)
+            {
+                if (p is BaseProcessable bp)
+                {
+                    return $"item={item.name} prog={bp.CurrentProgress:F2}/{bp.RequiredProgress:F2} " +
+                           $"IsComplete={bp.IsComplete} CanProcessChop={p.CanProcess(stationProcessType)}";
+                }
+
+                return $"item={item.name} IProcessable 无 BaseProcessable 细节 CanProcess={p.CanProcess(stationProcessType)}";
+            }
+        }
+
+        return $"item={item.name} 无 IProcessable 组件";
     }
 
     public override bool CanInteract(PlayerItemInteractor interactor)

@@ -153,6 +153,7 @@ MonoBehaviour:
   rotateAxis: 1
   angleRange: 45
   swingSpeed: 5
+  debugFlickerDiagnostics: 1
 --- !u!114 &7633457637363568201
 MonoBehaviour:
   m_ObjectHideFlags: 0

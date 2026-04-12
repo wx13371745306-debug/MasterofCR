@@ -54,12 +54,14 @@ public class FryPotUI : MonoBehaviour
     {
         if (pot == null || canvas == null || fillImage == null) return;
 
-        bool hasIngredient = pot.HasAnyIngredient();
-        bool isBurn = pot.IsBurnCountdown;
+        // 烹饪中：只显示进度条；菜已做好进入糊倒计时后：隐藏进度条，仅在「快糊」危险阶段且锅在台上时显示感叹号
+        bool showCookingProgress = !pot.cookingFinished && !pot.IsBurnCountdown && pot.HasAnyIngredient();
+        bool burnDanger =
+            pot.IsBurnCountdown
+            && pot.BurnRatio > pot.BurnSafeRatio
+            && pot.ReceivesStationHeat;
 
-        bool shouldShow = hasIngredient || isBurn;
-        if (pot.cookingFinished)
-            shouldShow = false;
+        bool shouldShow = showCookingProgress || burnDanger;
 
         if (!shouldShow)
             ResetBurnWarningVisual();
@@ -69,10 +71,8 @@ public class FryPotUI : MonoBehaviour
 
         if (!canvas.gameObject.activeSelf) return;
 
-        if (isBurn)
-        {
+        if (pot.IsBurnCountdown)
             UpdateBurnUI();
-        }
         else
         {
             UpdateCookingUI();

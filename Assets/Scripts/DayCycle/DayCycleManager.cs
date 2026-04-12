@@ -397,4 +397,38 @@ public class DayCycleManager : MonoBehaviour
         if (newPhase == DayCyclePhase.Prep && oldPhase != DayCyclePhase.DayZero)
             OnDayAdvanced?.Invoke();
     }
+
+    /// <summary>
+    /// Guest：收到 Host 进入换日过渡时播放本地黑屏，并在「全黑」时执行与 Host OnMidBlack 对称的桌子/传送逻辑。
+    /// </summary>
+    public void ApplyGuestNextDayTransitionWithFade(int dayIndex)
+    {
+        DayCyclePhase oldPhase = phase;
+        phase = DayCyclePhase.NextDayTransition;
+        currentDayIndex = dayIndex;
+        OnPhaseChanged?.Invoke(DayCyclePhase.NextDayTransition);
+
+        if (screenFade != null)
+        {
+            screenFade.RunFadeInHoldFadeOut(() => ApplyNetworkMidBlackGuestTransition(oldPhase));
+        }
+        else
+        {
+            if (debugLog)
+                Debug.LogWarning("[DayCycle] Guest 换日：screenFade 未赋值，直接执行中段逻辑。");
+            ApplyNetworkMidBlackGuestTransition(oldPhase);
+        }
+    }
+
+    void ApplyNetworkMidBlackGuestTransition(DayCyclePhase oldPhase)
+    {
+        if (cachedTables == null || cachedTables.Length == 0)
+            cachedTables = FindObjectsByType<OrderResponse>(FindObjectsSortMode.None);
+        if (oldPhase == DayCyclePhase.Closing)
+        {
+            foreach (var t in cachedTables)
+                if (t != null) t.HandleDayTransition();
+        }
+        TeleportPlayerToSpawn();
+    }
 }

@@ -22,12 +22,21 @@ namespace Mirror
 
         class Styles
         {
-            public GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
-            public GUIStyle componentName = new GUIStyle(EditorStyles.boldLabel);
-            public GUIStyle disabledName = new GUIStyle(EditorStyles.miniLabel);
+            public GUIStyle labelStyle;
+            public GUIStyle componentName;
+            public GUIStyle disabledName;
 
             public Styles()
             {
+                // EditorStyles 在部分 Inspector 重建时机尚未初始化，需后备为 GUI.skin / 空样式，避免 NRE。
+                GUIStyle BaseLabel() => EditorStyles.label != null ? EditorStyles.label : (GUI.skin != null ? GUI.skin.label : new GUIStyle());
+                GUIStyle BaseBold() => EditorStyles.boldLabel != null ? EditorStyles.boldLabel : BaseLabel();
+                GUIStyle BaseMini() => EditorStyles.miniLabel != null ? EditorStyles.miniLabel : BaseLabel();
+
+                labelStyle = new GUIStyle(BaseLabel());
+                componentName = new GUIStyle(BaseBold());
+                disabledName = new GUIStyle(BaseMini());
+
                 Color fontColor = new Color(0.7f, 0.7f, 0.7f);
                 labelStyle.padding.right += 20;
                 labelStyle.normal.textColor = fontColor;
@@ -60,7 +69,13 @@ namespace Mirror
         }
 
         GUIContent title;
-        Styles styles = new Styles();
+        Styles styles;
+
+        void EnsureStyles()
+        {
+            if (styles == null)
+                styles = new Styles();
+        }
 
         public override GUIContent GetPreviewTitle()
         {
@@ -75,6 +90,13 @@ namespace Mirror
         {
             // need to check if target is null to stop MissingReferenceException
             return target != null && target is GameObject gameObject && gameObject.GetComponent<NetworkIdentity>() != null;
+        }
+
+        public override void Cleanup()
+        {
+            styles = null;
+            title = null;
+            base.Cleanup();
         }
 
         public override void OnPreviewGUI(Rect r, GUIStyle background)
@@ -95,8 +117,9 @@ namespace Mirror
             if (identity == null)
                 return;
 
+            EnsureStyles();
             if (styles == null)
-                styles = new Styles();
+                return;
 
 
             // padding

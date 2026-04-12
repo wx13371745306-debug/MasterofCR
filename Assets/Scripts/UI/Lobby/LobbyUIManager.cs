@@ -76,6 +76,10 @@ public class LobbyUIManager : MonoBehaviour
             if (hostControls != null) hostControls.SetActive(isHost);
             if (clientControls != null) clientControls.SetActive(!isHost);
 
+            // 非 Host 不显示「开始游戏」（避免按钮未挂在 hostControls 下时仍可见）
+            if (startGameBtn != null)
+                startGameBtn.gameObject.SetActive(isHost);
+
             // 2. 房主逻辑：检查房间内每一名玩家是否都已准备（不依赖 Mirror 的 minPlayers / allPlayersReady 启发式）
             if (isHost && startGameBtn != null)
                 startGameBtn.interactable = AreAllRoomPlayersReady(nrm);
@@ -182,6 +186,23 @@ public class LobbyUIManager : MonoBehaviour
             networkDiscovery.StopDiscovery();
             
         SwitchToPanel(mainMenuPanel);
+    }
+
+    /// <summary>【大厅 UI 绑定】清空房间列表缓存与列表项，并重新发起局域网发现。</summary>
+    public void OnClickRefreshRoomList()
+    {
+        if (lobbyPanel == null || !lobbyPanel.activeInHierarchy)
+            return;
+
+        discoveredServers.Clear();
+        if (roomListContent != null)
+        {
+            foreach (Transform child in roomListContent)
+                Destroy(child.gameObject);
+        }
+
+        if (networkDiscovery != null)
+            networkDiscovery.StartDiscovery();
     }
 
     public void OnClickCreateRoom()

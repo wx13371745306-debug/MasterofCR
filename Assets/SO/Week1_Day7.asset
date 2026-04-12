@@ -14,17 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LevelConfigSO
   waves:
   - spawnTime: 3
-    groupSize: 2
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}
+  - spawnTime: 30
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}
+  - spawnTime: 50
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}
+  - spawnTime: 60
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
-    minDishes: 1
-    maxDishes: 2
-  - spawnTime: 7
-    groupSize: 2
+  - spawnTime: 100
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
-    minDishes: 1
-    maxDishes: 3
-  - spawnTime: 7
-    groupSize: 4
+  - spawnTime: 140
     groupPrefab: {fileID: 1297667703579807083, guid: c598d6b56b0a63d4d82c8034090f7ee0, type: 3}
-    minDishes: 3
-    maxDishes: 5
+  - spawnTime: 180
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}
+  - spawnTime: 200
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}
+  - spawnTime: 240
+    groupPrefab: {fileID: 1297667703579807083, guid: bd700ad79087fec43a75488af1104b9c, type: 3}

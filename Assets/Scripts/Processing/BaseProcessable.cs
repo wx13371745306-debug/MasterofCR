@@ -109,6 +109,9 @@ public abstract class BaseProcessable : MonoBehaviour, IProcessable
         if (Mirror.NetworkServer.active)
             Mirror.NetworkServer.Spawn(newObj);
 
+        if (Mirror.NetworkServer.active && newItem != null && oldPlacePoint != null)
+            newItem.RpcMirrorRegisterAtPlacePoint(oldPlacePoint.transform.position);
+
         if (Mirror.NetworkServer.active)
             Mirror.NetworkServer.Destroy(gameObject);
         else

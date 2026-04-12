@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 using Mirror.Discovery;
 
 /// <summary>
@@ -11,9 +12,18 @@ public class RoomLineUIEntry : MonoBehaviour
     [Header("UI References")]
     public TextMeshProUGUI roomIDText;
     public TextMeshProUGUI playerCountText;
-    
+
+    [Tooltip("局内展示模式时隐藏加入按钮；不拖则自动查找子物体上的第一个 Button。")]
+    [SerializeField] Button joinButton;
+
     private ServerResponse cachedServerInfo;
     private LobbyUIManager cachedUIManager;
+
+    void Awake()
+    {
+        if (joinButton == null)
+            joinButton = GetComponentInChildren<Button>(true);
+    }
 
     public void Setup(ServerResponse info, LobbyUIManager manager)
     {
@@ -27,7 +37,31 @@ public class RoomLineUIEntry : MonoBehaviour
         // 如果你的 ServerResponse 扩充了当前的游玩人数（默认为 -1 需开发者自己实现载荷）
         // 这里就简单地用 ?/4 代替。
         if (playerCountText != null)
-            playerCountText.text = "?/4"; 
+            playerCountText.text = "?/4";
+
+        SetJoinButtonVisible(true);
+    }
+
+    /// <summary>
+    /// 局内设置：与大厅同款布局，仅展示文案（隐藏加入）。
+    /// </summary>
+    public void SetupAsGameplayRow(string leftTitle, string rightText, bool showJoinButton)
+    {
+        cachedServerInfo = default;
+        cachedUIManager = null;
+
+        if (roomIDText != null)
+            roomIDText.text = leftTitle ?? "";
+        if (playerCountText != null)
+            playerCountText.text = rightText ?? "";
+
+        SetJoinButtonVisible(showJoinButton);
+    }
+
+    void SetJoinButtonVisible(bool visible)
+    {
+        if (joinButton != null)
+            joinButton.gameObject.SetActive(visible);
     }
 
     /// <summary>
