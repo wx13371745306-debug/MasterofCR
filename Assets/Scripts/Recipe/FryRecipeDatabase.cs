@@ -42,6 +42,20 @@ public class FryRecipeDatabase : ScriptableObject, IRecipeSource
         public DishSize size;
         // 订单 UI 显示用图标（Sprite）
         public Sprite dishIcon;
+
+        /// <summary>订单卡上展示的「一种原料 + 数量」，与 gameplay 的 ingredients 列表独立，仅用于 UI（需在菜谱资源里手动拖图标）。</summary>
+        [System.Serializable]
+        public class OrderCardIngredientDisplay
+        {
+            public Sprite icon;
+            [Min(1)]
+            [Tooltip("该原料在订单卡上显示的数量（仅 UI）")]
+            public int count = 1;
+        }
+
+        [Header("订单卡：原料图标条")]
+        [Tooltip("全局订单卡片上横向排列的原料图标；每种原料可单独设置数量。联机时 Host/Guest 均从同一 FryRecipe 资源读取，无需额外同步。")]
+        public List<OrderCardIngredientDisplay> orderCardIngredientDisplays = new List<OrderCardIngredientDisplay>();
         // 结算价格（匹配成功加钱）
         public int price = 50;
         // 用餐耗时（桌子进入用餐倒计时使用）

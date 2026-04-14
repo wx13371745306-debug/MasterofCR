@@ -264,6 +264,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7e4a2b91f3d405e9a8c6d1e2b4f7a90, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FryPotNetworkSync
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
 --- !u!1 &1776435893095315280
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,6 +694,18 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
       objectReference: {fileID: 0}
@@ -729,6 +744,10 @@ PrefabInstance:
     - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 400000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2300000, guid: 2dc5405acb760b74394bd9f9bc70d3c9, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'

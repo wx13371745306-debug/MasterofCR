@@ -150,7 +150,7 @@ MonoBehaviour:
   idleRotateSpeed: 30
   equippedScale: 0.5
   wasAutoEquipped: 0
-  critRateBonus: 0.9
+  critRateBonus: 0.2
 --- !u!1 &6695925239930478103
 GameObject:
   m_ObjectHideFlags: 0

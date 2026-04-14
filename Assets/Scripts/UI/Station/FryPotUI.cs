@@ -54,32 +54,34 @@ public class FryPotUI : MonoBehaviour
     {
         if (pot == null || canvas == null || fillImage == null) return;
 
-        // 烹饪中：只显示进度条；菜已做好进入糊倒计时后：隐藏进度条，仅在「快糊」危险阶段且锅在台上时显示感叹号
+        // 正常做菜：只开 Canvas 显示进度条。糊倒计时「快糊」险段：不开 Canvas，只驱动 burnWarningMotionTarget + Emission
         bool showCookingProgress = !pot.cookingFinished && !pot.IsBurnCountdown && pot.HasAnyIngredient();
         bool burnDanger =
             pot.IsBurnCountdown
             && pot.BurnRatio > pot.BurnSafeRatio
             && pot.ReceivesStationHeat;
 
-        bool shouldShow = showCookingProgress || burnDanger;
-
-        if (!shouldShow)
+        bool anyCookOrBurnAlert = showCookingProgress || burnDanger;
+        if (!anyCookOrBurnAlert)
             ResetBurnWarningVisual();
 
-        if (hideWhenEmpty && canvas.gameObject.activeSelf != shouldShow)
-            canvas.gameObject.SetActive(shouldShow);
-
-        if (!canvas.gameObject.activeSelf) return;
+        // Canvas 仅在做菜阶段打开（与 hideWhenEmpty 无关，避免糊险阶段仍亮整块 Canvas）
+        if (canvas.gameObject.activeSelf != showCookingProgress)
+            canvas.gameObject.SetActive(showCookingProgress);
 
         if (pot.IsBurnCountdown)
             UpdateBurnUI();
         else
         {
-            UpdateCookingUI();
+            if (showCookingProgress)
+                UpdateCookingUI();
+            else if (fillImage.gameObject.activeSelf)
+                fillImage.gameObject.SetActive(false);
+
             ResetBurnWarningVisual();
         }
 
-        if (alwaysFaceCamera && mainCamera != null)
+        if (alwaysFaceCamera && mainCamera != null && anyCookOrBurnAlert)
             transform.rotation = mainCamera.transform.rotation;
     }
 

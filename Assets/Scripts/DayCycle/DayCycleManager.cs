@@ -134,6 +134,7 @@ public class DayCycleManager : MonoBehaviour
 
         shopDeliveryQueue?.OnNewPrepStarted();
         customerSpawner?.ConfigureForDay(currentDayIndex);
+        LogDayCycleCustomerSpawnerAlign("StartPrepInternal（含首日/次日换日后的准备阶段）");
         customerSpawner?.SetSpawningPaused(true);
 
         SetGlobalOrdersVisible(false);
@@ -141,6 +142,13 @@ public class DayCycleManager : MonoBehaviour
         OnPrepStart?.Invoke();
 
         if (debugLog) Debug.Log($"[DayCycle] Prep start day={currentDayIndex}");
+    }
+
+    /// <summary>在 <see cref="CustomerSpawner.ConfigureForDay"/> 之后打 Log，便于与 <c>[Spawner][天数变更]</c> 对照。</summary>
+    void LogDayCycleCustomerSpawnerAlign(string sourceTag)
+    {
+        if (!debugLog) return;
+        Debug.Log($"[DayCycle][客人生成-天数] {sourceTag} → currentDayIndex={currentDayIndex}，已下发 CustomerSpawner 当日关卡");
     }
 
     void Update()
@@ -183,7 +191,11 @@ public class DayCycleManager : MonoBehaviour
             SetGlobalOrdersVisible(true);
             OnPhaseChanged?.Invoke(phase);
             OnBusinessStart?.Invoke();
-            if (debugLog) Debug.Log("[DayCycle] Business start");
+            if (debugLog)
+            {
+                Debug.Log("[DayCycle] Business start");
+                Debug.Log($"[DayCycle][客人生成-天数] 准备阶段结束 → 营业刷怪开启，currentDayIndex={currentDayIndex}（与 Spawner._trackedDayIndex 一致）");
+            }
         }
     }
 
@@ -369,6 +381,7 @@ public class DayCycleManager : MonoBehaviour
                 if (statsTracker != null) statsTracker.ClearDay();
                 shopDeliveryQueue?.OnNewPrepStarted();
                 customerSpawner?.ConfigureForDay(currentDayIndex);
+                LogDayCycleCustomerSpawnerAlign("ApplyNetworkPhase(Prep) 联机阶段同步");
                 customerSpawner?.SetSpawningPaused(true);
                 SetGlobalOrdersVisible(false);
                 OnPrepStart?.Invoke();
@@ -378,6 +391,8 @@ public class DayCycleManager : MonoBehaviour
                 customerSpawner?.SetSpawningPaused(false);
                 SetGlobalOrdersVisible(true);
                 OnBusinessStart?.Invoke();
+                if (debugLog)
+                    Debug.Log($"[DayCycle][客人生成-天数] ApplyNetworkPhase(Business) 联机同步 → 刷怪暂停解除，currentDayIndex={currentDayIndex}");
                 break;
 
             case DayCyclePhase.ExtendedBusiness:

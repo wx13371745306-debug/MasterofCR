@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -22,9 +23,9 @@ public class OrderResponse : BaseStation
     public OrderGenerator orderGenerator;
     public FryRecipeDatabase recipeDatabase;
     public DrinkRecipeDatabase drinkRecipeDatabase;
-    [Tooltip("桌上/配置用脏盘堆预制体（含 singlePlatePrefab 等视觉参数）")]
+    [Tooltip("收盘时 Instantiate 的脏盘堆网络预制体（需 NetworkIdentity，且加入 NetworkManager Spawn 列表）；含 singlePlatePrefab 等视觉参数")]
     public DirtyPlateStack dirtyPlateStackPrefab;
-    [Tooltip("玩家从本桌收走全部脏盘时生成在手上的网络 DirtyPlateStack；未填则使用 dirtyPlateStackPrefab")]
+    [Tooltip("可选：与 dirtyPlateStackPrefab 相同即可；未填则使用 dirtyPlateStackPrefab")]
     public DirtyPlateStack dirtyPlateStackHandPrefab;
 
     [Header("Table Identity")]
@@ -33,7 +34,8 @@ public class OrderResponse : BaseStation
     [Header("State (ReadOnly)")]
     [SyncVar(hook = nameof(OnCurrentStateSynced))]
     public TableState currentState = TableState.Empty;
-    [SyncVar] public float currentOrderProgress = 0f;
+    [SyncVar(hook = nameof(OnOrderProgressSynced))]
+    public float currentOrderProgress = 0f;
     public float currentEatTime = 0f; // 当前剩余用餐时间
     
     // 【新增】：预定锁。只要被分配了哪怕人还没到，这桌也不能再接客了
@@ -55,8 +57,17 @@ public class OrderResponse : BaseStation
     [HideInInspector] public float effectivePatienceCap = 100f;
     [HideInInspector] public float effectiveImpatientThreshold = 40f;
 
-    [SyncVar] public float currentPatienceOrder;
-    [SyncVar] public float currentPatienceFood;
+    /// <summary>联机同步到客户端：用于 UI 计算耐心比例（与 effectiveMaxPatienceOrder 一致，由服务端写入）。</summary>
+    [SyncVar] public float netMaxPatienceOrder = 100f;
+    /// <summary>联机同步到客户端：等上菜阶段耐心上限。</summary>
+    [SyncVar] public float netMaxPatienceFood = 100f;
+    /// <summary>联机同步到客户端：等上菜「不耐烦」图标阈值。</summary>
+    [SyncVar] public float netImpatientThreshold = 40f;
+
+    [SyncVar(hook = nameof(OnPatienceOrderSynced))]
+    public float currentPatienceOrder;
+    [SyncVar(hook = nameof(OnPatienceFoodSynced))]
+    public float currentPatienceFood;
 
     [Header("Order Settings")]
     [Tooltip("桌子物理上限（兜底），实际点菜数以顾客组配置为准")]
@@ -70,6 +81,9 @@ public class OrderResponse : BaseStation
 
     /// <summary>服务端维护；客户端通过 SyncList 还原 GetCurrentOrder。</summary>
     public readonly SyncList<string> syncedOrderRecipeNames = new SyncList<string>();
+
+    /// <summary>桌面进度 UI：状态/耐心/读条/订单列表任一同步变化时触发（含服务端写入 SyncVar 时）。</summary>
+    public event Action OnTableProgressUiSync;
 
     private Coroutine eatRoutine;
 
@@ -142,21 +156,6 @@ public class OrderResponse : BaseStation
         }
     }
 
-    [ClientRpc]
-    void RpcRemoveClientEatenReplicas(int count)
-    {
-        if (NetworkServer.active) return;
-        if (count <= 0) return;
-        int remove = Mathf.Min(count, clientReplicaEatenModels.Count);
-        for (int i = 0; i < remove; i++)
-        {
-            int idx = clientReplicaEatenModels.Count - 1;
-            if (clientReplicaEatenModels[idx] != null)
-                Destroy(clientReplicaEatenModels[idx]);
-            clientReplicaEatenModels.RemoveAt(idx);
-        }
-    }
-
     void ServerNotifyClientEatenLeftovers(List<string> names, List<Vector3> poss, List<Quaternion> rots)
     {
         if (!NetworkServer.active || names == null || names.Count == 0) return;
@@ -223,12 +222,63 @@ public class OrderResponse : BaseStation
     public override void OnStartClient()
     {
         base.OnStartClient();
+        syncedOrderRecipeNames.Callback += OnSyncedOrderRecipeNamesChanged;
         ApplyItemPlaceLockForState(currentState);
+    }
+
+    public override void OnStopClient()
+    {
+        syncedOrderRecipeNames.Callback -= OnSyncedOrderRecipeNamesChanged;
+        base.OnStopClient();
+    }
+
+    void OnSyncedOrderRecipeNamesChanged(SyncList<string>.Operation op, int index, string oldItem, string newItem)
+    {
+        RaiseTableProgressUiSync();
+    }
+
+    void RaiseTableProgressUiSync()
+    {
+        OnTableProgressUiSync?.Invoke();
+    }
+
+    void OnPatienceOrderSynced(float oldValue, float newValue)
+    {
+        RaiseTableProgressUiSync();
+    }
+
+    void OnPatienceFoodSynced(float oldValue, float newValue)
+    {
+        RaiseTableProgressUiSync();
+    }
+
+    void OnOrderProgressSynced(float oldValue, float newValue)
+    {
+        RaiseTableProgressUiSync();
     }
 
     void OnCurrentStateSynced(TableState oldState, TableState newState)
     {
         ApplyItemPlaceLockForState(newState);
+        RaiseTableProgressUiSync();
+    }
+
+    /// <summary>桌面 UI：等菜耐心比例（联机用 net 同步上限）。</summary>
+    public float GetDisplayMaxPatienceOrder()
+    {
+        return netMaxPatienceOrder > 0.01f ? netMaxPatienceOrder : effectiveMaxPatienceOrder;
+    }
+
+    /// <summary>桌面 UI：上菜后耐心比例（联机用 net 同步上限）。</summary>
+    public float GetDisplayMaxPatienceFood()
+    {
+        return netMaxPatienceFood > 0.01f ? netMaxPatienceFood : effectiveMaxPatienceFood;
+    }
+
+    /// <summary>桌面 UI：不耐烦图标阈值（联机用 net 同步）。</summary>
+    public float GetDisplayImpatientThreshold()
+    {
+        return netImpatientThreshold > 0.001f ? netImpatientThreshold : effectiveImpatientThreshold;
     }
 
     void ApplyItemPlaceLockForState(TableState state)
@@ -265,6 +315,10 @@ public class OrderResponse : BaseStation
         effectiveServePatienceBonus = group.baseServePatienceBonus * mods.serveBonusMultiplier;
         effectivePatienceCap       = group.basePatienceCap * mods.patienceMultiplier + mods.patienceAddon;
         effectiveImpatientThreshold = group.baseImpatientThreshold;
+
+        netMaxPatienceOrder = effectiveMaxPatienceOrder;
+        netMaxPatienceFood = effectiveMaxPatienceFood;
+        netImpatientThreshold = effectiveImpatientThreshold;
 
         currentMinDishes = group.minDishes;
         maxDishes = Mathf.Max(group.maxDishes, maxDishes); // 取较大值作为上限兜底
@@ -344,7 +398,7 @@ public class OrderResponse : BaseStation
     // 【新增】：看菜单的随机缓冲时间
     private IEnumerator ReadingMenuRoutine()
     {
-        float waitTime = Random.Range(2f, 5f);
+        float waitTime = UnityEngine.Random.Range(2f, 5f);
         yield return new WaitForSeconds(waitTime);
         readingMenuCoroutine = null;
 
@@ -580,12 +634,7 @@ public class OrderResponse : BaseStation
             if (MoneyManager.Instance != null)
             {
                 MoneyManager.Instance.AddMoney(finalPrice);
-                TableOrderProgressUI uiComponent = GetComponentInChildren<TableOrderProgressUI>(true);
-                if (uiComponent == null && transform.parent != null)
-                {
-                    uiComponent = transform.parent.GetComponentInChildren<TableOrderProgressUI>(true);
-                }
-                if (uiComponent != null) uiComponent.ShowMoneyEarned(finalPrice);
+                BroadcastTableMoneyPopup(finalPrice);
 
                 // 蝴蝶结小费：检查端菜玩家是否有小费加成
                 PlayerAttributes serverPlayer = item.lastHolderPlayer;
@@ -595,7 +644,7 @@ public class OrderResponse : BaseStation
                     if (tip > 0)
                     {
                         MoneyManager.Instance.AddMoney(tip);
-                        if (uiComponent != null) uiComponent.ShowMoneyEarned(tip);
+                        BroadcastTableMoneyPopup(tip);
                         Debug.Log($"[OrderResponse] 蝴蝶结小费: +{tip} (端菜玩家小费率={serverPlayer.accessoryTipRate})");
                     }
                 }
@@ -897,7 +946,7 @@ public class OrderResponse : BaseStation
             {
                 if (d.physicalItem == null) continue;
                 if (d.recipe != null && d.recipe.size == DishSize.D) continue; // 饮料吸收不留脏杯
-                
+
                 dirtyCount++;
                 Vector3 pos = d.physicalItem.transform.position;
                 Quaternion rot = d.physicalItem.transform.rotation;
@@ -925,13 +974,13 @@ public class OrderResponse : BaseStation
                 ServerNotifyClientEatenLeftovers(clientRpcNames, clientRpcPoss, clientRpcRots);
 
             SetState(TableState.WaitingForCleanup);
-            
+
             if (boundGroup != null)
             {
                 PatienceLeaveDbg("带着脏盘子离场，调用 CustomerGroup.BeginLeaveGroup()");
                 boundGroup.BeginLeaveGroup();
             }
-            
+
             if (dirtyCount == 0)
             {
                 CleanUpTable(); // 如果全是饮料，没有留下真正需要收的盘子，就直接重置
@@ -1065,13 +1114,19 @@ public class OrderResponse : BaseStation
 
     void ServerRefreshSyncedOrderList()
     {
-        if (!NetworkServer.active) return;
-        syncedOrderRecipeNames.Clear();
-        foreach (var r in currentOrder)
+        if (NetworkServer.active)
         {
-            if (r != null && !string.IsNullOrEmpty(r.recipeName))
-                syncedOrderRecipeNames.Add(r.recipeName);
+            syncedOrderRecipeNames.Clear();
+            foreach (var r in currentOrder)
+            {
+                if (r != null && !string.IsNullOrEmpty(r.recipeName))
+                    syncedOrderRecipeNames.Add(r.recipeName);
+            }
         }
+
+        // 单机无 NetworkServer 时 SyncList 不更新，仍需驱动桌面订单 UI
+        if (!NetworkClient.active && !NetworkServer.active)
+            RaiseTableProgressUiSync();
     }
 
     void RebuildClientOrderViewFromSyncList()
@@ -1109,6 +1164,32 @@ public class OrderResponse : BaseStation
         GlobalOrderManager.Instance?.ClientMirrorRemoveAllOrdersForTable(tableId);
     }
 
+    /// <summary>联机 Host 发 Rpc；纯单机无 NetworkServer 时直接本地飘字。</summary>
+    void BroadcastTableMoneyPopup(int amount)
+    {
+        if (amount <= 0) return;
+        if (NetworkServer.active)
+            RpcTableMoneyPopup(amount);
+        else
+            ApplyTableMoneyPopupLocal(amount);
+    }
+
+    void ApplyTableMoneyPopupLocal(int amount)
+    {
+        if (amount <= 0) return;
+        TableOrderProgressUI uiComponent = GetComponentInChildren<TableOrderProgressUI>(true);
+        if (uiComponent == null && transform.parent != null)
+            uiComponent = transform.parent.GetComponentInChildren<TableOrderProgressUI>(true);
+        if (uiComponent != null)
+            uiComponent.ShowMoneyEarned(amount);
+    }
+
+    [ClientRpc]
+    void RpcTableMoneyPopup(int amount)
+    {
+        ApplyTableMoneyPopupLocal(amount);
+    }
+
     public float GetOrderProgressNormalized() => requiredOrderTime > 0f ? Mathf.Clamp01(currentOrderProgress / requiredOrderTime) : 0f;
 
     /// <summary>等待点菜阶段：始终显示「呼叫点餐」Icon（颜色由 UI 根据耐心值渐变）。</summary>
@@ -1116,7 +1197,7 @@ public class OrderResponse : BaseStation
 
     /// <summary>等上菜阶段：耐心低于阈值时显示不耐烦 Icon（颜色由 UI 根据耐心值渐变）。</summary>
     public bool ShouldShowWaitingFoodImpatientIcon =>
-        currentState == TableState.WaitingForFood && currentPatienceFood < effectiveImpatientThreshold;
+        currentState == TableState.WaitingForFood && currentPatienceFood < GetDisplayImpatientThreshold();
     public IReadOnlyList<FryRecipeDatabase.FryRecipe> GetCurrentOrder()
     {
         if (!NetworkClient.active && !NetworkServer.active)
@@ -1127,31 +1208,11 @@ public class OrderResponse : BaseStation
         return clientOrderView;
     }
 
-    /// <summary>
-    /// 桌上「特殊残羹」视觉数量（与 DirtyPlateStack.plateCount 应对齐）。
-    /// </summary>
+    /// <summary>桌上「特殊残羹」视觉数量（仅服务端/客机副本列表）。</summary>
     public int GetActiveEatenModelCount()
     {
         if (NetworkClient.active && !NetworkServer.active)
             return clientReplicaEatenModels.Count;
         return activeEatenModels.Count;
-    }
-
-    /// <summary>
-    /// 玩家从本桌的 <see cref="DirtyPlateStack"/> 取走 count 个盘子时调用：按栈顶顺序销毁对应数量的特殊残羹模型。
-    /// </summary>
-    public void OnDirtyPlatesDispensed(int count)
-    {
-        if (count <= 0) return;
-        int remove = Mathf.Min(count, activeEatenModels.Count);
-        for (int i = 0; i < remove; i++)
-        {
-            int idx = activeEatenModels.Count - 1;
-            if (activeEatenModels[idx] != null)
-                Destroy(activeEatenModels[idx]);
-            activeEatenModels.RemoveAt(idx);
-        }
-        if (NetworkServer.active)
-            RpcRemoveClientEatenReplicas(remove);
     }
 }

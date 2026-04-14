@@ -62,7 +62,7 @@ MonoBehaviour:
   - {fileID: 4661414546829236135}
   poseConfig: {fileID: 0}
   sensorHighlight: {fileID: 5868119238746507454}
-  categories: 128
+  categories: 1152
   initialPlacePoint: {fileID: 0}
   isUsable: 1
   isPickable: 1

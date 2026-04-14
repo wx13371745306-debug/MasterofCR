@@ -27,8 +27,13 @@ MonoBehaviour:
     bondTag: 6
     size: 1
     dishIcon: {fileID: 21300000, guid: 13b47a888426a2643bdd5b8920a2908e, type: 3}
-    price: 50
-    eatTime: 15
+    orderCardIngredientDisplays:
+    - icon: {fileID: 21300000, guid: 8d54d4a3d12c1d94d9f8430500419a39, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: d169a04e6d134694199df8c990eebfb8, type: 3}
+      count: 1
+    price: 30
+    eatTime: 10
   - recipeName: GreenPepperMeat
     displayNameZh: "\u8FA3\u6912\u7092\u8089"
     unlocked: 1
@@ -43,7 +48,12 @@ MonoBehaviour:
     bondTag: 9
     size: 1
     dishIcon: {fileID: 21300000, guid: 981df2b0d56402c4da52cc58d7bb0527, type: 3}
-    price: 50
+    orderCardIngredientDisplays:
+    - icon: {fileID: 21300000, guid: 7caaa0b6db568d843ba2012cc9f3eec6, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: d7fc7a5a58f30904996ad50ad33cb668, type: 3}
+      count: 1
+    price: 40
     eatTime: 15
   - recipeName: MaPoDoufu
     displayNameZh: "\u9EBB\u5A46\u8C46\u8150"
@@ -61,7 +71,14 @@ MonoBehaviour:
     bondTag: 9
     size: 1
     dishIcon: {fileID: 21300000, guid: d58a0d28f7caf9344845ff6fd24bc0aa, type: 3}
-    price: 50
+    orderCardIngredientDisplays:
+    - icon: {fileID: 21300000, guid: 199dcb93be4a2b14ab7ba0cec7ee223b, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: a486f550ac245ab4491588659fe4e0cd, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: 2ff0bb520249fb5439ebbcd0c6d11187, type: 3}
+      count: 1
+    price: 60
     eatTime: 15
   - recipeName: GreenPepperEgg
     displayNameZh: "\u5241\u6912\u7092\u86CB"
@@ -77,8 +94,13 @@ MonoBehaviour:
     bondTag: 5
     size: 1
     dishIcon: {fileID: 21300000, guid: 0745e2209a3ed0e43ae3856c78823421, type: 3}
-    price: 60
-    eatTime: 15
+    orderCardIngredientDisplays:
+    - icon: {fileID: 21300000, guid: 7caaa0b6db568d843ba2012cc9f3eec6, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: d169a04e6d134694199df8c990eebfb8, type: 3}
+      count: 1
+    price: 30
+    eatTime: 10
   - recipeName: TWPork
     displayNameZh: "\u56DE\u9505\u8089"
     unlocked: 1
@@ -93,6 +115,11 @@ MonoBehaviour:
     bondTag: 11
     size: 1
     dishIcon: {fileID: 21300000, guid: 269ca09012f19af469cacf5d80186ff6, type: 3}
+    orderCardIngredientDisplays:
+    - icon: {fileID: 21300000, guid: d7fc7a5a58f30904996ad50ad33cb668, type: 3}
+      count: 1
+    - icon: {fileID: 21300000, guid: 2ff0bb520249fb5439ebbcd0c6d11187, type: 3}
+      count: 1
     price: 60
     eatTime: 15
   failedDishRecipe:
@@ -106,6 +133,7 @@ MonoBehaviour:
     bondTag: 0
     size: 0
     dishIcon: {fileID: 0}
+    orderCardIngredientDisplays: []
     price: 50
     eatTime: 10
   ingredientPotVisualCatalog:

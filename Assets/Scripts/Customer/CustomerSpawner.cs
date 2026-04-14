@@ -21,6 +21,9 @@ public class CustomerSpawner : MonoBehaviour
     private int currentWaveIndex = 0;
     private bool spawningPaused;
 
+    /// <summary>与 <see cref="DayCycleManager.CurrentDayIndex"/> 对齐，仅在 <see cref="ConfigureForDay"/> 时更新，用于生成客人时打 Log。</summary>
+    int _trackedDayIndex = -1;
+
     // 缓存场景里所有的桌子
     private OrderResponse[] allTables;
 
@@ -55,8 +58,12 @@ public class CustomerSpawner : MonoBehaviour
 
         levelTimer = 0f;
         currentWaveIndex = 0;
+        _trackedDayIndex = dayIndex;
         if (debugLog)
-            Debug.Log($"[Spawner] ConfigureForDay index={dayIndex}, waves={(currentLevelConfig != null ? currentLevelConfig.waves.Count : 0)}");
+        {
+            int waveCount = currentLevelConfig != null ? currentLevelConfig.waves.Count : 0;
+            Debug.Log($"[Spawner][天数变更] 客人生成关卡已切换：dayIndex={dayIndex}，本日波次数={waveCount}（与 DayCycle 对齐，此后 Spawn 均视为该天）");
+        }
     }
 
     /// <summary>
@@ -160,8 +167,9 @@ public class CustomerSpawner : MonoBehaviour
 
         if (debugLog)
         {
-            Debug.Log($"<color=#00FFFF>[Spawner]</color> 游戏时间 {levelTimer:F1}s: 生成了 {wave.groupPrefab.groupSize} 人小队，分配到桌号 {targetTable.tableId}。" +
-                $"点餐范围: {wave.groupPrefab.minDishes}-{wave.groupPrefab.maxDishes}。");
+            Debug.Log($"<color=#00FFFF>[Spawner][生成客人]</color> 当前 dayIndex={_trackedDayIndex}（若仍为 -1 表示尚未执行 ConfigureForDay），" +
+                $"游戏内计时 {levelTimer:F1}s：生成 {wave.groupPrefab.groupSize} 人小队 → 桌号 {targetTable.tableId}，" +
+                $"点餐范围 {wave.groupPrefab.minDishes}-{wave.groupPrefab.maxDishes}。");
             if (customerExitPoint == null)
                 Debug.LogWarning("[Spawner][PatienceLeave] customerExitPoint 未设置：耐心耗尽时顾客会原地销毁而不会走向消失点。");
         }

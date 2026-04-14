@@ -39,6 +39,10 @@ public class LobbyUIManager : MonoBehaviour
     public GameObject hostControls;
     public Button startGameBtn;
 
+    [Header("联机诊断")]
+    [Tooltip("输出大厅/发现/断线相关快照，用于排查「搜不到房间」")]
+    public bool discoveryDiagLog = true;
+
     // 缓存发现的服务器房间以及当前房间内的玩家
     private readonly Dictionary<long, ServerResponse> discoveredServers = new Dictionary<long, ServerResponse>();
     private readonly List<CustomRoomPlayer> roomPlayers = new List<CustomRoomPlayer>();
@@ -49,15 +53,49 @@ public class LobbyUIManager : MonoBehaviour
         Instance = this;
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
     private void Start()
     {
-        // 如果没有拖拽 Discovery，主动去场景里找找
-        if (networkDiscovery == null)
-            networkDiscovery = FindAnyObjectByType<NetworkDiscovery>();
+        ResolveNetworkDiscoveryReference();
 
         SwitchToPanel(mainMenuPanel);
         if (playerNameInput != null)
             playerNameInput.text = PlayerPrefs.GetString("PlayerLobbyName", "Player");
+
+        LogDiscoveryDiag("Start");
+    }
+
+    /// <summary>
+    /// 优先绑定到 <see cref="NetworkManager.singleton"/> 上的 Discovery。
+    /// 当 DDOL 已有一份 NM、场景再次加载导致第二份 NM 被 Mirror 整物体 Destroy 时，
+    /// Inspector 里拖的引用可能指向已销毁物体；此处避免 StartDiscovery / AdvertiseServer 一直为空。
+    /// </summary>
+    void ResolveNetworkDiscoveryReference()
+    {
+        NetworkManager nm = NetworkManager.singleton;
+        NetworkDiscovery fromSingleton = null;
+        if (nm != null)
+        {
+            fromSingleton = nm.GetComponent<NetworkDiscovery>();
+            if (fromSingleton == null)
+                fromSingleton = nm.GetComponentInChildren<NetworkDiscovery>(true);
+        }
+
+        if (fromSingleton != null)
+        {
+            networkDiscovery = fromSingleton;
+            return;
+        }
+
+        if (networkDiscovery != null)
+            return;
+
+        networkDiscovery = FindAnyObjectByType<NetworkDiscovery>();
     }
 
     private void Update()
@@ -165,6 +203,8 @@ public class LobbyUIManager : MonoBehaviour
     public void OnClickMultiplayer()
     {
         SaveName();
+        ResolveNetworkDiscoveryReference();
+        LogDiscoveryDiag("OnClickMultiplayer(进入大厅前)");
         SwitchToPanel(lobbyPanel);
 
         // 激活多人的时候，大厅开启搜索局域网
@@ -172,7 +212,13 @@ public class LobbyUIManager : MonoBehaviour
         foreach (Transform child in roomListContent) Destroy(child.gameObject); // 清理旧 UI 数据
         
         if (networkDiscovery != null)
+        {
             networkDiscovery.StartDiscovery();
+            LogDiscoveryDiag("OnClickMultiplayer(StartDiscovery 已调用)");
+            StartCoroutine(DiagDiscoveryAfterFrames("OnClickMultiplayer", 4));
+        }
+        else
+            Debug.LogWarning("[LobbyDiag] networkDiscovery 为空，无法 StartDiscovery");
     }
 
     public void OnClickExitGame() { Application.Quit(); }
@@ -182,10 +228,13 @@ public class LobbyUIManager : MonoBehaviour
     // =========================================================
     public void OnClickBackToMenu()
     {
+        ResolveNetworkDiscoveryReference();
+        LogDiscoveryDiag("OnClickBackToMenu(停发现前)");
         if (networkDiscovery != null)
             networkDiscovery.StopDiscovery();
             
         SwitchToPanel(mainMenuPanel);
+        LogDiscoveryDiag("OnClickBackToMenu(回主菜单后)");
     }
 
     /// <summary>【大厅 UI 绑定】清空房间列表缓存与列表项，并重新发起局域网发现。</summary>
@@ -194,6 +243,7 @@ public class LobbyUIManager : MonoBehaviour
         if (lobbyPanel == null || !lobbyPanel.activeInHierarchy)
             return;
 
+        ResolveNetworkDiscoveryReference();
         discoveredServers.Clear();
         if (roomListContent != null)
         {
@@ -202,25 +252,54 @@ public class LobbyUIManager : MonoBehaviour
         }
 
         if (networkDiscovery != null)
+        {
             networkDiscovery.StartDiscovery();
+            LogDiscoveryDiag("OnClickRefreshRoomList(StartDiscovery 后)");
+            StartCoroutine(DiagDiscoveryAfterFrames("OnClickRefreshRoomList", 4));
+        }
     }
 
     public void OnClickCreateRoom()
     {
+        ResolveNetworkDiscoveryReference();
+        LogDiscoveryDiag("OnClickCreateRoom(StartHost 前)");
         SwitchToPanel(roomPanel);
         if (roomIDText != null) 
             roomIDText.text = $"Room: {Random.Range(1000, 9999)}";
 
         // 作为 Host 建立房间并广播让客机听到
         NetworkManager.singleton.StartHost();
+        ResolveNetworkDiscoveryReference();
         if (networkDiscovery != null)
-            networkDiscovery.AdvertiseServer();
+        {
+            try
+            {
+                networkDiscovery.AdvertiseServer();
+                LogDiscoveryDiag("OnClickCreateRoom(AdvertiseServer 成功)");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[LobbyDiag] AdvertiseServer 抛错（常见：UDP 端口被占用）: {ex.Message}\n{ex}");
+            }
+        }
+        else
+            Debug.LogWarning("[LobbyDiag] networkDiscovery 为空，无法 AdvertiseServer");
+
+        StartCoroutine(DiagDiscoveryAfterFrames("OnClickCreateRoom", 4));
     }
 
     // NetworkDiscovery 引擎扫描到网络上别人广播的信息后会调用这里
     public void OnDiscoveredServer(ServerResponse info)
     {
-        if (discoveredServers.ContainsKey(info.serverId)) return; // 避免重复添加
+        if (discoveredServers.ContainsKey(info.serverId))
+        {
+            if (discoveryDiagLog)
+                Debug.Log($"[LobbyDiag] OnDiscoveredServer 跳过重复 serverId={info.serverId} uri={info.uri}");
+            return; // 避免重复添加
+        }
+
+        if (discoveryDiagLog)
+            Debug.Log($"[LobbyDiag] OnDiscoveredServer 新房间 serverId={info.serverId} uri={info.uri} 当前已缓存数={discoveredServers.Count}");
 
         discoveredServers[info.serverId] = info;
 
@@ -238,12 +317,18 @@ public class LobbyUIManager : MonoBehaviour
 
     public void JoinDiscoveredRoom(ServerResponse info)
     {
+        ResolveNetworkDiscoveryReference();
+        LogDiscoveryDiag("JoinDiscoveredRoom(连接前)");
+        if (discoveryDiagLog)
+            Debug.Log($"[LobbyDiag] JoinDiscoveredRoom 目标 uri={info.uri} serverId={info.serverId}");
+
         if (networkDiscovery != null)
             networkDiscovery.StopDiscovery();
 
         // 告知管理器目标服务端 IP 并且连接
         NetworkManager.singleton.StartClient(info.uri);
         SwitchToPanel(roomPanel);
+        LogDiscoveryDiag("JoinDiscoveredRoom(StartClient 已调用)");
     }
 
     // =========================================================
@@ -298,15 +383,82 @@ public class LobbyUIManager : MonoBehaviour
 
     public void OnClickLeaveRoom()
     {
-        if (NetworkServer.active && NetworkClient.isConnected) 
-            NetworkManager.singleton.StopHost();    // 房主解散
+        LogDiscoveryDiag("OnClickLeaveRoom(调用 StopHost/StopClient 前)");
+        if (NetworkServer.active && NetworkClient.isConnected)
+            NetworkManager.singleton.StopHost();    // 房主解散（全员断线）
         else if (NetworkClient.isConnected)
-            NetworkManager.singleton.StopClient();  // 客机退出
+            NetworkManager.singleton.StopClient();  // 客机主动退出
 
-        // 重置清槽，回到主菜单 
-        foreach (var slot in playerSlots) if (slot != null) slot.Clear();
+        // StopHost/StopClient 会触发 Mirror 的 OnRoomClientDisconnect；此处再同步清一次，避免回调顺序导致漏清
+        ResetLocalLobbyAfterDisconnect();
+    }
+
+    /// <summary>
+    /// 本地客户端与服务器断开后恢复大厅默认状态：停发现、清房间列表缓存、清槽位、回主菜单。
+    /// 供 <see cref="OnClickLeaveRoom"/> 与 <see cref="CustomNetworkRoomManager.OnRoomClientDisconnect"/> 共用
+    /// （房主 StopHost 后其它玩家仅能通过断线回调收到）。
+    /// </summary>
+    public void ResetLocalLobbyAfterDisconnect()
+    {
+        LogDiscoveryDiag("ResetLocalLobbyAfterDisconnect(开始)");
+        ResolveNetworkDiscoveryReference();
+        if (networkDiscovery != null)
+            networkDiscovery.StopDiscovery();
+
+        discoveredServers.Clear();
+        if (roomListContent != null)
+        {
+            foreach (Transform child in roomListContent)
+                Destroy(child.gameObject);
+        }
+
+        foreach (var slot in playerSlots)
+        {
+            if (slot != null) slot.Clear();
+        }
         roomPlayers.Clear();
+
         SwitchToPanel(mainMenuPanel);
+        LogDiscoveryDiag("ResetLocalLobbyAfterDisconnect(结束，已回主菜单；需再次点「多人」才会 StartDiscovery)");
+    }
+
+    /// <summary>
+    /// 输出当前场景与 Mirror 客户端/服务端状态，用于对照 Mirror 文档中「联网时 StopDiscovery」等行为。
+    /// </summary>
+    void LogDiscoveryDiag(string tag)
+    {
+        if (!discoveryDiagLog) return;
+
+        Scene s = SceneManager.GetActiveScene();
+        var nrm = NetworkManager.singleton as NetworkRoomManager;
+        string roomSceneInfo = nrm != null
+            ? $"RoomScene={nrm.RoomScene} IsRoomSceneActive={Utils.IsSceneActive(nrm.RoomScene)} GameplayScene={nrm.GameplayScene}"
+            : "NetworkRoomManager=null";
+
+        Debug.Log(
+            $"[LobbyDiag][{tag}]\n" +
+            $"  activeScene: name={s.name} path={s.path}\n" +
+            $"  {roomSceneInfo}\n" +
+            $"  NetworkServer.active={NetworkServer.active} NetworkClient.active={NetworkClient.active} NetworkClient.isConnected={NetworkClient.isConnected}\n" +
+            $"  discoveredServers.Count={discoveredServers.Count}");
+    }
+
+    /// <summary>
+    /// 延迟数帧再快照：给 Mirror 完成 Host/Client 与场景切换后再看 isConnected，便于发现「仍显示已连接导致搜不到」的竞态。
+    /// </summary>
+    IEnumerator DiagDiscoveryAfterFrames(string tag, int frames)
+    {
+        for (int i = 0; i < frames; i++)
+            yield return null;
+
+        LogDiscoveryDiag($"{tag}(延迟{frames}帧后)");
+
+        if (discoveryDiagLog && lobbyPanel != null && lobbyPanel.activeInHierarchy && NetworkClient.isConnected)
+        {
+            Debug.LogWarning(
+                $"[LobbyDiag][{tag}] 大厅已打开但 NetworkClient.isConnected==true。" +
+                "Mirror 的 NetworkDiscovery 在广播时会因此 StopDiscovery()，可能导致列表一直为空。若与此相关，请检查断线顺序或延后 StartDiscovery。");
+        }
     }
 
     // =========================================================

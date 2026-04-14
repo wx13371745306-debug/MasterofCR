@@ -14,7 +14,7 @@ public class GlobalOrderManager : MonoBehaviour
     [Header("饮料菜谱（供各桌自动获取）")]
     public DrinkRecipeDatabase drinkRecipeDatabase;
 
-    [Tooltip("与 OrderGenerator 一致，用于联机客户端根据 recipeName 还原全局订单卡片")]
+    [Tooltip("与 OrderGenerator 一致，用于联机客户端根据 recipeName 还原全局订单卡片（含订单卡上的菜名、原料图标等 FryRecipe 展示字段）")]
     public FryRecipeDatabase fryRecipeDatabase;
 
     [Header("全局耐心修正 (乘数，1.0 = 不修改)")]

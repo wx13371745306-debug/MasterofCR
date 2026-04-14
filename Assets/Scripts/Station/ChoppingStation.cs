@@ -27,6 +27,11 @@ public class ChoppingStation : BaseStation
     [Header("Diagnostics")]
     [Tooltip("联机 Guest 砧台闪烁排查：syncChopping 开着但高亮/可加工条件丢失时打印（含节流到避免刷屏）。")]
     [SerializeField] bool debugFlickerDiagnostics = false;
+    [Tooltip("联机切菜链路：[ChopNetDiag] SyncVar 边沿、Guest 被挡原因（传感器/无 processable）、服务端 Begin/End。打包联调时勾选。")]
+    [SerializeField] bool debugChopNetworkDiag = false;
+
+    /// <summary>供 PlayerNetworkController 在 Cmd 到达服务端时是否额外打印 [ChopNetDiag]。</summary>
+    public bool DebugChopNetworkDiag => debugChopNetworkDiag;
 
     private Quaternion initialRotation;
     private float currentPhase = 0f;
@@ -35,6 +40,14 @@ public class ChoppingStation : BaseStation
     /// <summary>上一帧 Guest 是否在「应显示切菜表现」的好状态（用于边沿检测）。</summary>
     bool _lastGuestChopVisualOk = true;
     float _nextFlickerDiagLogTime;
+
+    // [ChopNetDiag] Guest：SyncVar 与进度节流
+    bool _prevGuestSyncChopActive;
+    float _prevGuestSyncProgSnapshot = -1f;
+    float _nextChopNetDiagGuestProgLogTime;
+    float _nextChopNetDiagThrottleSensor;
+    float _nextChopNetDiagThrottleProc;
+    bool _guestChopNetDiagInited;
 
     void Start()
     {
@@ -82,6 +95,8 @@ public class ChoppingStation : BaseStation
         if (NetworkClient.active && !NetworkServer.active)
             chopping = syncChoppingActive;
 
+        LogChopNetDiagGuestSyncVarsIfNeeded();
+
         if (!chopping)
         {
             ResetVisualIfNeeded();
@@ -91,6 +106,7 @@ public class ChoppingStation : BaseStation
         // 离开范围后停止推进
         if (!isSensorTargeted)
         {
+            LogChopNetDiagGuestBlockedSensorIfNeeded();
             ResetVisualIfNeeded();
             return;
         }
@@ -100,6 +116,7 @@ public class ChoppingStation : BaseStation
         IProcessable processable = GetCurrentProcessable();
         if (processable == null)
         {
+            LogChopNetDiagGuestBlockedProcessableIfNeeded();
             if (isServerOrOffline) EndInteract(cachedInteractor);
             else ResetVisualIfNeeded();
             return;
@@ -124,6 +141,64 @@ public class ChoppingStation : BaseStation
         }
 
         LogGuestFlickerDiagIfNeeded(chopping);
+    }
+
+    void LogChopNetDiagGuestSyncVarsIfNeeded()
+    {
+        if (!debugChopNetworkDiag) return;
+        if (!NetworkClient.active || NetworkServer.active) return;
+
+        if (!_guestChopNetDiagInited)
+        {
+            _prevGuestSyncChopActive = syncChoppingActive;
+            _prevGuestSyncProgSnapshot = syncProcessProgress;
+            _guestChopNetDiagInited = true;
+        }
+
+        if (syncChoppingActive != _prevGuestSyncChopActive)
+        {
+            Debug.Log(
+                $"[ChopNetDiag] Guest syncChoppingActive: {_prevGuestSyncChopActive} -> {syncChoppingActive} | syncProg={syncProcessProgress:F3} | {name}",
+                this);
+            _prevGuestSyncChopActive = syncChoppingActive;
+            _prevGuestSyncProgSnapshot = syncProcessProgress;
+        }
+
+        if (!syncChoppingActive) return;
+
+        float dProg = Mathf.Abs(syncProcessProgress - _prevGuestSyncProgSnapshot);
+        if (dProg > 0.0005f && Time.unscaledTime >= _nextChopNetDiagGuestProgLogTime)
+        {
+            Debug.Log(
+                $"[ChopNetDiag] Guest syncProcessProgress 变化: {_prevGuestSyncProgSnapshot:F3} -> {syncProcessProgress:F3} (Δ{dProg:F4}) | {name}",
+                this);
+            _prevGuestSyncProgSnapshot = syncProcessProgress;
+            _nextChopNetDiagGuestProgLogTime = Time.unscaledTime + 0.18f;
+        }
+    }
+
+    void LogChopNetDiagGuestBlockedSensorIfNeeded()
+    {
+        if (!debugChopNetworkDiag) return;
+        if (!NetworkClient.active || NetworkServer.active) return;
+        if (Time.unscaledTime < _nextChopNetDiagThrottleSensor) return;
+
+        Debug.Log(
+            $"[ChopNetDiag] Guest 停摆：!isSensorTargeted（本地传感器未指向砧台）| syncChop={syncChoppingActive} syncProg={syncProcessProgress:F2} | {name}",
+            this);
+        _nextChopNetDiagThrottleSensor = Time.unscaledTime + 0.35f;
+    }
+
+    void LogChopNetDiagGuestBlockedProcessableIfNeeded()
+    {
+        if (!debugChopNetworkDiag) return;
+        if (!NetworkClient.active || NetworkServer.active) return;
+        if (Time.unscaledTime < _nextChopNetDiagThrottleProc) return;
+
+        Debug.Log(
+            $"[ChopNetDiag] Guest 停摆：无可用 processable | isSensorTargeted={isSensorTargeted} syncProg={syncProcessProgress:F2} | {BuildProcessableDenyDetail()} | {name}",
+            this);
+        _nextChopNetDiagThrottleProc = Time.unscaledTime + 0.35f;
     }
 
     /// <summary>供 PlayerItemInteractor 诊断：为何当前无法 GetCurrentProcessable。</summary>
@@ -201,6 +276,9 @@ public class ChoppingStation : BaseStation
         isSensorTargeted = true;
         currentPhase = 0f;
 
+        if (debugChopNetworkDiag && NetworkServer.active)
+            Debug.Log($"[ChopNetDiag] Server BeginInteract | station={name} | player={interactor?.name ?? "null"}", this);
+
         if (debugLog) Debug.Log($"[ChoppingStation] Begin interact: {name} | isServer={NetworkServer.active}");
     }
 
@@ -210,6 +288,9 @@ public class ChoppingStation : BaseStation
         if (NetworkServer.active)
             syncChoppingActive = false;
         ResetVisualIfNeeded();
+
+        if (debugChopNetworkDiag && NetworkServer.active)
+            Debug.Log($"[ChopNetDiag] Server EndInteract | station={name} | player={interactor?.name ?? "null"}", this);
 
         if (debugLog) Debug.Log($"[ChoppingStation] End interact: {name} | isServer={NetworkServer.active}");
     }

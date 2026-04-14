@@ -29,7 +29,8 @@
 ### 步骤 3：挂载 BinStation 脚本
 
 1. 给 `BinStation` 添加 **`BinStation`** 组件
-2. Inspector 上会看到以下字段：
+2. **联机**：在垃圾桶**根物体**（或包含本脚本的祖先）上挂 **`NetworkIdentity`**，否则「成品菜 → 空盘」无法发 `Command`（会打 Error Log）。
+3. Inspector 上会看到以下字段：
    - **Highlight Object**（继承自 BaseStation）：拖入高亮显示用的子物体（可选）
    - **Bin Place Point**：拖入下面创建的 ItemPlacePoint（步骤 4）
    - **Clean Plate Prefab**：拖入干净盘子预制体（和 `DishWashingStation` 上的 `cleanPlatePrefab` 用同一个即可）
@@ -59,28 +60,31 @@
 | `highlightObject` | GameObject | 高亮物体，Sensor 瞄准时亮起（可选） |
 | `debugLog` | bool | 是否在 Console 打印调试日志 |
 | `binPlacePoint` | ItemPlacePoint | 垃圾桶的放置点，J 键放入物品时触发销毁 |
-| `cleanPlatePrefab` | GameObject | 空盘子预制体，Dish 转盘子时使用 |
+| `cleanPlatePrefab` | GameObject | 空盘子预制体，Dish 转盘子时使用；**联机必须带 `NetworkIdentity`**（与洗碗机发放盘子一致） |
 
 ---
 
 ## 四、功能说明
 
+### ItemCategory.BinProtected（策划配置）
+
+- 在 **`CarryableItem` 的 Categories** 中勾选 **`BinProtected`** 的预制体：面向 BinStation 按 **J / K** 无玩法效果（输入被吞掉）；也 **不能** 通过垃圾桶槽位被销毁。
+- **锅**、**成品菜**（`DishRecipeTag`）仍以 **组件** 判定，不要求勾 BinProtected。
+- 若希望 **空盘子** 也不能扔桶，请在空盘预制体上勾选 **`BinProtected`**。
+
 ### 功能 A：J 键 — 把物品放进垃圾桶（销毁）
 
-- 玩家手持任何物品 → 面对 BinStation 的 PlacePoint → 按 J 放下
-- 物品被放置到 PlacePoint 后立即被销毁
-- 适用于所有类型的 CarryableItem
+- 玩家手持 **未受保护** 的物品 → 面对 BinStation 的 PlacePoint → 按 J 放下 → 销毁。
+- **受保护**（锅 / 成品菜 / `BinProtected`）：无法放入槽位销毁，放下会被取消。
 
-### 功能 B：K 键 — 手持锅（FryPot）清空
+### 功能 B：J / K — 手持锅（FryPot）
 
-- 玩家长按 J 端起锅 → 面对 BinStation → 按 K
-- 锅内的所有食材、烹饪进度、视觉效果全部清除
-- 锅本身留在玩家手中，变回空锅
+- 有内容可清空时：清空锅（联机走 `CmdRequestFryPotDump`）。
+- **空锅**：无状态变化，仅 Console 日志（`debugLog` 开启时）。
 
-### 功能 C：K 键 — 手持菜品（Dish）转空盘
+### 功能 C：J / K — 手持成品菜（`DishRecipeTag`）转空盘
 
-- 玩家手持成品菜（带有 `DishRecipeTag` 的物品）→ 面对 BinStation → 按 K
-- 菜品被销毁，玩家手中变为一个干净的空盘子（`cleanPlatePrefab`）
+- 转为 `cleanPlatePrefab` 空盘（与 `BinProtected` 并存时 **优先** 走成品菜逻辑）。
 
 ---
 
@@ -90,7 +94,7 @@
 |------|--------|
 | Sensor 检测不到 BinStation | 确认 BinStation 的 Collider 是 Trigger，且 Layer 在 `stationMask` 中 |
 | J 键放不上物品 | 确认 BinPlacePoint 的 Collider 是 Trigger，Layer 在 `placePointMask` 中，且 `allowAnyCategory = true` |
-| K 键对锅无反应 | 确认锅内确实有食材（`HasAnyIngredient`）或已完成烹饪（`cookingFinished`） |
-| K 键对菜品无反应 | 确认菜品预制体上挂有 `DishRecipeTag` 组件 |
-| 菜品转盘子后手中是空的 | 确认 BinStation 的 `cleanPlatePrefab` 已配置，且该预制体有 `CarryableItem` |
+| 锅无法清空 | 确认 `CanDump()` 为真（有食材、已出菜或糊菜倒计时等，见 `FryPot`） |
+| 成品菜无反应 | 确认预制体挂有 `DishRecipeTag`；`cleanPlatePrefab` 已配置 |
+| 某道具仍被桶销毁 | 在预制体 `CarryableItem` 上勾选 **BinProtected** |
 | 持物时 BinStation 不高亮 | 确认 `highlightObject` 已拖入 |

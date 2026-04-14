@@ -367,8 +367,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b7651ff707f03e4dbc303e4ec42225f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DecayableProp
-  freshnessDuration: 2
-  rottennessDuration: 2
+  freshnessDuration: 1
+  rottennessDuration: 1
   freshObj: {fileID: 8375528032097777668}
   staleObj: {fileID: 3481738019473544264}
   rottenObj: {fileID: 4763124921936786043}

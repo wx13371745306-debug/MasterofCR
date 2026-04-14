@@ -14,5 +14,7 @@ public enum ItemCategory
     CleanPlate = 1 << 7,
     Item = 1 << 8,
     Accessory = 1 << 9,
+    /// <summary>标记为不可当垃圾处理；需在预制体上勾选。锅/成品菜仍以组件逻辑为准。</summary>
+    BinProtected = 1 << 10,
     Any = ~0
 }

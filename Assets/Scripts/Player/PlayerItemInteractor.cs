@@ -14,6 +14,8 @@ public class PlayerItemInteractor : MonoBehaviour
     [Header("Diagnostics")]
     [Tooltip("Guest 砧台闪烁：传感器指向 ChoppingStation 但 CanInteract=false 时打印（与 ChoppingStation.debugFlickerDiagnostics 配合）。")]
     [SerializeField] bool debugChoppingHighlightDeny = false;
+    [Tooltip("联机切菜：客户端发送 Cmd 前打印 [ChopNetDiag]（需在场景砧台上勾选 ChoppingStation.debugChopNetworkDiag 以看全链路）。")]
+    [SerializeField] bool debugChopNetworkDiag = false;
 
     private CarryableItem heldItem;
     private IInteractiveStation activeStation;
@@ -119,7 +121,7 @@ public class PlayerItemInteractor : MonoBehaviour
         {
             // 空手状态：可以捡起物体 (J)，可以互动台子 (K)
             CarryableItem item = sensor.GetCurrentItem();
-            if (item != null && (item.CanBePickedUp(holdPoint) || item is DirtyPlateStack))
+            if (item != null && item.CanBePickedUp(holdPoint))
             {
                 highlightedItem = item;
                 highlightedItem.SetSensorHighlight(true);
@@ -290,18 +292,6 @@ public class PlayerItemInteractor : MonoBehaviour
         if (target == null)
             return false;
 
-        // 【优先级1】如果目标是 DirtyPlateStack，走联机分发逻辑
-        if (target is DirtyPlateStack dirtyStack)
-        {
-            if (networkController != null && NetworkClient.active)
-            {
-                networkController.CmdRequestDispenseBox(dirtyStack.gameObject, isLongPress);
-                if (debugLog) Debug.Log($"<color=#8B4513>[大脑 拿取]</color> 发起脏盘堆拿取请求");
-                return true;
-            }
-            return false;
-        }
-
         if (!target.CanBePickedUp(holdPoint))
             return false;
 
@@ -349,6 +339,15 @@ public class PlayerItemInteractor : MonoBehaviour
         if (heldItem == null) return;
 
         CarryableItem item = heldItem;
+
+        // 传感器指着垃圾桶放置点且手持物不可当垃圾销毁：禁止 ReleasePlace，保持手持（与 TryHandleFacing 一致）
+        if (ShouldSuppressReleaseIntoBin(item))
+        {
+            if (debugLog)
+                Debug.Log("<color=#FF4444>[大脑 放下]</color> 该物品不可放入垃圾桶槽位，已取消放下。");
+            return;
+        }
+
         PlayerNetworkController net = GetComponent<PlayerNetworkController>();
 
         if (net != null && NetworkClient.active && item.GetComponent<NetworkIdentity>() != null)
@@ -363,6 +362,23 @@ public class PlayerItemInteractor : MonoBehaviour
         }
 
         TryEndHoldLocal();
+    }
+
+    /// <summary>
+    /// 当前指向的 <see cref="ItemPlacePoint"/> 若属于某 <see cref="BinStation"/>，且手持物满足 <see cref="BinStation.ShouldSuppressTrashPlacement"/>，则不应放入桶内销毁。
+    /// </summary>
+    static bool ShouldSuppressReleaseIntoBin(CarryableItem item, PlayerInteractionSensor sensor)
+    {
+        if (item == null || sensor == null) return false;
+        ItemPlacePoint pp = sensor.GetCurrentPlacePoint();
+        if (pp == null) return false;
+        if (pp.GetComponentInParent<BinStation>() == null) return false;
+        return BinStation.ShouldSuppressTrashPlacement(item);
+    }
+
+    bool ShouldSuppressReleaseIntoBin(CarryableItem item)
+    {
+        return ShouldSuppressReleaseIntoBin(item, sensor);
     }
 
     /// <summary>
@@ -640,6 +656,14 @@ public class PlayerItemInteractor : MonoBehaviour
                 string netIdStr = ni != null ? ni.netId.ToString() : "无NI";
                 Debug.Log($"<color=#FFAA00>[StationK]</color> CmdSetStationInteractState(true) → stationRoot={stationRoot.name} netId={netIdStr} stationTypeName={stationTypeName}");
             }
+            if (debugChopNetworkDiag && activeStation is ChoppingStation chopSend)
+            {
+                NetworkIdentity niChop = stationRoot.GetComponent<NetworkIdentity>();
+                bool sensorMatches = sensor != null && ReferenceEquals(sensor.GetCurrentStation(), activeStation);
+                Debug.Log(
+                    $"[ChopNetDiag] 客户端即将 Cmd Begin | station={chopSend.name} root={stationRoot.name} netId={(niChop != null ? niChop.netId.ToString() : "?")} sensor仍指向此台={sensorMatches}",
+                    this);
+            }
             networkController.CmdSetStationInteractState(stationRoot, true, stationTypeName);
         }
         else
@@ -679,7 +703,15 @@ public class PlayerItemInteractor : MonoBehaviour
         else if (isNetworked && activeStation is Component comp)
         {
             string stationTypeName = GetInteractiveStationTypeName(activeStation);
-            networkController.CmdSetStationInteractState(FindNetworkedGameObject(comp), false, stationTypeName);
+            GameObject stationRoot = FindNetworkedGameObject(comp);
+            if (debugChopNetworkDiag && activeStation is ChoppingStation chopEnd)
+            {
+                NetworkIdentity niChop = stationRoot.GetComponent<NetworkIdentity>();
+                Debug.Log(
+                    $"[ChopNetDiag] 客户端即将 Cmd End | station={chopEnd.name} root={stationRoot.name} netId={(niChop != null ? niChop.netId.ToString() : "?")}",
+                    this);
+            }
+            networkController.CmdSetStationInteractState(stationRoot, false, stationTypeName);
         }
         else
         {
@@ -712,7 +744,14 @@ public class PlayerItemInteractor : MonoBehaviour
         IInteractiveStation station = sensor.GetCurrentStation();
         if (station is BinStation bin)
         {
-            if (bin.TryDumpHeldItem(this, heldItem))
+            if (bin.TryHandleFacing(this, heldItem))
+                return true;
+        }
+        // Station 碰撞体未命中但 PlacePoint 命中垃圾桶时，仍按 Bin 规则处理（与 K 一致）
+        else if (ShouldSuppressReleaseIntoBin(heldItem, sensor))
+        {
+            BinStation binFromPoint = sensor.GetCurrentPlacePoint()?.GetComponentInParent<BinStation>();
+            if (binFromPoint != null && binFromPoint.TryHandleFacing(this, heldItem))
                 return true;
         }
 

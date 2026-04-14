@@ -407,11 +407,11 @@ PrefabInstance:
       objectReference: {fileID: 21300000, guid: d169a04e6d134694199df8c990eebfb8, type: 3}
     - target: {fileID: 720072719967674740, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
       propertyPath: freshnessDuration
-      value: 3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 720072719967674740, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
       propertyPath: rottennessDuration
-      value: 3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1191365486440998169, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
       propertyPath: isUsable
@@ -529,6 +529,7 @@ PrefabInstance:
     - {fileID: 7625046583453187905, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
     - {fileID: 3614473036376660884, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
     - {fileID: 3122082320579666158, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
+    - {fileID: 1428004225202558589, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 4016743043812015211, guid: 98e920435dcfe594d89aa57694e95e8b, type: 3}
       insertIndex: 0

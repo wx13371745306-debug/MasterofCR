@@ -110,10 +110,10 @@ MonoBehaviour:
   - {fileID: 4428252706592054150}
   poseConfig: {fileID: 0}
   sensorHighlight: {fileID: 8115982950613496741}
-  categories: 64
+  categories: 1088
   initialPlacePoint: {fileID: 0}
   isUsable: 0
-  isPickable: 0
+  isPickable: 1
   useHighlightObject: {fileID: 0}
   disableCollidersOnAttach: 1
   leftHandGrip: {fileID: 0}
@@ -121,11 +121,9 @@ MonoBehaviour:
   debugLog: 1
   lastHolderPlayer: {fileID: 0}
   plateCount: 1
-  singlePlatePrefab: {fileID: 2333114217492066870, guid: 49cebbdedb4494b4cb6ed420cf96d610, type: 3}
-  stackPrefab: {fileID: 0}
+  singlePlatePrefab: {fileID: 8549049122132773693, guid: f05b0425177dd954ab25a12d37fb77ba, type: 3}
   stackYOffset: 0.05
   visualRoot: {fileID: 5447718609551752888}
-  maxDispensePerStack: 5
 --- !u!54 &8922402952605187616
 Rigidbody:
   m_ObjectHideFlags: 0

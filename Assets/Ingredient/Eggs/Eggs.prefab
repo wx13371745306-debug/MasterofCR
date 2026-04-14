@@ -147,6 +147,7 @@ GameObject:
   - component: {fileID: 1369196321915004110}
   - component: {fileID: 8921473218158967}
   - component: {fileID: 3726766481549469959}
+  - component: {fileID: 5567734697223414635}
   m_Layer: 3
   m_Name: Eggs
   m_TagString: Untagged
@@ -308,6 +309,29 @@ MonoBehaviour:
   rotationSensitivity: 0.01
   positionPrecision: 0.01
   scalePrecision: 0.01
+--- !u!114 &5567734697223414635
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7883651931078979996}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b7651ff707f03e4dbc303e4ec42225f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DecayableProp
+  freshnessDuration: 1
+  rottennessDuration: 1
+  freshObj: {fileID: 8112222852023731925}
+  staleObj: {fileID: 7325994417177248661}
+  rottenObj: {fileID: 4231604616136033747}
+  itemIcon: {fileID: 21300000, guid: d169a04e6d134694199df8c990eebfb8, type: 3}
+  currentState: 0
+  currentFreshness: 0
+  currentRottenness: 0
+  isInFridge: 0
+  debugLog: 0
 --- !u!1 &8112222852023731925
 GameObject:
   m_ObjectHideFlags: 0

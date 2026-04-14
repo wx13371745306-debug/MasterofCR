@@ -1,5 +1,6 @@
 using UnityEngine;
 using Mirror;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// 自定义网络房间管理器，管理客户端连接与场景切换
@@ -8,6 +9,9 @@ public class CustomNetworkRoomManager : NetworkRoomManager
 {
     [Header("Debug Settings")]
     public bool debugLog = false;
+
+    [Tooltip("与 LobbyUIManager.discoveryDiagLog 配合：断线/连接时多打一条场景与连接快照")]
+    public bool connectionDiagLog = true;
 
     // 【屏蔽原生UI】防止屏幕上出现 Mirror 默认的灰色方块和连通信息
     public override void OnGUI() {}
@@ -59,13 +63,51 @@ public class CustomNetworkRoomManager : NetworkRoomManager
         base.OnRoomClientConnect();
         if (debugLog)
             Debug.Log("[CustomNetworkRoomManager] 本地客户端成功连接服务器");
+        if (connectionDiagLog)
+        {
+            Scene s = SceneManager.GetActiveScene();
+            Debug.Log(
+                $"[NetDiag] OnRoomClientConnect scene={s.name} path={s.path} " +
+                $"RoomScene={RoomScene} IsRoomSceneActive={Utils.IsSceneActive(RoomScene)} " +
+                $"NetworkClient.isConnected={NetworkClient.isConnected}");
+        }
+    }
+
+    public override void OnClientChangeScene(string newSceneName, SceneOperation sceneOperation, bool customHandling)
+    {
+        base.OnClientChangeScene(newSceneName, sceneOperation, customHandling);
+
+        // 切往游戏场景时显示「正在加入」遮罩（Host / Guest 均会收到；单机 StartHost 后跳关同理）
+        if (sceneOperation == SceneOperation.Normal &&
+            GameplayLoadingOverlay.NamesMatchGameplay(GameplayScene, newSceneName) &&
+            GameplayLoadingOverlay.Instance != null)
+        {
+            GameplayLoadingOverlay.Instance.Show();
+        }
     }
 
     public override void OnRoomClientDisconnect()
     {
+        GameplayLoadingOverlay.TryHide();
+
+        if (connectionDiagLog)
+        {
+            Scene s = SceneManager.GetActiveScene();
+            Debug.Log(
+                $"[NetDiag] OnRoomClientDisconnect(进入) scene={s.name} path={s.path} " +
+                $"NetworkClient.active={NetworkClient.active} NetworkClient.isConnected={NetworkClient.isConnected}");
+        }
+
         base.OnRoomClientDisconnect();
         if (debugLog)
             Debug.Log("[CustomNetworkRoomManager] 本地客户端断开连接");
+        if (connectionDiagLog)
+            Debug.Log(
+                $"[NetDiag] OnRoomClientDisconnect(base 后) NetworkClient.active={NetworkClient.active} NetworkClient.isConnected={NetworkClient.isConnected}");
+
+        // 房主 StopHost / 客机掉线 / 服务器关闭：统一把大厅 UI 拉回主菜单（Gameplay 场景无 Instance 时自动跳过）
+        if (LobbyUIManager.Instance != null)
+            LobbyUIManager.Instance.ResetLocalLobbyAfterDisconnect();
     }
 
     // 【新增修复】拦截 Mirror 在所有人准备后默认触发的「全自动跳场景」！

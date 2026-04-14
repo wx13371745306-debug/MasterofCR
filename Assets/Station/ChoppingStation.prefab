@@ -154,6 +154,7 @@ MonoBehaviour:
   angleRange: 45
   swingSpeed: 5
   debugFlickerDiagnostics: 1
+  debugChopNetworkDiag: 1
 --- !u!114 &7633457637363568201
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,7 +175,7 @@ MonoBehaviour:
   - {fileID: 4411372568672821604}
   poseConfig: {fileID: 0}
   sensorHighlight: {fileID: 3046444914030582448}
-  categories: 0
+  categories: 1024
   initialPlacePoint: {fileID: 0}
   isUsable: 0
   isPickable: 1
@@ -182,7 +183,7 @@ MonoBehaviour:
   disableCollidersOnAttach: 0
   leftHandGrip: {fileID: 0}
   rightHandGrip: {fileID: 0}
-  debugLog: 0
+  debugLog: 1
   lastHolderPlayer: {fileID: 0}
 --- !u!114 &2943789578518126812
 MonoBehaviour:

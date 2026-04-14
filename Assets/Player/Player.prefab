@@ -117,7 +117,7 @@ MonoBehaviour:
   playerRoot: {fileID: 403802713317666071}
   sensorOrigin: {fileID: 7745429072234897360}
   interactor: {fileID: 1696173215733838411}
-  debugLog: 1
+  debugLog: 0
 --- !u!65 &8892767367112515968
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -1006,7 +1006,8 @@ MonoBehaviour:
   sensor: {fileID: 1547345450132018411}
   holdPoint: {fileID: 1513223606655305747}
   debugLog: 1
-  debugChoppingHighlightDeny: 1
+  debugChoppingHighlightDeny: 0
+  debugChopNetworkDiag: 1
 --- !u!114 &1008561482671382456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1042,7 +1043,7 @@ MonoBehaviour:
   accessoryTipRate: 0
   hasDash: 0
   originalMass: 1
-  debugLog: 1
+  debugLog: 0
 --- !u!114 &8247370276962769854
 MonoBehaviour:
   m_ObjectHideFlags: 0

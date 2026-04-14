@@ -81,6 +81,8 @@ public class PlayerNetworkController : NetworkBehaviour
 
             if (debugLog) Debug.Log("[PlayerNetworkController] 已将玩家引用和出生点注入 DayCycleManager。");
         }
+
+        GameplayLoadingOverlay.TryHide();
     }
 
     // =========================================================
@@ -135,38 +137,23 @@ public class PlayerNetworkController : NetworkBehaviour
         RpcAcknowledgePickUp(targetItemObj, isLongPress);
     }
 
+    /// <summary>仅 SupplyBox 提货；脏盘堆已改为标准 <see cref="CmdRequestPickUp"/>，勿再经此 Command。</summary>
     [Command]
     public void CmdRequestDispenseBox(GameObject stationObj, bool isLongPress)
     {
         if (stationObj == null) return;
 
-        GameObject generatedObj = null;
-
         SupplyBox supplyBox = stationObj.GetComponent<SupplyBox>();
-        if (supplyBox != null)
-        {
-            generatedObj = supplyBox.ServerDispenseItem(isLongPress);
-        }
-        else
-        {
-            DirtyPlateStack dirtyStack = stationObj.GetComponent<DirtyPlateStack>();
-            if (dirtyStack != null)
-            {
-                generatedObj = dirtyStack.ServerDispenseItem(isLongPress);
-            }
-        }
+        if (supplyBox == null) return;
 
-        if (generatedObj != null)
-        {
-            NetworkIdentity itemIdentity = generatedObj.GetComponent<NetworkIdentity>();
-            if (itemIdentity != null)
-            {
-                itemIdentity.AssignClientAuthority(connectionToClient);
-            }
-            
-            // 下发拾取动作指令给该玩家，如同他刚刚拾取了这个刚生成的物体
-            RpcAcknowledgePickUp(generatedObj, isLongPress);
-        }
+        GameObject generatedObj = supplyBox.ServerDispenseItem(isLongPress);
+        if (generatedObj == null) return;
+
+        NetworkIdentity itemIdentity = generatedObj.GetComponent<NetworkIdentity>();
+        if (itemIdentity != null)
+            itemIdentity.AssignClientAuthority(connectionToClient);
+
+        RpcAcknowledgePickUp(generatedObj, isLongPress);
     }
 
     /// <summary>
@@ -551,6 +538,11 @@ public class PlayerNetworkController : NetworkBehaviour
         if (debugLog)
             Debug.Log($"[StationK/Cmd] Server 执行 {(isInteracting ? "BeginInteract" : "EndInteract")} | station={station.GetType().Name} on {station.gameObject.name} | playerNetId={netId}");
 
+        if (station is ChoppingStation chop && chop.DebugChopNetworkDiag)
+            Debug.Log(
+                $"[ChopNetDiag] Cmd 已到达服务端 → {(isInteracting ? "Begin" : "End")} | station={station.gameObject.name} | playerNetId={netId}",
+                station);
+
         if (isInteracting)
             station.BeginInteract(pi);
         else
@@ -638,6 +630,75 @@ public class PlayerNetworkController : NetworkBehaviour
 
         pot.ForceClear();
         if (debugLog) Debug.Log($"[CmdRequestFryPotDump] Server 已清空锅 {potItemObj.name}");
+    }
+
+    /// <summary>
+    /// 垃圾桶前成品菜 → 空盘：仅服务端销毁 Dish、Spawn 盘子并下发 RpcAcknowledgePickUp，与 <see cref="CmdRequestPlateToolServe"/> 同源。
+    /// </summary>
+    [Command]
+    public void CmdRequestBinDishToPlate(uint binStationRootNetId, GameObject dishObj)
+    {
+        if (dishObj == null) return;
+
+        if (!NetworkServer.spawned.TryGetValue(binStationRootNetId, out NetworkIdentity binRootNi))
+        {
+            if (debugLog)
+                Debug.LogWarning($"[CmdRequestBinDishToPlate] 无效的 binStationRootNetId={binStationRootNetId}");
+            return;
+        }
+
+        BinStation bin = binRootNi.GetComponentInChildren<BinStation>(true);
+        if (bin == null || bin.cleanPlatePrefab == null)
+        {
+            if (debugLog)
+                Debug.LogWarning("[CmdRequestBinDishToPlate] 未找到 BinStation 或 cleanPlatePrefab 为空。");
+            return;
+        }
+
+        NetworkIdentity dishNi = dishObj.GetComponent<NetworkIdentity>();
+        if (dishNi == null)
+        {
+            if (debugLog)
+                Debug.LogWarning("[CmdRequestBinDishToPlate] 菜品缺少 NetworkIdentity，无法联机同步。");
+            return;
+        }
+
+        if (dishNi.connectionToClient != connectionToClient)
+        {
+            if (debugLog)
+                Debug.LogWarning($"[CmdRequestBinDishToPlate] 菜品权威不符 netId={dishNi.netId}");
+            return;
+        }
+
+        CarryableItem dishItem = dishObj.GetComponent<CarryableItem>();
+        if (dishItem == null || dishItem.GetComponent<DishRecipeTag>() == null)
+            return;
+
+        GameObject prefab = bin.cleanPlatePrefab;
+        if (prefab.GetComponent<NetworkIdentity>() == null)
+        {
+            Debug.LogError("[CmdRequestBinDishToPlate] cleanPlatePrefab 必须带 NetworkIdentity，否则无法 Spawn。");
+            return;
+        }
+
+        if (debugLog)
+            Debug.Log($"<color=#FF4444>[CmdRequestBinDishToPlate]</color> Server：{dishObj.name} → 空盘");
+
+        NetworkServer.Destroy(dishObj);
+
+        GameObject plateObj = Object.Instantiate(prefab);
+        CarryableItem plateItem = plateObj.GetComponent<CarryableItem>();
+        NetworkIdentity plateNi = plateObj.GetComponent<NetworkIdentity>();
+        if (plateItem == null || plateNi == null)
+        {
+            Debug.LogError("[CmdRequestBinDishToPlate] cleanPlatePrefab 缺少 CarryableItem 或 NetworkIdentity。");
+            Object.Destroy(plateObj);
+            return;
+        }
+
+        NetworkServer.Spawn(plateObj);
+        plateNi.AssignClientAuthority(connectionToClient);
+        RpcAcknowledgePickUp(plateObj, false);
     }
 
     // =========================================================

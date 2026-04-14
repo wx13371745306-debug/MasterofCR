@@ -1,6 +1,10 @@
 using UnityEngine;
 using Mirror;
 
+/// <summary>
+/// 垃圾桶：J/K 判定顺序为 FryPot（含空锅吞输入）→ DishRecipeTag 转空盘 → BinProtected 吞输入无效果；
+/// 其它物体放入 <see cref="binPlacePoint"/> 会销毁（受保护物见 <see cref="ShouldSuppressTrashPlacement"/>）。
+/// </summary>
 public class BinStation : BaseStation
 {
     [Header("Bin Settings")]
@@ -17,6 +21,7 @@ public class BinStation : BaseStation
             binPlacePoint.OnItemPlacedEvent += OnItemDroppedIntoBin;
     }
 
+
     void OnDestroy()
     {
         if (binPlacePoint != null)
@@ -26,6 +31,16 @@ public class BinStation : BaseStation
     void OnItemDroppedIntoBin(CarryableItem item)
     {
         if (item == null) return;
+
+        if (ShouldSuppressTrashPlacement(item))
+        {
+            Debug.LogWarning(
+                $"[BinStation] 受保护物品不应经槽位销毁: {item.name}。已清除槽位并掉落地面，请检查 ShouldSuppressReleaseIntoBin。",
+                this);
+            binPlacePoint.ClearOccupant();
+            item.DropToGround();
+            return;
+        }
 
         binPlacePoint.ClearOccupant();
 
@@ -46,6 +61,35 @@ public class BinStation : BaseStation
     public override void BeginInteract(PlayerItemInteractor interactor) { }
     public override void EndInteract(PlayerItemInteractor interactor) { }
 
+    /// <summary>
+    /// 手持物不可被「放进垃圾桶槽位销毁」：锅、成品菜组件、或勾选 <see cref="ItemCategory.BinProtected"/>。
+    /// </summary>
+    public static bool ShouldSuppressTrashPlacement(CarryableItem item)
+    {
+        if (item == null) return false;
+        if (item.GetComponent<FryPot>() != null) return true;
+        if (item.GetComponent<DishRecipeTag>() != null) return true;
+        return item.HasBinProtectedCategory();
+    }
+
+    /// <summary>
+    /// 面对本 BinStation：先 <see cref="TryDumpHeldItem"/>（锅/菜）；再处理 <see cref="ItemCategory.BinProtected"/>。
+    /// </summary>
+    public bool TryHandleFacing(PlayerItemInteractor interactor, CarryableItem heldItem)
+    {
+        if (TryDumpHeldItem(interactor, heldItem))
+            return true;
+        // BinProtected 优先于 Accessory 短路，避免饰品等仍需「面对 Bin 无反应」
+        if (heldItem.HasBinProtectedCategory())
+        {
+            if (debugLog)
+                Debug.Log("<color=#FF4444>[BinStation]</color> BinProtected 物品，已忽略本次 J/K。", this);
+            return true;
+        }
+        if (heldItem is AccessoryItem) return false;
+        return false;
+    }
+
     public bool TryDumpHeldItem(PlayerItemInteractor interactor, CarryableItem heldItem)
     {
         if (interactor == null || heldItem == null) return false;
@@ -55,6 +99,7 @@ public class BinStation : BaseStation
         if (pot != null)
             return TryDumpPot(pot, heldItem, interactor);
 
+        // 与 BinProtected 并存时优先成品菜逻辑（勿在成品菜上叠 BinProtected）
         DishRecipeTag dishTag = heldItem.GetComponent<DishRecipeTag>();
         if (dishTag != null)
             return TryConvertDishToPlate(interactor, heldItem);
@@ -67,11 +112,10 @@ public class BinStation : BaseStation
         if (!pot.CanDump())
         {
             if (debugLog)
-                Debug.Log("<color=#FF4444>[BinStation]</color> 锅是空的，无需清空。");
-            return false;
+                Debug.Log("<color=#FF4444>[BinStation]</color> 空锅，无内容可清空。", this);
+            return true;
         }
 
-        // 联机：必须在服务端清空，否则 Guest 本地 ForceClear 无效且会被 FryPotNetworkSync 覆盖
         if (NetworkClient.active)
         {
             PlayerNetworkController net = interactor != null ? interactor.GetComponent<PlayerNetworkController>() : null;
@@ -79,18 +123,18 @@ public class BinStation : BaseStation
             {
                 net.CmdRequestFryPotDump(heldItem.gameObject);
                 if (debugLog)
-                    Debug.Log("<color=#FF4444>[BinStation]</color> 已发起 CmdRequestFryPotDump。");
+                    Debug.Log("<color=#FF4444>[BinStation]</color> 已发起 CmdRequestFryPotDump。", this);
                 return true;
             }
             if (debugLog)
-                Debug.LogWarning("<color=#FF4444>[BinStation]</color> 无 PlayerNetworkController，无法倒锅。");
+                Debug.LogWarning("<color=#FF4444>[BinStation]</color> 无 PlayerNetworkController，无法倒锅。", this);
             return false;
         }
 
         pot.ForceClear();
 
         if (debugLog)
-            Debug.Log("<color=#FF4444>[BinStation]</color> 已清空锅内所有食材和进度。");
+            Debug.Log("<color=#FF4444>[BinStation]</color> 已清空锅内所有食材和进度。", this);
 
         return true;
     }
@@ -107,6 +151,33 @@ public class BinStation : BaseStation
         Transform holdPoint = interactor.GetHoldPoint();
         if (holdPoint == null) return false;
 
+        // 联机：仅服务端生成/销毁，由 RpcAcknowledgePickUp 同步各端手持
+        if (NetworkClient.active)
+        {
+            PlayerNetworkController net = interactor.GetComponent<PlayerNetworkController>();
+            if (net == null)
+            {
+                if (debugLog)
+                    Debug.LogWarning("<color=#FF4444>[BinStation]</color> 无 PlayerNetworkController，无法联机转盘子。");
+                return false;
+            }
+
+            NetworkIdentity binRoot = TryGetNetworkIdentityInParents(transform);
+            if (binRoot == null)
+            {
+                Debug.LogError(
+                    "<color=#FF4444>[BinStation]</color> 联机需要本物体位于带 NetworkIdentity 的层级下（向上查找无 NI）。请在垃圾桶根挂 NetworkIdentity。",
+                    this);
+                return false;
+            }
+
+            net.CmdRequestBinDishToPlate(binRoot.netId, dish.gameObject);
+            if (debugLog)
+                Debug.Log("<color=#FF4444>[BinStation]</color> 已发起 CmdRequestBinDishToPlate。", this);
+            return true;
+        }
+
+        // 单机 / 无 Mirror 客户端
         GameObject plateObj = Instantiate(cleanPlatePrefab);
         CarryableItem plateItem = plateObj.GetComponent<CarryableItem>();
 
@@ -132,5 +203,17 @@ public class BinStation : BaseStation
         else
             Destroy(dish.gameObject);
         return true;
+    }
+
+    static NetworkIdentity TryGetNetworkIdentityInParents(Transform start)
+    {
+        Transform t = start;
+        while (t != null)
+        {
+            NetworkIdentity ni = t.GetComponent<NetworkIdentity>();
+            if (ni != null) return ni;
+            t = t.parent;
+        }
+        return null;
     }
 }

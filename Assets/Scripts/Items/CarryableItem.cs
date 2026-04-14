@@ -109,6 +109,8 @@ public class CarryableItem : NetworkBehaviour
         return (categories & mask) != 0;
     }
 
+    public bool HasBinProtectedCategory() => HasAnyCategory(ItemCategory.BinProtected);
+
     public virtual bool CanBePickedUp()
     {
         return isPickable && state != ItemState.Held;
@@ -341,7 +343,11 @@ public class CarryableItem : NetworkBehaviour
             // 放置失败时恢复 NT，避免关闭同步后卡在默认位姿 (0,0,0)、无父节点
             SetNetworkTransformSync(true);
             if (debugLog)
-                Debug.LogWarning($"[RpcMirrorRegisterAtPlacePoint] TryAcceptItem 失败 item={name} point={pp.name}");
+                Debug.LogWarning($"[ChopNetDiag][RpcMirrorRegisterAtPlacePoint] TryAcceptItem 失败 item={name} point={pp.name}");
+        }
+        else if (debugLog)
+        {
+            Debug.Log($"[ChopNetDiag] RpcMirrorRegisterAtPlacePoint OK item={name} → point={pp.name}");
         }
     }
 
